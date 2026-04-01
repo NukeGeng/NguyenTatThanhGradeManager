@@ -5,6 +5,7 @@ const dotenv = require("dotenv");
 const connectDatabase = require("./config/database");
 const authRoutes = require("./routes/auth");
 const classRoutes = require("./routes/classes");
+const gradeRoutes = require("./routes/grades");
 const studentRoutes = require("./routes/students");
 const errorHandler = require("./middleware/errorHandler");
 
@@ -25,6 +26,7 @@ app.get("/api/health", (req, res) => {
 
 app.use("/api/auth", authRoutes);
 app.use("/api/classes", classRoutes);
+app.use("/api/grades", gradeRoutes);
 app.use("/api/students", studentRoutes);
 
 app.use((req, res) => {

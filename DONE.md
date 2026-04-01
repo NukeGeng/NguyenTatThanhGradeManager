@@ -28,6 +28,12 @@
 - File đã tạo/sửa: backend/src/models/Class.js, backend/src/models/Student.js, backend/src/routes/classes.js, backend/src/routes/students.js, backend/src/index.js
 - Ghi chú: Đã thêm auth middleware cho toàn bộ routes classes/students, có auto tăng/giảm studentCount, đã check syntax không lỗi.
 
+## [DONE-003] Ngày 3 - Grades API + Import Excel/CSV
+
+- Ngày: 01/04/2026
+- File đã tạo/sửa: backend/src/models/Grade.js, backend/src/routes/grades.js, backend/src/services/importService.js, backend/src/templates/grade_import_template.xlsx, backend/package.json, backend/src/index.js
+- Ghi chú: Đã thêm CRUD grades cơ bản, import template/preview/excel bằng multer+xlsx, parse/validate/import dữ liệu điểm, và đã check syntax không lỗi.
+
 ---
 
 ## AI ENGINE
