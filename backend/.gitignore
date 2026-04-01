@@ -1,0 +1,20 @@
+﻿# Dependencies
+node_modules/
+
+# Environment - TUYET DOI khong push
+.env
+.env.local
+.env.production
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+
+# File upload tam
+uploads/
+temp/
+
+# OS
+.DS_Store
+Thumbs.db

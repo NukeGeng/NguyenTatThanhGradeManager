@@ -1,0 +1,24 @@
+﻿# Python cache
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+.Python
+
+# Virtual environment - khong push
+venv/
+env/
+.venv/
+
+# Model files - nang, khong push (chay train.py de tao lai)
+models/*.pkl
+models/*.joblib
+
+# Data gia de train - khong can push
+data/*.csv
+
+# Jupyter
+.ipynb_checkpoints/
+
+# OS
+.DS_Store

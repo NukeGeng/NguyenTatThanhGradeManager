@@ -1,0 +1,29 @@
+﻿# Tat ca node_modules trong moi thu muc con
+**/node_modules/
+
+# Python
+**/__pycache__/
+**/*.pyc
+**/venv/
+**/.venv/
+
+# Model files - nang, train lai duoc, khong can push
+**/models/*.pkl
+**/models/*.joblib
+**/data/*.csv
+
+# Environment files - KHONG BAO GIO push len GitHub
+**/.env
+**/.env.*
+!**/.env.example
+
+# Build output
+**/dist/
+**/.angular/
+
+# Logs
+**/*.log
+
+# OS
+.DS_Store
+Thumbs.db
