@@ -25,6 +25,18 @@ router.get("/", async (req, res, next) => {
     const { classId, status } = req.query;
     const query = {};
 
+    if (req.user.role !== "admin") {
+      const classes = await Class.find({
+        departmentId: {
+          $in: (req.user.departmentIds || []).map((item) =>
+            item?._id ? item._id : item,
+          ),
+        },
+      }).select("_id");
+
+      query.classId = { $in: classes.map((item) => item._id) };
+    }
+
     if (classId) {
       query.classId = classId;
     }
@@ -49,13 +61,31 @@ router.get("/", async (req, res, next) => {
 
 router.get("/:id", async (req, res, next) => {
   try {
-    const student = await Student.findById(req.params.id).populate("classId");
+    const student = await Student.findById(req.params.id).populate(
+      "classId",
+      "name departmentId gradeLevel schoolYearId",
+    );
 
     if (!student) {
       return res.status(404).json({
         success: false,
         message: "Student not found",
       });
+    }
+
+    if (req.user.role !== "admin") {
+      const allowedDepartmentIds = (req.user.departmentIds || []).map((item) =>
+        item?._id ? String(item._id) : String(item),
+      );
+
+      if (
+        !allowedDepartmentIds.includes(String(student.classId?.departmentId))
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "Bạn không có quyền truy cập học sinh này",
+        });
+      }
     }
 
     return res.status(200).json({
@@ -90,6 +120,19 @@ router.post("/", async (req, res, next) => {
       });
     }
 
+    if (req.user.role !== "admin") {
+      const allowedDepartmentIds = (req.user.departmentIds || []).map((item) =>
+        item?._id ? String(item._id) : String(item),
+      );
+
+      if (!allowedDepartmentIds.includes(String(classData.departmentId))) {
+        return res.status(403).json({
+          success: false,
+          message: "Bạn không có quyền tạo học sinh cho lớp này",
+        });
+      }
+    }
+
     await session.withTransaction(async () => {
       const studentCode = await generateStudentCode();
 
@@ -101,8 +144,13 @@ router.post("/", async (req, res, next) => {
             dateOfBirth: dateOfBirth || null,
             gender,
             classId,
+            address: req.body.address || "",
+            parentName: req.body.parentName || "",
             parentPhone: parentPhone || "",
+            parentEmail: req.body.parentEmail || "",
+            avatar: req.body.avatar || "",
             status: status || "active",
+            notes: req.body.notes || "",
           },
         ],
         { session },
@@ -115,7 +163,7 @@ router.post("/", async (req, res, next) => {
       );
 
       const createdStudent = await Student.findById(createdStudents[0]._id)
-        .populate("classId", "name")
+        .populate("classId", "name departmentId gradeLevel schoolYearId")
         .session(session);
 
       res.status(201).json({
@@ -142,8 +190,13 @@ router.put("/:id", async (req, res, next) => {
       "dateOfBirth",
       "gender",
       "classId",
+      "address",
+      "parentName",
       "parentPhone",
+      "parentEmail",
+      "avatar",
       "status",
+      "notes",
     ];
 
     const payload = {};
@@ -170,6 +223,25 @@ router.put("/:id", async (req, res, next) => {
         return;
       }
 
+      if (req.user.role !== "admin") {
+        const currentClass = await Class.findById(
+          currentStudent.classId,
+        ).session(session);
+        const allowedDepartmentIds = (req.user.departmentIds || []).map(
+          (item) => (item?._id ? String(item._id) : String(item)),
+        );
+
+        if (
+          !allowedDepartmentIds.includes(String(currentClass?.departmentId))
+        ) {
+          res.status(403).json({
+            success: false,
+            message: "Bạn không có quyền cập nhật học sinh này",
+          });
+          return;
+        }
+      }
+
       if (
         payload.classId &&
         String(payload.classId) !== String(currentStudent.classId)
@@ -181,6 +253,20 @@ router.put("/:id", async (req, res, next) => {
             message: "New class not found",
           });
           return;
+        }
+
+        if (req.user.role !== "admin") {
+          const allowedDepartmentIds = (req.user.departmentIds || []).map(
+            (item) => (item?._id ? String(item._id) : String(item)),
+          );
+
+          if (!allowedDepartmentIds.includes(String(newClass.departmentId))) {
+            res.status(403).json({
+              success: false,
+              message: "Bạn không có quyền chuyển học sinh sang lớp này",
+            });
+            return;
+          }
         }
 
         await Class.findByIdAndUpdate(
@@ -202,7 +288,7 @@ router.put("/:id", async (req, res, next) => {
       });
 
       const updatedStudent = await Student.findById(req.params.id)
-        .populate("classId", "name")
+        .populate("classId", "name departmentId gradeLevel schoolYearId")
         .session(session);
 
       res.status(200).json({
@@ -233,6 +319,25 @@ router.delete("/:id", async (req, res, next) => {
           message: "Student not found",
         });
         return;
+      }
+
+      if (req.user.role !== "admin") {
+        const studentClass = await Class.findById(student.classId).session(
+          session,
+        );
+        const allowedDepartmentIds = (req.user.departmentIds || []).map(
+          (item) => (item?._id ? String(item._id) : String(item)),
+        );
+
+        if (
+          !allowedDepartmentIds.includes(String(studentClass?.departmentId))
+        ) {
+          res.status(403).json({
+            success: false,
+            message: "Bạn không có quyền xóa học sinh này",
+          });
+          return;
+        }
       }
 
       await Student.findByIdAndDelete(req.params.id, { session });

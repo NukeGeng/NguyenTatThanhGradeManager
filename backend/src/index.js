@@ -4,6 +4,10 @@ const dotenv = require("dotenv");
 
 const connectDatabase = require("./config/database");
 const authRoutes = require("./routes/auth");
+const departmentRoutes = require("./routes/departments");
+const userRoutes = require("./routes/users");
+const schoolYearRoutes = require("./routes/schoolYears");
+const subjectRoutes = require("./routes/subjects");
 const classRoutes = require("./routes/classes");
 const gradeRoutes = require("./routes/grades");
 const studentRoutes = require("./routes/students");
@@ -25,6 +29,10 @@ app.get("/api/health", (req, res) => {
 });
 
 app.use("/api/auth", authRoutes);
+app.use("/api/departments", departmentRoutes);
+app.use("/api/users", userRoutes);
+app.use("/api/school-years", schoolYearRoutes);
+app.use("/api/subjects", subjectRoutes);
 app.use("/api/classes", classRoutes);
 app.use("/api/grades", gradeRoutes);
 app.use("/api/students", studentRoutes);

@@ -27,20 +27,47 @@ const studentSchema = new mongoose.Schema(
       ref: "Class",
       required: [true, "Class is required"],
     },
+    address: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    parentName: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     parentPhone: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    parentEmail: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    avatar: {
       type: String,
       trim: true,
       default: "",
     },
     status: {
       type: String,
-      enum: ["active", "inactive"],
+      enum: ["active", "inactive", "transferred"],
       default: "active",
+    },
+    notes: {
+      type: String,
+      trim: true,
+      default: "",
     },
   },
   {
     timestamps: true,
   },
 );
+
+studentSchema.index({ classId: 1, status: 1 });
 
 module.exports = mongoose.model("Student", studentSchema);

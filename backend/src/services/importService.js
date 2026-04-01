@@ -1,19 +1,9 @@
 const XLSX = require("xlsx");
 const Student = require("../models/Student");
 const Grade = require("../models/Grade");
+const Subject = require("../models/Subject");
 
 const CONDUCT_VALUES = ["Tốt", "Khá", "Trung Bình", "Yếu"];
-
-const SUBJECT_HEADER_MAP = {
-  toan: "Toán",
-  van: "Ngữ Văn",
-  anh: "Tiếng Anh",
-  ly: "Vật Lý",
-  hoa: "Hóa Học",
-  sinh: "Sinh Học",
-  su: "Lịch Sử",
-  dia: "Địa Lý",
-};
 
 const normalizeText = (value) =>
   String(value || "")
@@ -25,38 +15,30 @@ const normalizeText = (value) =>
     .replace(/\s+/g, " ")
     .trim();
 
-const getHeaderKey = (rawHeader) => {
+const getSubjectMap = async () => {
+  const subjects = await Subject.find({ isActive: true }).sort({ name: 1 });
+  return new Map(subjects.map((subject) => [subject.code, subject.name]));
+};
+
+const getHeaderKey = (rawHeader, subjectMap) => {
   const header = normalizeText(rawHeader);
 
-  if (header === "ma hs" || header === "ma hoc sinh") {
-    return "studentCode";
-  }
+  if (header === "ma hs" || header === "ma hoc sinh") return "studentCode";
+  if (header === "ho ten") return "studentName";
+  if (header === "so buoi vang") return "attendanceAbsent";
+  if (header === "hanh kiem") return "conductScore";
 
-  if (header === "ho ten") {
-    return "studentName";
-  }
-
-  if (header === "toan") return "toan";
-  if (header === "ngu van" || header === "van") return "van";
-  if (header === "tieng anh" || header === "anh") return "anh";
-  if (header === "vat ly" || header === "ly") return "ly";
-  if (header === "hoa hoc" || header === "hoa") return "hoa";
-  if (header === "sinh hoc" || header === "sinh") return "sinh";
-  if (header === "lich su" || header === "su") return "su";
-  if (header === "dia ly" || header === "dia") return "dia";
-
-  if (header === "so buoi vang") {
-    return "attendanceAbsent";
-  }
-
-  if (header === "hanh kiem") {
-    return "conductScore";
+  for (const [code, name] of subjectMap.entries()) {
+    const normalizedName = normalizeText(name);
+    if (header === normalizedName || header === normalizeText(code)) {
+      return code;
+    }
   }
 
   return null;
 };
 
-const parseExcelFile = (buffer) => {
+const parseExcelFile = (buffer, subjectMap) => {
   const workbook = XLSX.read(buffer, { type: "buffer" });
   const firstSheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[firstSheetName];
@@ -77,10 +59,8 @@ const parseExcelFile = (buffer) => {
     };
 
     Object.entries(row).forEach(([header, value]) => {
-      const key = getHeaderKey(header);
-      if (!key) {
-        return;
-      }
+      const key = getHeaderKey(header, subjectMap);
+      if (!key) return;
 
       if (key === "studentCode") {
         mappedRow.studentCode = String(value || "").trim();
@@ -109,25 +89,37 @@ const parseExcelFile = (buffer) => {
   });
 };
 
-const validateRows = async (rows, classId, semester, schoolYearId) => {
+const validateRows = async (
+  rows,
+  classId,
+  semester,
+  schoolYearId,
+  subjectMap,
+) => {
   const errors = [];
   const validRows = [];
 
   const normalizedSemester = Number(semester);
-  const normalizedSchoolYear = String(schoolYearId || "").trim();
 
-  if (!classId || !normalizedSemester || !normalizedSchoolYear) {
+  if (!classId || !normalizedSemester || !schoolYearId) {
     return {
       validRows: [],
       errorRows: [
         {
           row: 0,
           studentCode: "",
+          studentName: "",
           error: "Thiếu classId, semester hoặc schoolYearId",
         },
       ],
     };
   }
+
+  const subjectCodes = [...subjectMap.keys()];
+  const subjects = await Subject.find({ code: { $in: subjectCodes } }).select(
+    "_id code",
+  );
+  const subjectEntityMap = new Map(subjects.map((item) => [item.code, item]));
 
   const studentCodes = rows
     .map((row) => String(row.studentCode || "").trim())
@@ -161,24 +153,22 @@ const validateRows = async (rows, classId, semester, schoolYearId) => {
         row: row.row,
         studentCode,
         studentName: row.studentName || "",
-        error: "Không tìm thấy học sinh",
+        error: "Không tìm thấy học sinh trong lớp đã chọn",
       });
       continue;
     }
 
-    const subjects = {};
-    let hasSubjectValue = false;
+    const scores = [];
     let hasRowError = false;
 
-    Object.keys(SUBJECT_HEADER_MAP).forEach((subjectKey) => {
-      const rawValue = row.subjects?.[subjectKey];
-
+    for (const code of subjectCodes) {
+      const rawValue = row.subjects?.[code];
       if (
         rawValue === null ||
         rawValue === undefined ||
         String(rawValue).trim() === ""
       ) {
-        return;
+        continue;
       }
 
       const numericScore = Number(rawValue);
@@ -188,20 +178,33 @@ const validateRows = async (rows, classId, semester, schoolYearId) => {
           row: row.row,
           studentCode,
           studentName: student.fullName,
-          error: `Điểm ${SUBJECT_HEADER_MAP[subjectKey]} không hợp lệ: '${rawValue}'`,
+          error: `Điểm môn ${subjectMap.get(code)} không hợp lệ: '${rawValue}'`,
         });
-        return;
+        break;
       }
 
-      subjects[subjectKey] = numericScore;
-      hasSubjectValue = true;
-    });
+      const subjectEntity = subjectEntityMap.get(code);
+      if (!subjectEntity) {
+        hasRowError = true;
+        errors.push({
+          row: row.row,
+          studentCode,
+          studentName: student.fullName,
+          error: `Môn học ${code} không tồn tại trong hệ thống`,
+        });
+        break;
+      }
 
-    if (hasRowError) {
-      continue;
+      scores.push({
+        subjectId: subjectEntity._id,
+        subjectCode: code,
+        score: numericScore,
+      });
     }
 
-    if (!hasSubjectValue) {
+    if (hasRowError) continue;
+
+    if (scores.length === 0) {
       errors.push({
         row: row.row,
         studentCode,
@@ -225,6 +228,7 @@ const validateRows = async (rows, classId, semester, schoolYearId) => {
     const conductScore = row.conductScore
       ? String(row.conductScore).trim()
       : null;
+
     if (conductScore && !CONDUCT_VALUES.includes(conductScore)) {
       errors.push({
         row: row.row,
@@ -242,19 +246,16 @@ const validateRows = async (rows, classId, semester, schoolYearId) => {
       gradePayload: {
         studentId: student._id,
         classId,
+        schoolYearId,
         semester: normalizedSemester,
-        schoolYear: normalizedSchoolYear,
-        subjects,
+        scores,
         attendanceAbsent,
         conductScore,
       },
     });
   }
 
-  return {
-    validRows,
-    errorRows: errors,
-  };
+  return { validRows, errorRows: errors };
 };
 
 const importValidRows = async (validRows, enteredBy) => {
@@ -264,18 +265,12 @@ const importValidRows = async (validRows, enteredBy) => {
   }));
 
   if (docs.length === 0) {
-    return {
-      importedCount: 0,
-      duplicateErrors: [],
-    };
+    return { importedCount: 0, duplicateErrors: [] };
   }
 
   try {
     const inserted = await Grade.insertMany(docs, { ordered: false });
-    return {
-      importedCount: inserted.length,
-      duplicateErrors: [],
-    };
+    return { importedCount: inserted.length, duplicateErrors: [] };
   } catch (error) {
     if (!error?.writeErrors) {
       throw error;
@@ -288,17 +283,62 @@ const importValidRows = async (validRows, enteredBy) => {
         message: "Đã tồn tại bảng điểm học kỳ này",
       }));
 
-    const insertedCount = docs.length - error.writeErrors.length;
-
-    return {
-      importedCount: insertedCount,
-      duplicateErrors,
-    };
+    const importedCount = docs.length - error.writeErrors.length;
+    return { importedCount, duplicateErrors };
   }
 };
 
+const generateTemplateWorkbook = (subjectMap) => {
+  const workbook = XLSX.utils.book_new();
+  const headers = [
+    "Mã HS",
+    "Họ tên",
+    ...[...subjectMap.values()],
+    "Số buổi vắng",
+    "Hạnh kiểm",
+  ];
+
+  const sampleRows = [
+    [
+      "HS0001",
+      "Nguyễn Văn A",
+      ...[...subjectMap.keys()].map(() => 7.5),
+      2,
+      "Khá",
+    ],
+    ["HS0002", "Trần Thị B", ...[...subjectMap.keys()].map(() => 8), 0, "Tốt"],
+    [
+      "HS0003",
+      "Lê Văn C",
+      ...[...subjectMap.keys()].map(() => 6.5),
+      4,
+      "Trung Bình",
+    ],
+  ];
+
+  const templateSheet = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
+  XLSX.utils.book_append_sheet(workbook, templateSheet, "Template");
+
+  const guideRows = [
+    ["HƯỚNG DẪN IMPORT"],
+    ["- Điểm hợp lệ: 0 đến 10"],
+    ["- Hạnh kiểm hợp lệ: Tốt | Khá | Trung Bình | Yếu"],
+    ["- Mã HS phải đúng với lớp đã chọn"],
+    ["- Danh sách môn hợp lệ:"],
+    ...[...subjectMap.entries()].map(([code, name]) => [`${code}: ${name}`]),
+  ];
+  const guideSheet = XLSX.utils.aoa_to_sheet(guideRows);
+  XLSX.utils.book_append_sheet(workbook, guideSheet, "Hướng dẫn");
+
+  return workbook;
+};
+
 module.exports = {
+  getSubjectMap,
+  normalizeText,
+  getHeaderKey,
   parseExcelFile,
   validateRows,
   importValidRows,
+  generateTemplateWorkbook,
 };

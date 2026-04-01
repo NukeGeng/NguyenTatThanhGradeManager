@@ -26,11 +26,39 @@ const userSchema = new mongoose.Schema(
       enum: ["admin", "teacher"],
       default: "teacher",
     },
+    departmentIds: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Department",
+      },
+    ],
+    phone: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    avatar: {
+      type: String,
+      trim: true,
+      default: "",
+    },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
+    lastLogin: {
+      type: Date,
+      default: null,
+    },
   },
   {
     timestamps: true,
   },
 );
+
+userSchema.virtual("isAdmin").get(function isAdminGetter() {
+  return this.role === "admin";
+});
 
 userSchema.methods.comparePassword = async function comparePassword(
   plainPassword,

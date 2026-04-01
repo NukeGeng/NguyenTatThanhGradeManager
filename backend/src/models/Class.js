@@ -7,16 +7,21 @@ const classSchema = new mongoose.Schema(
       required: [true, "Class name is required"],
       trim: true,
     },
-    grade: {
+    departmentId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Department",
+      required: [true, "departmentId is required"],
+    },
+    gradeLevel: {
       type: Number,
-      required: [true, "Grade is required"],
+      required: [true, "gradeLevel is required"],
       min: 10,
       max: 12,
     },
-    schoolYear: {
-      type: String,
-      required: [true, "School year is required"],
-      trim: true,
+    schoolYearId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "SchoolYear",
+      required: [true, "schoolYearId is required"],
     },
     teacherId: {
       type: mongoose.Schema.Types.ObjectId,
@@ -28,10 +33,16 @@ const classSchema = new mongoose.Schema(
       default: 0,
       min: 0,
     },
+    isActive: {
+      type: Boolean,
+      default: true,
+    },
   },
   {
     timestamps: true,
   },
 );
+
+classSchema.index({ name: 1, schoolYearId: 1 }, { unique: true });
 
 module.exports = mongoose.model("Class", classSchema);

@@ -1,4 +1,5 @@
 # 🎓 HỆ THỐNG QUẢN LÝ HỌC SINH + AI DỰ ĐOÁN KẾT QUẢ
+
 ## Tài liệu Vibe Code — 14 Ngày — Mục tiêu 100 Điểm
 
 ---
@@ -25,10 +26,12 @@
 **Giải pháp:** Web app cho phép nhập điểm học sinh, ML model tự học pattern từ dữ liệu lịch sử và dự đoán kết quả học kỳ tiếp theo, cảnh báo sớm học sinh có nguy cơ.
 
 **Người dùng:**
+
 - Giáo viên chủ nhiệm: nhập điểm, xem cảnh báo, theo dõi học sinh
 - Admin trường: quản lý lớp, giáo viên, tổng quan toàn trường
 
 **Stack công nghệ:**
+
 - Frontend: Angular v21 (Standalone Components + Angular Material)
 - Backend: Node.js + Express
 - AI Engine: Python + FastAPI + scikit-learn
@@ -58,6 +61,7 @@
 ```
 
 **Luồng dữ liệu chính:**
+
 ```
 Giáo viên nhập điểm
   → Node.js lưu vào MongoDB
@@ -80,35 +84,38 @@ student-ai-system/
 │   │   ├── config/
 │   │   │   └── database.js         # Kết nối MongoDB
 │   │   ├── middleware/
-│   │   │   ├── auth.js             # JWT middleware
+│   │   │   ├── auth.js             # Xác thực JWT
+│   │   │   ├── adminOnly.js        # Chỉ Admin mới qua
+│   │   │   ├── departmentAccess.js # GV chỉ truy cập khoa mình
 │   │   │   ├── auditLog.js         # Tự động ghi AuditLog
 │   │   │   └── errorHandler.js     # Xử lý lỗi toàn cục
 │   │   ├── models/
-│   │   │   ├── User.js
-│   │   │   ├── SchoolYear.js       # MỚI
-│   │   │   ├── Subject.js          # MỚI
-│   │   │   ├── Class.js
+│   │   │   ├── User.js             # Thêm departmentIds[]
+│   │   │   ├── Department.js       # MỚI
+│   │   │   ├── SchoolYear.js
+│   │   │   ├── Subject.js          # Thêm departmentId + semester
+│   │   │   ├── Class.js            # Thêm departmentId
 │   │   │   ├── Student.js
 │   │   │   ├── Grade.js
 │   │   │   ├── Prediction.js
-│   │   │   ├── Notification.js     # MỚI
-│   │   │   └── AuditLog.js         # MỚI
+│   │   │   ├── Notification.js
+│   │   │   └── AuditLog.js
 │   │   ├── routes/
 │   │   │   ├── auth.js
-│   │   │   ├── schoolYears.js      # MỚI
-│   │   │   ├── subjects.js         # MỚI
-│   │   │   ├── classes.js
+│   │   │   ├── departments.js      # MỚI
+│   │   │   ├── users.js            # MỚI: Admin quản lý GV
+│   │   │   ├── schoolYears.js
+│   │   │   ├── subjects.js         # Filter theo departmentId + semester
+│   │   │   ├── classes.js          # Filter theo departmentId
 │   │   │   ├── students.js
 │   │   │   ├── grades.js
 │   │   │   ├── predictions.js
-│   │   │   ├── notifications.js    # MỚI
-│   │   │   └── auditLogs.js        # MỚI
+│   │   │   ├── notifications.js
+│   │   │   └── auditLogs.js
 │   │   ├── services/
-│   │   │   ├── aiService.js            # Gọi Python API
-│   │   │   ├── notificationService.js  # Tạo notification tự động
-│   │   │   └── importService.js        # MỚI: parse Excel/CSV, validate, import
-│   │   ├── templates/
-│   │   │   └── grade_import_template.xlsx  # MỚI: file mẫu cho GV tải về
+│   │   │   ├── aiService.js
+│   │   │   ├── notificationService.js
+│   │   │   └── importService.js    # Load Subject theo khoa + học kỳ động
 │   │   └── index.js
 │   ├── .env
 │   └── package.json
@@ -175,55 +182,81 @@ student-ai-system/
 ## 4. ERD DATABASE
 
 ### Sơ đồ quan hệ tổng thể
+
 ```
-SchoolYear ──────────────────────────────────────┐
-    │ (1)                                         │
-    │ (n)                                         │
-  Class ──── (n) ──── User (Teacher)              │
-    │ (1)                                         │
-    │ (n)                                         │
- Student ───────────────────────────────── AuditLog
-    │ (1)                 (1)                  (n)
-    │ (n)               Subject
-   Grade ──── (n:1) ────────────────────────────
-    │ (1)
-    │ (1)
-Prediction
-    │ (1)
-    │ (n)
-Notification
+                    Admin
+                      │ quản lý toàn bộ
+          ┌───────────┼───────────────────┐
+          ▼           ▼                   ▼
+      Department ── Subject ──── User (Teacher)
+          │ (1)       │ (n)        │ (n:n qua departments[])
+          │ (n)       │            │
+        Class ─────────────── Grade
+          │ (1)                    │ (1)
+          │ (n)                    │ (1)
+       Student              Prediction
+                                   │ (1)
+                              Notification
 ```
 
-**Tổng: 9 bảng — 14 quan hệ**
+**Tổng: 10 bảng — 18 quan hệ**
 
 ---
 
-### 1. User (Giáo viên / Admin)
+### 1. User (Admin / Giáo viên)
+
+```
+{
+  _id:            ObjectId,
+  name:           String (required),
+  email:          String (unique, required),        // abc@nttu.edu.vn
+  password:       String (hashed, required),
+  role:           Enum['admin', 'teacher']
+                  (default: 'teacher'),
+  // Chỉ Teacher mới có departmentIds — Admin không thuộc khoa nào
+  departmentIds:  [ObjectId] (ref: Department),     // Giáo viên dạy nhiều khoa
+  phone:          String,
+  avatar:         String,
+  isActive:       Boolean (default: true),
+  lastLogin:      Date,
+  createdAt:      Date,
+  updatedAt:      Date
+}
+Index: email (unique)
+Ràng buộc:
+  - Admin: role='admin', departmentIds=[] (không cần)
+  - Teacher: role='teacher', departmentIds phải có ít nhất 1 khoa
+  - Chỉ Admin mới tạo được tài khoản Teacher và gán departmentIds
+```
+
+### 2. Department (Khoa)
+
 ```
 {
   _id:          ObjectId,
-  name:         String (required),
-  email:        String (unique, required),        // abc@nttu.edu.vn
-  password:     String (hashed, required),
-  role:         Enum['admin', 'teacher']
-                (default: 'teacher'),
-  phone:        String,
-  avatar:       String,                           // URL ảnh đại diện
+  code:         String (unique, required),          // "CNTT", "KTKT", "QTKD"
+  name:         String (required),                  // "Công nghệ Thông tin"
+  description:  String,
+  headId:       ObjectId (ref: User),               // Trưởng khoa
   isActive:     Boolean (default: true),
-  lastLogin:    Date,
   createdAt:    Date,
   updatedAt:    Date
 }
-Index: email (unique)
+Index: code (unique)
+Dữ liệu mẫu:
+  { code: "CNTT", name: "Công nghệ Thông tin" }
+  { code: "KTKT", name: "Kỹ thuật - Kinh tế" }
+  { code: "QTKD", name: "Quản trị Kinh doanh" }
 ```
 
-### 2. SchoolYear (Năm học / Học kỳ)
+### 3. SchoolYear (Năm học / Học kỳ)
+
 ```
 {
   _id:          ObjectId,
   name:         String (required),                // "2024-2025"
-  startDate:    Date (required),                  // 05/09/2024
-  endDate:      Date (required),                  // 31/05/2025
+  startDate:    Date (required),
+  endDate:      Date (required),
   semesters: [
     {
       semesterNumber: Number,                     // 1 hoặc 2
@@ -232,7 +265,7 @@ Index: email (unique)
       isCurrent:      Boolean (default: false)
     }
   ],
-  isCurrent:    Boolean (default: false),         // Năm học hiện tại
+  isCurrent:    Boolean (default: false),
   createdBy:    ObjectId (ref: User),
   createdAt:    Date
 }
@@ -240,105 +273,104 @@ Index: name (unique), isCurrent
 Ràng buộc: Chỉ 1 SchoolYear có isCurrent = true tại một thời điểm
 ```
 
-### 3. Subject (Danh mục môn học)
+### 4. Subject (Môn học)
+
 ```
 {
-  _id:          ObjectId,
-  code:         String (unique, required),        // "TOAN", "VAN", "ANH"
-  name:         String (required),                // "Toán", "Ngữ văn"
-  gradeLevel:   [Number],                         // [10, 11, 12] — áp dụng khối nào
-  coefficient:  Number (default: 1),              // Hệ số môn (Toán hệ số 2)
-  category:     Enum['science', 'social',
-                     'language', 'other'],
-  isActive:     Boolean (default: true),
-  createdAt:    Date
+  _id:            ObjectId,
+  code:           String (unique, required),      // "toan", "ltcb", "ktpm"
+  name:           String (required),              // "Toán", "Lập trình cơ bản"
+  departmentId:   ObjectId (ref: Department, required),  // Môn thuộc khoa nào
+  semester:       Enum[1, 2, 'both']              // Học kỳ nào dạy môn này
+                  (default: 'both'),
+  coefficient:    Number (default: 1, min:1, max:3),
+  category:       Enum['science','social','language','specialized','other'],
+  gradeLevel:     [Number] (default: [10,11,12]),
+  isActive:       Boolean (default: true),
+  createdAt:      Date
 }
-Index: code (unique)
-Dữ liệu mặc định:
-  { code: "TOAN",  name: "Toán",       coefficient: 2, category: "science"  }
-  { code: "VAN",   name: "Ngữ văn",    coefficient: 2, category: "social"   }
-  { code: "ANH",   name: "Tiếng Anh",  coefficient: 1, category: "language" }
-  { code: "LY",    name: "Vật lý",     coefficient: 1, category: "science"  }
-  { code: "HOA",   name: "Hóa học",    coefficient: 1, category: "science"  }
-  { code: "SINH",  name: "Sinh học",   coefficient: 1, category: "science"  }
-  { code: "SU",    name: "Lịch sử",    coefficient: 1, category: "social"   }
-  { code: "DIA",   name: "Địa lý",     coefficient: 1, category: "social"   }
+Index: code (unique), departmentId, semester
+Dữ liệu mẫu khoa CNTT:
+  { code: "ltcb",  name: "Lập trình cơ bản",    semester: 1, departmentId: CNTT }
+  { code: "csdl",  name: "Cơ sở dữ liệu",       semester: 2, departmentId: CNTT }
+  { code: "mmt",   name: "Mạng máy tính",        semester: 2, departmentId: CNTT }
+  { code: "ktpm",  name: "Kỹ thuật phần mềm",    semester: 2, departmentId: CNTT }
 ```
 
-### 4. Class (Lớp học)
+### 5. Class (Lớp học)
+
 ```
 {
-  _id:          ObjectId,
-  name:         String (required),                // "11A1"
-  gradeLevel:   Number (required, enum:[10,11,12]),
-  schoolYearId: ObjectId (ref: SchoolYear, required),
-  teacherId:    ObjectId (ref: User),             // GVCN
-  studentCount: Number (default: 0),
-  description:  String,
-  isActive:     Boolean (default: true),
-  createdAt:    Date,
-  updatedAt:    Date
+  _id:            ObjectId,
+  name:           String (required),              // "CNTT01", "KTKT02"
+  departmentId:   ObjectId (ref: Department, required),  // Lớp thuộc khoa
+  gradeLevel:     Number (required, enum:[10,11,12]),
+  schoolYearId:   ObjectId (ref: SchoolYear, required),
+  teacherId:      ObjectId (ref: User),           // GVCN (phải thuộc khoa này)
+  studentCount:   Number (default: 0),
+  isActive:       Boolean (default: true),
+  createdAt:      Date,
+  updatedAt:      Date
 }
-Index: { name, schoolYearId } (unique) — tên lớp không trùng trong cùng năm học
+Index: { name, schoolYearId } (unique)
 ```
 
-### 5. Student (Học sinh)
+### 6. Student (Học sinh)
+
 ```
 {
   _id:          ObjectId,
-  studentCode:  String (unique, required),        // "HS0001"
+  studentCode:  String (unique, required),
   fullName:     String (required),
   dateOfBirth:  Date,
   gender:       Enum['male', 'female'],
   classId:      ObjectId (ref: Class, required),
   address:      String,
-  parentName:   String,                           // Tên phụ huynh
+  parentName:   String,
   parentPhone:  String,
   parentEmail:  String,
   avatar:       String,
-  status:       Enum['active', 'inactive',
-                     'transferred']               // transferred = chuyển trường
-                (default: 'active'),
-  notes:        String,                           // Ghi chú đặc biệt
+  status:       Enum['active', 'inactive', 'transferred'] (default: 'active'),
+  notes:        String,
   createdAt:    Date,
   updatedAt:    Date
 }
 Index: studentCode (unique), classId, status
 ```
 
-### 6. Grade (Bảng điểm)
+### 7. Grade (Bảng điểm)
+
 ```
 {
-  _id:            ObjectId,
-  studentId:      ObjectId (ref: Student, required),
-  classId:        ObjectId (ref: Class, required),
-  schoolYearId:   ObjectId (ref: SchoolYear, required),
-  semester:       Number (enum:[1,2], required),
-  scores: [                                       // Mảng linh hoạt theo Subject
+  _id:              ObjectId,
+  studentId:        ObjectId (ref: Student, required),
+  classId:          ObjectId (ref: Class, required),
+  departmentId:     ObjectId (ref: Department),       // Cache để query nhanh
+  schoolYearId:     ObjectId (ref: SchoolYear, required),
+  semester:         Number (enum:[1,2], required),
+  scores: [
     {
-      subjectId:  ObjectId (ref: Subject),
-      subjectCode: String,                        // Cache để query nhanh
-      score:      Number (min:0, max:10)
+      subjectId:    ObjectId (ref: Subject),
+      subjectCode:  String,
+      score:        Number (min:0, max:10)
     }
   ],
-  attendanceTotal:   Number (default: 0),         // Tổng số buổi học
-  attendanceAbsent:  Number (default: 0),         // Số buổi vắng
-  attendanceRate:    Number,                      // % chuyên cần (tự tính)
-  conductScore:   Enum['Tốt', 'Khá',
-                       'Trung Bình', 'Yếu'],
-  averageScore:   Number,                         // Tính tự động (có hệ số)
-  ranking:        Enum['Giỏi', 'Khá',
-                       'Trung Bình', 'Yếu'],      // Xếp loại thực tế
-  classRank:      Number,                         // Hạng trong lớp
-  enteredBy:      ObjectId (ref: User),           // Ai nhập điểm
-  createdAt:      Date,
-  updatedAt:      Date
+  attendanceTotal:   Number (default: 0),
+  attendanceAbsent:  Number (default: 0),
+  attendanceRate:    Number,
+  conductScore:      Enum['Tốt','Khá','Trung Bình','Yếu'],
+  averageScore:      Number,
+  ranking:           Enum['Giỏi','Khá','Trung Bình','Yếu'],
+  classRank:         Number,
+  enteredBy:         ObjectId (ref: User),
+  createdAt:         Date,
+  updatedAt:         Date
 }
 Index: { studentId, semester, schoolYearId } (unique)
-Pre-save hook: tự tính averageScore (có hệ số) + attendanceRate + ranking
 ```
 
-### 7. Prediction (Kết quả AI dự đoán)
+### 8. Prediction (Kết quả AI)
+
 ```
 {
   _id:              ObjectId,
@@ -346,136 +378,174 @@ Pre-save hook: tự tính averageScore (có hệ số) + attendanceRate + rankin
   gradeId:          ObjectId (ref: Grade, required),
   schoolYearId:     ObjectId (ref: SchoolYear),
   semester:         Number,
-  predictedRank:    Enum['Giỏi', 'Khá',
-                         'Trung Bình', 'Yếu'],
-  confidence:       Number,                       // 0-100 (%)
-  riskLevel:        Enum['low', 'medium', 'high'],
-  weakSubjects:     [String],                     // Code môn yếu
-  suggestions:      [String],                     // Gợi ý cải thiện
-  analysis:         String,                       // Đoạn phân tích tổng thể
-  modelVersion:     String (default: '1.0'),      // Version model đã dùng
-  inputFeatures:    Object,                       // Lưu input đã dùng để debug
-  isRead:           Boolean (default: false),     // GV đã xem chưa
+  predictedRank:    Enum['Giỏi','Khá','Trung Bình','Yếu'],
+  confidence:       Number,
+  riskLevel:        Enum['low','medium','high'],
+  weakSubjects:     [String],
+  suggestions:      [String],
+  analysis:         String,
+  modelVersion:     String (default: '1.0'),
+  inputFeatures:    Object,
+  isRead:           Boolean (default: false),
   createdAt:        Date
 }
 Index: studentId, gradeId, riskLevel, isRead
 ```
 
-### 8. Notification (Thông báo & Cảnh báo)
+### 9. Notification (Thông báo)
+
 ```
 {
   _id:          ObjectId,
-  userId:       ObjectId (ref: User, required),   // Người nhận
-  type:         Enum[
-                  'risk_alert',                   // Cảnh báo HS có nguy cơ
-                  'grade_entered',                // Điểm vừa được nhập
-                  'prediction_done',              // AI dự đoán xong
-                  'system'                        // Thông báo hệ thống
-                ],
+  userId:       ObjectId (ref: User, required),
+  type:         Enum['risk_alert','grade_entered','prediction_done','system'],
   title:        String (required),
   message:      String (required),
-  data: {                                         // Dữ liệu đính kèm
-    studentId:  ObjectId,
-    classId:    ObjectId,
-    gradeId:    ObjectId,
+  data: {
+    studentId:    ObjectId,
+    classId:      ObjectId,
+    departmentId: ObjectId,
+    gradeId:      ObjectId,
     predictionId: ObjectId
   },
-  priority:     Enum['low', 'normal', 'high']
-                (default: 'normal'),
+  priority:     Enum['low','normal','high'] (default: 'normal'),
   isRead:       Boolean (default: false),
   readAt:       Date,
   createdAt:    Date
 }
 Index: { userId, isRead }, createdAt
-Auto-trigger:
-  → Khi Prediction.riskLevel = 'high'   → tạo notification type='risk_alert'
-  → Khi Grade được tạo                  → tạo notification type='grade_entered'
-  → Khi Prediction xong                 → tạo notification type='prediction_done'
 ```
 
-### 9. AuditLog (Lịch sử thao tác)
+### 10. AuditLog (Lịch sử thao tác)
+
 ```
 {
   _id:          ObjectId,
-  userId:       ObjectId (ref: User, required),   // Ai thực hiện
-  action:       Enum[
-                  'CREATE', 'UPDATE',
-                  'DELETE', 'LOGIN',
-                  'LOGOUT', 'PREDICT'
-                ],
-  resource:     String (required),                // "Student", "Grade", "Class"
-  resourceId:   ObjectId,                         // ID bản ghi bị tác động
-  description:  String,                           // Mô tả ngắn gọn
-  oldData:      Object,                           // Dữ liệu trước khi sửa
-  newData:      Object,                           // Dữ liệu sau khi sửa
+  userId:       ObjectId (ref: User, required),
+  action:       Enum['CREATE','UPDATE','DELETE','LOGIN','LOGOUT','PREDICT'],
+  resource:     String (required),
+  resourceId:   ObjectId,
+  description:  String,
+  oldData:      Object,
+  newData:      Object,
   ipAddress:    String,
   userAgent:    String,
   createdAt:    Date
 }
 Index: userId, action, resource, createdAt
-Retention: Giữ tối đa 90 ngày (TTL index)
-Auto-trigger: Middleware ghi log sau mọi thao tác CREATE/UPDATE/DELETE
+Retention: TTL 90 ngày
 ```
 
 ---
 
 ### Tóm tắt quan hệ
 
-| Bảng | Quan hệ với |
-|------|------------|
-| User | Class (1-n), AuditLog (1-n), Notification (1-n), Grade.enteredBy |
-| SchoolYear | Class (1-n), Grade (1-n) |
-| Subject | Grade.scores (n-n qua array) |
-| Class | Student (1-n), Grade (1-n) |
-| Student | Grade (1-n), Prediction (1-n), Notification (qua data) |
-| Grade | Prediction (1-1), Notification (qua data) |
-| Prediction | Notification (1-1 khi tạo) |
+| Bảng           | Quan hệ với                                                                                |
+| -------------- | ------------------------------------------------------------------------------------------ |
+| **User**       | Department (n:n qua departmentIds[]), Class (1-n GVCN), AuditLog (1-n), Notification (1-n) |
+| **Department** | Subject (1-n), Class (1-n), User/Teacher (n:n)                                             |
+| **SchoolYear** | Class (1-n), Grade (1-n)                                                                   |
+| **Subject**    | Department (n:1), Grade.scores (n-n qua array)                                             |
+| **Class**      | Department (n:1), Student (1-n), Grade (1-n)                                               |
+| **Student**    | Class (n:1), Grade (1-n), Prediction (1-n)                                                 |
+| **Grade**      | Prediction (1-1), Notification (qua data)                                                  |
+| **Prediction** | Notification (1-1 khi tạo)                                                                 |
+
+---
+
+### Ma trận phân quyền
+
+| Chức năng           | Admin | Giáo viên (đúng khoa)    | Giáo viên (sai khoa) |
+| ------------------- | ----- | ------------------------ | -------------------- |
+| Xem tất cả khoa     | ✅    | ❌                       | ❌                   |
+| Tạo/xóa khoa        | ✅    | ❌                       | ❌                   |
+| Tạo tài khoản GV    | ✅    | ❌                       | ❌                   |
+| Gán GV vào khoa     | ✅    | ❌                       | ❌                   |
+| Tạo/xóa môn học     | ✅    | ❌                       | ❌                   |
+| Xem lớp của khoa    | ✅    | ✅                       | ❌                   |
+| Xem học sinh        | ✅    | ✅ (lớp thuộc khoa mình) | ❌                   |
+| Nhập điểm           | ✅    | ✅ (môn thuộc khoa mình) | ❌                   |
+| Xem dự đoán AI      | ✅    | ✅ (lớp thuộc khoa mình) | ❌                   |
+| Báo cáo toàn trường | ✅    | ❌                       | ❌                   |
 
 ---
 
 ## 5. API ENDPOINTS
 
 ### Auth
+
 ```
-POST   /api/auth/register           Đăng ký
 POST   /api/auth/login              Đăng nhập → trả JWT + ghi AuditLog
 POST   /api/auth/logout             Đăng xuất + ghi AuditLog
-GET    /api/auth/me                 Thông tin user hiện tại
+GET    /api/auth/me                 Thông tin user + danh sách khoa của mình
 PUT    /api/auth/change-password    Đổi mật khẩu
 ```
 
+### Departments (Khoa) — Admin only
+
+```
+GET    /api/departments             Danh sách khoa (Admin: tất cả, Teacher: khoa mình)
+GET    /api/departments/:id         Chi tiết khoa + danh sách GV + môn học
+POST   /api/departments             Tạo khoa mới [Admin]
+PUT    /api/departments/:id         Sửa thông tin khoa [Admin]
+DELETE /api/departments/:id         Xóa khoa (chỉ khi không có lớp/môn) [Admin]
+GET    /api/departments/:id/teachers      Danh sách GV thuộc khoa
+GET    /api/departments/:id/subjects      Môn học thuộc khoa (?semester=1)
+GET    /api/departments/:id/classes       Lớp thuộc khoa
+GET    /api/departments/:id/stats         Thống kê tổng quan của khoa [Admin]
+```
+
+### Users — Admin only
+
+```
+GET    /api/users                   Danh sách giáo viên [Admin]
+GET    /api/users/:id               Chi tiết giáo viên
+POST   /api/users                   Tạo tài khoản GV + gán khoa [Admin]
+PUT    /api/users/:id               Sửa thông tin GV [Admin]
+PATCH  /api/users/:id/departments   Cập nhật danh sách khoa của GV [Admin]
+PATCH  /api/users/:id/toggle        Bật/tắt tài khoản [Admin]
+DELETE /api/users/:id               Xóa tài khoản [Admin]
+```
+
 ### SchoolYear (Năm học)
+
 ```
 GET    /api/school-years            Danh sách năm học
-GET    /api/school-years/current    Năm học hiện tại (isCurrent=true)
+GET    /api/school-years/current    Năm học hiện tại
 GET    /api/school-years/:id        Chi tiết năm học
 POST   /api/school-years            Tạo năm học mới [Admin]
-PUT    /api/school-years/:id        Cập nhật năm học [Admin]
+PUT    /api/school-years/:id        Cập nhật [Admin]
 PATCH  /api/school-years/:id/set-current   Đặt làm năm học hiện tại [Admin]
 ```
 
 ### Subjects (Môn học)
+
 ```
-GET    /api/subjects                Danh sách môn học (có filter gradeLevel)
-GET    /api/subjects/:id            Chi tiết môn học
-POST   /api/subjects                Thêm môn học [Admin]
-PUT    /api/subjects/:id            Sửa môn học [Admin]
-PATCH  /api/subjects/:id/toggle     Bật/tắt môn học [Admin]
+GET    /api/subjects                        Môn học (Teacher: chỉ khoa mình)
+GET    /api/subjects?departmentId=&semester= Filter theo khoa + học kỳ
+GET    /api/subjects/:id                    Chi tiết môn
+POST   /api/subjects                        Thêm môn vào khoa [Admin]
+PUT    /api/subjects/:id                    Sửa môn [Admin]
+PATCH  /api/subjects/:id/toggle             Bật/tắt môn [Admin]
+DELETE /api/subjects/:id                    Xóa môn (nếu chưa có điểm) [Admin]
 ```
 
 ### Classes (Lớp học)
+
 ```
-GET    /api/classes                 Danh sách lớp (filter schoolYearId, teacherId)
+GET    /api/classes                 Lớp học (Teacher: chỉ khoa mình)
+GET    /api/classes?departmentId=   Filter theo khoa [Admin]
 GET    /api/classes/:id             Chi tiết lớp
 GET    /api/classes/:id/students    Danh sách học sinh trong lớp
-POST   /api/classes                 Tạo lớp [Admin]
+POST   /api/classes                 Tạo lớp (gán departmentId) [Admin]
 PUT    /api/classes/:id             Sửa lớp
 DELETE /api/classes/:id             Xóa lớp [Admin]
 ```
 
 ### Students (Học sinh)
+
 ```
-GET    /api/students                Danh sách (filter classId, status)
+GET    /api/students                Học sinh (Teacher: lớp thuộc khoa mình)
 GET    /api/students/:id            Chi tiết học sinh
 GET    /api/students/:id/summary    Tóm tắt: điểm + dự đoán + lịch sử
 POST   /api/students                Thêm học sinh
@@ -485,52 +555,47 @@ DELETE /api/students/:id            Xóa [Admin]
 ```
 
 ### Grades (Điểm)
+
 ```
 GET    /api/grades/student/:id           Lịch sử điểm của học sinh
 GET    /api/grades/class/:id             Điểm cả lớp (?semester=&schoolYearId=)
 GET    /api/grades/:id                   Chi tiết 1 bảng điểm
-POST   /api/grades                       Nhập điểm 1 học sinh (form tay)
+POST   /api/grades                       Nhập điểm (môn phải thuộc khoa GV)
 PUT    /api/grades/:id                   Sửa điểm
 DELETE /api/grades/:id                   Xóa điểm [Admin]
 
-// Import hàng loạt
-GET    /api/grades/import/template       Tải file Excel template về
-POST   /api/grades/import/excel          Upload file .xlsx → import hàng loạt
-POST   /api/grades/import/preview        Upload file → preview trước khi lưu (không lưu DB)
-```
-
-**Luồng import Excel:**
-```
-Bước 1: Giáo viên tải template    GET /template → file .xlsx có sẵn cột đúng format
-Bước 2: Điền điểm vào file        Giáo viên điền offline
-Bước 3: Preview trước khi lưu     POST /preview → trả về valid rows + error rows
-Bước 4: Xác nhận import           POST /excel → lưu valid rows, trả báo cáo kết quả
+GET    /api/grades/import/template       Tải template (môn theo khoa GV + học kỳ)
+POST   /api/grades/import/preview        Preview import
+POST   /api/grades/import/excel          Thực hiện import
 ```
 
 ### Predictions (Dự đoán AI)
+
 ```
-POST   /api/predictions/predict           Dự đoán 1 học sinh (nhận gradeId)
-POST   /api/predictions/predict-class     Dự đoán cả lớp (nhận classId)
-GET    /api/predictions/student/:id       Lịch sử dự đoán của học sinh
+POST   /api/predictions/predict           Dự đoán 1 học sinh
+POST   /api/predictions/predict-class     Dự đoán cả lớp
+GET    /api/predictions/student/:id       Lịch sử dự đoán
 GET    /api/predictions/class/:id         Dự đoán mới nhất cả lớp
-GET    /api/predictions/alerts            HS rủi ro cao (riskLevel=high)
+GET    /api/predictions/alerts            HS rủi ro cao (theo khoa GV)
 PATCH  /api/predictions/:id/read          Đánh dấu đã xem
 ```
 
-### Notifications (Thông báo)
+### Notifications
+
 ```
 GET    /api/notifications                 Thông báo của user hiện tại
-GET    /api/notifications/unread-count    Số thông báo chưa đọc
+GET    /api/notifications/unread-count    Số chưa đọc
 PATCH  /api/notifications/:id/read        Đánh dấu đã đọc
 PATCH  /api/notifications/read-all        Đọc tất cả
-DELETE /api/notifications/:id             Xóa thông báo
+DELETE /api/notifications/:id             Xóa
 ```
 
-### AuditLog (Lịch sử thao tác)
+### AuditLog — Admin only
+
 ```
-GET    /api/audit-logs                    Danh sách log [Admin]
-GET    /api/audit-logs?userId=&action=    Filter theo user/action [Admin]
-GET    /api/audit-logs?resource=&resourceId=   Filter theo đối tượng [Admin]
+GET    /api/audit-logs                         Toàn bộ log [Admin]
+GET    /api/audit-logs?userId=&action=         Filter theo user/action
+GET    /api/audit-logs?resource=&resourceId=   Filter theo đối tượng
 ```
 
 ---
@@ -564,6 +629,7 @@ Ngày 14 │ Viết báo cáo + chuẩn bị slide demo
 ## 7. PROMPT VIBE CODE TỪNG NGÀY
 
 > **TEMPLATE CHUẨN** — Dán vào đầu MỌI prompt:
+>
 > ```
 > Tôi đang làm đồ án "Hệ thống Quản lý Học sinh + AI dự đoán kết quả học tập"
 > Stack: Angular v21 | Node.js Express | Python FastAPI | MongoDB Mongoose | JWT Auth
@@ -576,6 +642,7 @@ Ngày 14 │ Viết báo cáo + chuẩn bị slide demo
 ### 📅 NGÀY 1 — Setup + Auth Backend
 
 **Prompt 1.1 — Khởi tạo project:**
+
 ```
 [DÙNG TEMPLATE CHUẨN Ở TRÊN]
 
@@ -588,48 +655,178 @@ Tạo cấu trúc backend Node.js Express với:
 - Dependencies: express mongoose dotenv cors bcryptjs jsonwebtoken nodemon axios
 ```
 
-**Prompt 1.2 — User Model + Auth:**
+**Prompt 1.2 — User + Department Models + Auth + Middleware:**
+
 ```
 [DÙNG TEMPLATE CHUẨN]
 
 Tạo:
-1. src/models/User.js: schema gồm name(String,required), email(unique,required),
-   password(String,required), role(enum:['admin','teacher'], default:'teacher'), createdAt
-   Thêm method comparePassword dùng bcrypt
+1. src/models/Department.js:
+   - code(String,unique,required,uppercase,trim)   // "CNTT", "KTKT"
+   - name(String,required)                          // "Công nghệ Thông tin"
+   - description(String), headId(ObjectId,ref:User)
+   - isActive(Boolean,default:true), timestamps:true
 
-2. src/middleware/auth.js: middleware xác thực JWT, gắn req.user từ token, trả 401 nếu sai
+2. src/models/User.js:
+   - name, email(unique), password(hashed), role(enum:['admin','teacher'])
+   - departmentIds([ObjectId],ref:'Department',default:[])
+     Admin luôn để [], Teacher phải có ít nhất 1 khoa
+   - phone, avatar, isActive(default:true), lastLogin(Date), timestamps:true
+   - Method comparePassword dùng bcrypt
+   - Virtual 'isAdmin': return this.role === 'admin'
 
-3. src/routes/auth.js:
-   - POST /api/auth/register: validate input, hash password, tạo user, trả JWT
-   - POST /api/auth/login: tìm user, so password, trả JWT 7 ngày
-   - GET /api/auth/me: cần auth middleware, trả thông tin user (bỏ password)
+3. src/middleware/auth.js:
+   JWT middleware, gắn req.user từ token
+   Payload JWT bao gồm: { id, role, departmentIds }
+   Trả 401 nếu không có token hoặc token hết hạn
 
-4. src/middleware/errorHandler.js: middleware xử lý lỗi toàn cục, trả JSON {success:false, message}
+4. src/middleware/adminOnly.js:
+   Kiểm tra req.user.role === 'admin'
+   Trả 403 "Chỉ Admin mới có quyền thực hiện" nếu không phải
+
+5. src/middleware/departmentAccess.js:
+   Nhận departmentId từ params/body/query (theo thứ tự ưu tiên)
+   Nếu Admin → next() luôn
+   Nếu Teacher → kiểm tra departmentId.toString() có trong req.user.departmentIds không
+   Nếu không thuộc → 403 "Bạn không có quyền truy cập khoa này"
+
+6. src/routes/auth.js:
+   - POST /api/auth/login: tìm user, so password, cập nhật lastLogin
+     Trả JWT 7 ngày + { user: { id, name, email, role, departmentIds } }
+   - POST /api/auth/logout: ghi AuditLog
+   - GET /api/auth/me: populate departmentIds (chỉ lấy _id, code, name)
+   - PUT /api/auth/change-password
+
+7. src/routes/departments.js:
+   - GET /api/departments:
+     Admin → tất cả khoa
+     Teacher → chỉ khoa có trong departmentIds của mình
+   - GET /api/departments/:id: populate subjects(isActive) và teachers
+   - GET /api/departments/:id/subjects?semester=: môn học theo khoa + filter học kỳ
+   - GET /api/departments/:id/classes: lớp thuộc khoa
+   - GET /api/departments/:id/stats [adminOnly]: thống kê tổng quan khoa
+   - POST /api/departments [adminOnly]: tạo khoa
+   - PUT /api/departments/:id [adminOnly]: sửa thông tin
+   - DELETE /api/departments/:id [adminOnly]:
+     Kiểm tra không có Class hoặc Subject nào → mới cho xóa
+
+8. src/routes/users.js [adminOnly toàn bộ]:
+   - GET /api/users?departmentId=: danh sách GV, populate departmentIds
+   - GET /api/users/:id: chi tiết + khoa đang dạy
+   - POST /api/users: tạo GV, validate departmentIds không rỗng nếu role=teacher
+   - PUT /api/users/:id: sửa thông tin cơ bản
+   - PATCH /api/users/:id/departments: gán/bỏ khoa, validate các departmentId tồn tại
+   - PATCH /api/users/:id/toggle: bật/tắt isActive
+   - DELETE /api/users/:id: không cho xóa admin cuối cùng
+
+9. src/middleware/errorHandler.js: trả JSON { success:false, message, errors? }
 ```
 
 ---
 
-### 📅 NGÀY 2 — CRUD Students + Classes
+### 📅 NGÀY 2 — CRUD Students + Classes + Subjects
 
 **Prompt 2.1 — Models:**
+
 ```
 [DÙNG TEMPLATE CHUẨN]
 
-Tạo 2 Mongoose models:
+Tạo 3 Mongoose models:
 
-1. src/models/Class.js:
-   - name(String,required), grade(Number,required,min:10,max:12)
-   - schoolYear(String,required), teacherId(ObjectId,ref:User)
-   - studentCount(Number,default:0), timestamps:true
+1. src/models/Subject.js:
+   - code(String, unique, required, lowercase, trim)  // "toan", "van" — KHÔNG cho sửa sau khi tạo
+   - name(String, required)                           // "Toán", "Ngữ Văn" — tên hiển thị
+   - coefficient(Number, default:1, min:1, max:3)     // hệ số tính điểm TB
+   - category(enum:['science','social','language','other'], default:'other')
+   - gradeLevel([Number], default:[10,11,12])          // áp dụng cho khối nào
+   - isActive(Boolean, default:true)
+   - timestamps:true
+   Thêm index: code(unique), isActive
 
-2. src/models/Student.js:
+2. src/models/Class.js:
+   - name(String,required), gradeLevel(Number,required,min:10,max:12)
+   - schoolYearId(ObjectId,ref:SchoolYear), teacherId(ObjectId,ref:User)
+   - studentCount(Number,default:0), isActive(Boolean,default:true), timestamps:true
+
+3. src/models/Student.js:
    - studentCode(String,unique,required), fullName(String,required)
    - dateOfBirth(Date), gender(enum:['male','female'])
-   - classId(ObjectId,ref:Class,required), parentPhone(String)
-   - status(enum:['active','inactive'],default:'active'), timestamps:true
+   - classId(ObjectId,ref:Class,required), parentPhone(String), parentName(String)
+   - status(enum:['active','inactive','transferred'],default:'active'), timestamps:true
 ```
 
-**Prompt 2.2 — Routes CRUD:**
+**Prompt 2.2 — Subject Routes (Admin + Department filter):**
+
+```
+[DÙNG TEMPLATE CHUẨN]
+
+Tạo src/routes/subjects.js:
+- GET /api/subjects:
+  Admin → tất cả môn, hỗ trợ filter ?departmentId=&semester=&isActive=
+  Teacher → chỉ môn thuộc các khoa trong departmentIds của mình
+  Populate departmentId (chỉ lấy code, name)
+- GET /api/subjects/:id: chi tiết môn
+- POST /api/subjects [adminOnly]:
+  Bắt buộc có departmentId (phải tồn tại trong DB)
+  Bắt buộc có semester (1, 2, hoặc 'both')
+  Validate code: chỉ chứa a-z và số, không dấu cách, unique toàn hệ thống
+- PUT /api/subjects/:id [adminOnly]:
+  Cho sửa: name, coefficient, category, gradeLevel, semester, departmentId
+  KHÔNG cho sửa code
+- PATCH /api/subjects/:id/toggle [adminOnly]: bật/tắt isActive
+- DELETE /api/subjects/:id [adminOnly]:
+  Kiểm tra Grade nào có subjectCode này không → nếu có thì từ chối xóa
+```
+
+**Prompt 2.3 — Seed data mặc định (Department + Subject + Users):**
+
+```
+[DÙNG TEMPLATE CHUẨN]
+
+Trong file src/scripts/seedData.js, seed theo thứ tự sau:
+
+// 1. Seed khoa mặc định
+const departments = [
+  { code: "CNTT", name: "Công nghệ Thông tin" },
+  { code: "KTKT", name: "Kỹ thuật - Kinh tế" },
+  { code: "QTKD", name: "Quản trị Kinh doanh" },
+];
+
+// 2. Seed môn học theo từng khoa + học kỳ
+const subjects = [
+  // Khoa CNTT - HK1
+  { code: "ltcb",  name: "Lập trình cơ bản",    departmentCode: "CNTT", semester: 1, coefficient: 2 },
+  { code: "tthcm", name: "Tư tưởng HCM",         departmentCode: "CNTT", semester: 1, coefficient: 1 },
+  // Khoa CNTT - HK2
+  { code: "csdl",  name: "Cơ sở dữ liệu",        departmentCode: "CNTT", semester: 2, coefficient: 2 },
+  { code: "mmt",   name: "Mạng máy tính",         departmentCode: "CNTT", semester: 2, coefficient: 1 },
+  { code: "ktpm",  name: "Kỹ thuật phần mềm",     departmentCode: "CNTT", semester: 2, coefficient: 2 },
+  // Khoa KTKT - HK1
+  { code: "co",    name: "Cơ học",                departmentCode: "KTKT", semester: 1, coefficient: 2 },
+  { code: "vl",    name: "Vật lý đại cương",      departmentCode: "KTKT", semester: 1, coefficient: 1 },
+  // Khoa QTKD - HK1
+  { code: "ktvm",  name: "Kinh tế vi mô",         departmentCode: "QTKD", semester: 1, coefficient: 2 },
+  { code: "ktvm2", name: "Kinh tế vĩ mô",         departmentCode: "QTKD", semester: 2, coefficient: 2 },
+];
+// Map departmentCode → departmentId sau khi seed department xong
+
+// 3. Seed users
+// 1 Admin (không có departmentIds)
+{ email: "admin@nttu.edu.vn", password: "Admin@123", role: "admin", departmentIds: [] }
+// 2 Giáo viên (có departmentIds)
+{ email: "gv1@nttu.edu.vn", password: "Teacher@123", role: "teacher", departmentIds: [CNTT._id] }
+{ email: "gv2@nttu.edu.vn", password: "Teacher@123", role: "teacher", departmentIds: [CNTT._id, KTKT._id] }
+
+// 4. Seed classes (gán departmentId)
+// 3 lớp: CNTT01 (CNTT), CNTT02 (CNTT), KTKT01 (KTKT)
+
+// 5. Seed students + grades + run predictions như cũ
+
+Dùng insertMany với ordered:false, chạy nhiều lần không bị lỗi.
+```
+
+**Prompt 2.4 — Routes CRUD Students + Classes:**
+
 ```
 [DÙNG TEMPLATE CHUẨN]
 
@@ -652,7 +849,8 @@ Tạo tương tự src/routes/classes.js với CRUD đầy đủ cho Class.
 
 ### 📅 NGÀY 3 — Grades API
 
-**Prompt 3.1 — Grade Model:**
+**Prompt 3.1 — Grade Model (dùng Subject động từ DB):**
+
 ```
 [DÙNG TEMPLATE CHUẨN]
 
@@ -661,17 +859,25 @@ Tạo src/models/Grade.js:
 - classId(ObjectId,ref:Class,required)
 - semester(Number,enum:[1,2],required)
 - schoolYear(String,required)
-- subjects: object chứa toan,van,anh,ly,hoa,sinh,su,dia (đều Number,min:0,max:10)
-- attendanceAbsent(Number,default:0) — số buổi vắng
+- subjects: Map (key=subjectCode, value=Number 0-10)
+  Dùng kiểu Map thay vì Object cứng để linh hoạt theo môn học trong DB
+  Ví dụ: subjects = { "toan": 8.5, "van": 7.0, "tin": 9.0 }
+- attendanceAbsent(Number,default:0)
 - conductScore(enum:['Tốt','Khá','Trung Bình','Yếu'])
-- averageScore(Number) — tính tự động
+- averageScore(Number)   — tính tự động có hệ số
+- ranking(enum:['Giỏi','Khá','Trung Bình','Yếu'])  — tự xếp loại
+- enteredBy(ObjectId,ref:User)
 - timestamps:true
-- Index unique: {studentId, semester, schoolYear} — 1 HS chỉ có 1 bảng điểm/học kỳ
+- Index unique: {studentId, semester, schoolYear}
 
-Thêm pre-save hook để tự tính averageScore từ trung bình các môn (bỏ qua môn null/undefined)
+Thêm pre-save hook:
+  1. Load tất cả Subject isActive=true từ DB
+  2. Tính averageScore theo hệ số: Σ(điểm × hệ số) / Σ(hệ số) — bỏ qua môn null
+  3. Tự xếp ranking: ≥8.0 → Giỏi, ≥6.5 → Khá, ≥5.0 → Trung Bình, <5.0 → Yếu
 ```
 
 **Prompt 3.2 — Grades Routes:**
+
 ```
 [DÙNG TEMPLATE CHUẨN]
 
@@ -685,75 +891,71 @@ Tạo src/routes/grades.js:
   Trả về mảng có populate thông tin học sinh
 ```
 
-**Prompt 3.3 — Import Excel/CSV:**
+**Prompt 3.3 — Import Excel/CSV (môn học động từ DB):**
+
 ```
 [DÙNG TEMPLATE CHUẨN]
 
 Cài thêm package: npm install xlsx multer
 
-Tạo src/services/importService.js với các hàm:
+Tạo src/services/importService.js — KHÔNG hardcode môn học,
+toàn bộ danh sách môn load từ Subject collection:
 
-1. parseExcelFile(buffer):
-   - Dùng xlsx để đọc file .xlsx hoặc .csv
-   - Map cột theo header: Mã HS, Toán, Ngữ Văn, Tiếng Anh,
-     Vật Lý, Hóa Học, Sinh Học, Lịch Sử, Địa Lý,
-     Số buổi vắng, Hạnh kiểm
-   - Trả về mảng raw rows
+1. getSubjectMap():
+   - Load Subject.find({ isActive: true }) từ DB
+   - Trả về Map: { "toan": "Toán", "van": "Ngữ Văn", ... }
+   - Dùng cho cả việc nhận dạng cột Excel lẫn validate điểm
 
-2. validateRows(rows, classId, semester, schoolYearId):
-   - Với mỗi row: tìm Student theo studentCode trong classId
-   - Kiểm tra điểm hợp lệ: 0 ≤ điểm ≤ 10, là số
-   - Kiểm tra hạnh kiểm: chỉ nhận 'Tốt','Khá','Trung Bình','Yếu'
-   - Trả về:
-     {
-       validRows: [...],   // hợp lệ, sẵn sàng import
-       errorRows: [        // lỗi, kèm lý do
-         { row: 5, studentCode: "HS001", error: "Không tìm thấy học sinh" },
-         { row: 7, studentCode: "HS003", error: "Điểm Toán không hợp lệ: 'abc'" }
-       ]
-     }
+2. normalizeText(value):
+   - Chuẩn hóa chuỗi: bỏ dấu, lowercase, trim
+   - Dùng để so khớp tên cột Excel không phân biệt dấu
 
-3. importValidRows(validRows, enteredBy):
-   - Dùng insertMany với ordered:false
-   - Bỏ qua duplicate (đã có điểm học kỳ đó rồi)
-   - Trả về số lượng imported thành công
+3. getHeaderKey(rawHeader, subjectMap):
+   - Normalize rawHeader
+   - Match cột cố định: "ma hs" → studentCode, "ho ten" → studentName,
+     "so buoi vang" → attendanceAbsent, "hanh kiem" → conductScore
+   - Match môn học: so normalize(subjectMap[code]) với header
+     hoặc code === header → trả về code
+   - KHÔNG hardcode tên môn — hoàn toàn dựa vào subjectMap từ DB
 
-Tạo src/routes/grades.js bổ sung thêm 3 routes:
+4. parseExcelFile(buffer, subjectMap):
+   - Đọc sheet đầu tiên bằng xlsx
+   - Map từng row theo getHeaderKey(header, subjectMap)
+   - Trả về mảng raw rows với: row, studentCode, studentName,
+     attendanceAbsent, conductScore, subjects(Map động)
+
+5. validateRows(rows, classId, semester, schoolYearId, subjectMap):
+   - Tìm student theo studentCode trong classId
+   - Validate điểm: 0 ≤ điểm ≤ 10, là số hợp lệ
+   - Validate hạnh kiểm: Tốt / Khá / Trung Bình / Yếu
+   - Trả về { validRows, errorRows: [{ row, studentCode, studentName, error }] }
+
+6. importValidRows(validRows, enteredBy):
+   - insertMany với ordered:false
+   - Bắt lỗi duplicate key (code 11000) → báo cáo riêng
+   - Trả về { importedCount, duplicateErrors }
+
+Tạo src/routes/grades.js bổ sung 3 import routes:
 
 - GET /api/grades/import/template:
-  Đọc file src/templates/grade_import_template.xlsx
-  Trả về file download với header Content-Disposition
+  Gọi getSubjectMap() để lấy danh sách môn HIỆN TẠI từ DB
+  Generate file .xlsx động bằng xlsx:
+    Hàng 1: Header màu xanh — "Mã HS", "Họ tên",
+             [tên từng môn theo subjectMap], "Số buổi vắng", "Hạnh kiểm"
+    Hàng 2-4: 3 dòng mẫu màu xám
+    Sheet 2 "Hướng dẫn": ghi rõ quy tắc điền, danh sách môn hợp lệ
+  Trả về file download — KHÔNG dùng file tĩnh
 
 - POST /api/grades/import/preview:
-  Dùng multer nhận file (field name: 'file', max 5MB, chỉ .xlsx/.csv)
+  Multer nhận file (field: 'file', max 5MB, chỉ .xlsx/.csv)
   Nhận body: classId, semester, schoolYearId
-  Gọi parseExcelFile + validateRows
-  KHÔNG lưu DB, chỉ trả về preview:
-  {
-    totalRows: 30,
-    validCount: 28,
-    errorCount: 2,
-    validRows: [...],
-    errorRows: [{ row, studentCode, studentName, error }]
-  }
+  Gọi getSubjectMap() → parseExcelFile() → validateRows()
+  KHÔNG lưu DB, trả về preview:
+  { totalRows, validCount, errorCount, validRows, errorRows }
 
 - POST /api/grades/import/excel:
-  Tương tự preview nhưng LƯU validRows vào DB
-  Trả về:
-  {
-    success: true,
-    imported: 28,
-    skipped: 2,
-    errors: [{ row, studentCode, error }]
-  }
-
-Tạo file src/templates/grade_import_template.xlsx bằng xlsx package:
-Hàng 1: Header tiếng Việt có màu xanh
-Hàng 2-4: 3 dòng dữ liệu mẫu màu xám (HS001, HS002, HS003)
-Các cột: Mã HS | Họ tên | Toán | Ngữ Văn | Tiếng Anh |
-         Vật Lý | Hóa Học | Sinh Học | Lịch Sử | Địa Lý |
-         Số buổi vắng | Hạnh kiểm
-Thêm sheet thứ 2 tên "Hướng dẫn" ghi rõ quy tắc điền
+  Tương tự preview + gọi thêm importValidRows()
+  Trả về: { success, imported, skipped, duplicates, errors }
 ```
 
 ---
@@ -761,6 +963,7 @@ Thêm sheet thứ 2 tên "Hướng dẫn" ghi rõ quy tắc điền
 ### 📅 NGÀY 4 — AI Engine: Generate Data + Train Model
 
 **Prompt 4.1 — Generate Data:**
+
 ```
 Tôi cần file Python ai-engine/data/generate_data.py để tạo dữ liệu giả train ML model.
 
@@ -783,6 +986,7 @@ Lưu ra data/students.csv và in ra phân phối nhãn.
 ```
 
 **Prompt 4.2 — Train Model:**
+
 ```
 Tôi cần file Python ai-engine/train.py để train ML model phân loại học lực.
 
@@ -806,6 +1010,7 @@ In ra feature importance để kiểm tra model học đúng không.
 ### 📅 NGÀY 5 — Python FastAPI
 
 **Prompt 5.1 — FastAPI Server:**
+
 ```
 Tôi cần file Python ai-engine/main.py — FastAPI server chạy port 5000.
 
@@ -837,6 +1042,7 @@ Dùng uvicorn, thêm CORS cho phép origin http://localhost:3000
 ### 📅 NGÀY 6 — Node.js gọi AI + Predictions API
 
 **Prompt 6.1 — AI Service + Predictions:**
+
 ```
 [DÙNG TEMPLATE CHUẨN]
 
@@ -866,6 +1072,7 @@ Tạo src/routes/predictions.js:
 ### 📅 NGÀY 7 — Test Backend
 
 **Prompt 7.1 — Test Checklist:**
+
 ```
 Tôi cần file backend/TEST_CHECKLIST.md liệt kê tất cả test cases cần kiểm tra bằng Postman
 cho hệ thống quản lý học sinh. Bao gồm:
@@ -882,6 +1089,7 @@ Format: method | endpoint | body | expected response
 ### 📅 NGÀY 8 — Setup Angular + Auth UI
 
 **Prompt 8.1 — Setup Angular:**
+
 ```
 [DÙNG TEMPLATE CHUẨN]
 
@@ -911,6 +1119,7 @@ Tạo Angular v21 standalone app với cấu trúc sau:
 ```
 
 **Prompt 8.2 — Login UI:**
+
 ```
 [DÙNG TEMPLATE CHUẨN]
 
@@ -928,6 +1137,7 @@ Tạo features/auth/login/login.component.ts (standalone, Angular v21):
 ### 📅 NGÀY 9 — Dashboard
 
 **Prompt 9.1 — Dashboard:**
+
 ```
 [DÙNG TEMPLATE CHUẨN]
 
@@ -952,9 +1162,80 @@ Dùng Angular Material + màu sắc:
 
 ---
 
-### 📅 NGÀY 10 — Quản lý Lớp + Học sinh
+### 📅 NGÀY 10 — Quản lý Khoa + Môn học + Lớp + Học sinh
+
+**Prompt 10.1 — Department Management (Admin):**
+
+```
+[DÙNG TEMPLATE CHUẨN]
+
+Tạo features/departments/department-list/department-list.component.ts:
+Chỉ hiện với Admin, guard route.
+
+Giao diện:
+1. BẢNG KHOA: Mã khoa | Tên khoa | Số môn | Số lớp | Số GV | Thao tác
+   Nút: Xem chi tiết, Sửa, Xóa
+
+2. DIALOG tạo/sửa khoa: Mã (code, readonly khi sửa), Tên khoa, Mô tả, Trưởng khoa
+
+Tạo features/departments/department-detail/department-detail.component.ts:
+Hiện 3 tab:
+  Tab 1 "Môn học": danh sách môn thuộc khoa, filter theo học kỳ (HK1/HK2/Tất cả)
+    Nút Thêm môn, Sửa, Bật/Tắt
+  Tab 2 "Lớp học": danh sách lớp thuộc khoa theo năm học
+  Tab 3 "Giáo viên": danh sách GV đang dạy khoa này
+```
+
+**Prompt 10.2 — User/Teacher Management (Admin):**
+
+```
+[DÙNG TEMPLATE CHUẨN]
+
+Tạo features/users/user-list/user-list.component.ts [Admin only]:
+
+BẢNG GIÁO VIÊN: Họ tên | Email | Khoa đang dạy | Trạng thái | Thao tác
+  - Cột "Khoa đang dạy": hiện chip cho mỗi khoa (vd: [CNTT] [KTKT])
+  - Nút: Sửa thông tin, Phân khoa, Bật/Tắt tài khoản
+
+DIALOG "Tạo tài khoản GV":
+  - Họ tên, email (@nttu.edu.vn), mật khẩu tạm
+  - Phân khoa: checkbox list các khoa đang active
+  - Validate: phải chọn ít nhất 1 khoa
+
+DIALOG "Phân khoa":
+  - Hiện danh sách tất cả khoa
+  - Checkbox khoa đang dạy (đã chọn sẵn theo data hiện tại)
+  - Nút Lưu → PATCH /api/users/:id/departments
+
+Lưu ý: Admin không có trong danh sách GV này.
+Admin quản lý admin qua màn hình Settings riêng.
+```
+
+**Prompt 10.3 — Subject Management (Admin):**
+
+```
+[DÙNG TEMPLATE CHUẨN]
+
+Tạo features/subjects/subject-list/subject-list.component.ts [Admin only]:
+
+BẢNG MÔN HỌC:
+  Mã môn | Tên môn | Khoa | Học kỳ | Hệ số | Trạng thái | Thao tác
+  Filter: dropdown Khoa + dropdown Học kỳ (HK1/HK2/Tất cả) + toggle Chỉ active
+
+DIALOG thêm/sửa môn:
+  - Mã môn (code): chỉ a-z+số, readonly khi sửa
+  - Tên môn (name): required
+  - Khoa (departmentId): dropdown các khoa active [Admin]
+  - Học kỳ (semester): radio HK1 / HK2 / Cả hai
+  - Hệ số (coefficient): 1-3
+  - Khối áp dụng: checkbox [10] [11] [12]
+
+Cảnh báo khi xóa:
+  "Môn này đã có dữ liệu điểm. Hãy TẮT thay vì XÓA để giữ lịch sử."
+```
 
 **Prompt 10.1 — Class Management:**
+
 ```
 [DÙNG TEMPLATE CHUẨN]
 
@@ -970,6 +1251,7 @@ Tạo features/classes/:
 ```
 
 **Prompt 10.2 — Student Management:**
+
 ```
 [DÙNG TEMPLATE CHUẨN]
 
@@ -993,6 +1275,7 @@ Tạo features/students/:
 ### 📅 NGÀY 11 — Nhập Điểm + Import Excel + Gọi AI
 
 **Prompt 11.1 — Grade Entry (nhập tay):**
+
 ```
 [DÙNG TEMPLATE CHUẨN]
 
@@ -1012,6 +1295,7 @@ Dùng MatStepper cho 3 bước.
 ```
 
 **Prompt 11.2 — Import Excel/CSV:**
+
 ```
 [DÙNG TEMPLATE CHUẨN]
 
@@ -1060,6 +1344,7 @@ Lưu ý Angular:
 ### 📅 NGÀY 12 — Trang Kết Quả AI
 
 **Prompt 12.1 — Prediction Report:**
+
 ```
 [DÙNG TEMPLATE CHUẨN]
 
@@ -1089,6 +1374,7 @@ Tạo thêm features/predictions/class-predictions.component.ts:
 ### 📅 NGÀY 13 — Polish + Fix Bug
 
 **Prompt 13.1 — Navbar + Sidebar:**
+
 ```
 [DÙNG TEMPLATE CHUẨN]
 
@@ -1102,6 +1388,7 @@ Tạo shared/components/layout/layout.component.ts (shell component):
 ```
 
 **Prompt 13.2 — Error Handling:**
+
 ```
 [DÙNG TEMPLATE CHUẨN]
 
@@ -1122,6 +1409,7 @@ Tạo shared/components/error-handling:
 ### 📅 NGÀY 14 — Báo Cáo + Demo
 
 **Prompt 14.1 — Chuẩn bị demo data:**
+
 ```
 [DÙNG TEMPLATE CHUẨN]
 
@@ -1141,6 +1429,7 @@ Thêm script vào package.json: "seed": "node src/scripts/seedData.js"
 ## 8. CHECKLIST NỘP BÀI
 
 ### Tiêu chí 1 — Ý tưởng & Tính cấp thiết (15đ)
+
 ```
 □ Trình bày rõ: bài toán phát hiện học sinh yếu thường phát hiện muộn
 □ Nêu số liệu: X% học sinh bị lưu ban do không được can thiệp kịp thời
@@ -1148,6 +1437,7 @@ Thêm script vào package.json: "seed": "node src/scripts/seedData.js"
 ```
 
 ### Tiêu chí 2 — Tính ứng dụng & Giá trị (15đ)
+
 ```
 □ User group rõ: giáo viên chủ nhiệm + ban giám hiệu
 □ Pain point cụ thể: hiện tại theo dõi thủ công bằng Excel
@@ -1155,14 +1445,16 @@ Thêm script vào package.json: "seed": "node src/scripts/seedData.js"
 ```
 
 ### Tiêu chí 3 — Phân tích & Thiết kế (15đ)
+
 ```
 □ Use Case Diagram: 2 actor (Admin, Teacher) + 8 use cases
-□ ERD: 5 entities với đầy đủ quan hệ
+□ ERD: 9 entities với đầy đủ quan hệ
 □ Architecture Diagram: Angular → Node.js → Python AI + MongoDB
 □ Sequence Diagram: luồng nhập điểm → dự đoán AI → hiển thị kết quả
 ```
 
 ### Tiêu chí 4 — Chức năng nghiệp vụ (20đ)
+
 ```
 □ CRUD Users (Admin)
 □ CRUD Classes
@@ -1175,6 +1467,7 @@ Thêm script vào package.json: "seed": "node src/scripts/seedData.js"
 ```
 
 ### Tiêu chí 5 — Giao diện UI/UX (10đ)
+
 ```
 □ Responsive (desktop + tablet)
 □ Loading states cho mọi API call
@@ -1185,8 +1478,9 @@ Thêm script vào package.json: "seed": "node src/scripts/seedData.js"
 ```
 
 ### Tiêu chí 6 — Công nghệ & Độ khó (10đ)
+
 ```
-□ Angular v17+ Standalone Components
+□ Angular v21 Standalone Components
 □ Machine Learning (RandomForest) tự train
 □ 3-tier architecture (Angular + Node + Python)
 □ JWT Authentication
@@ -1195,6 +1489,7 @@ Thêm script vào package.json: "seed": "node src/scripts/seedData.js"
 ```
 
 ### Tiêu chí 7 — Demo (10đ)
+
 ```
 □ Chạy seed data trước demo
 □ Luồng demo: Login → Dashboard → Xem HS rủi ro → Nhập điểm mới → Xem dự đoán
@@ -1204,6 +1499,7 @@ Thêm script vào package.json: "seed": "node src/scripts/seedData.js"
 ```
 
 ### Tiêu chí 8 — Thuyết trình (5đ)
+
 ```
 □ Slide: vấn đề → giải pháp → demo → kết quả
 □ Phân công rõ ai làm phần nào (dù 1 mình vẫn cần nói)
@@ -1215,14 +1511,15 @@ Thêm script vào package.json: "seed": "node src/scripts/seedData.js"
 
 ## 📂 FILE THEO DÕI TIẾN ĐỘ
 
-| File | Mục đích |
-|------|----------|
+| File      | Mục đích                                                              |
+| --------- | --------------------------------------------------------------------- |
 | `BUGS.md` | Ghi lại bug đã gặp + cách fix, AI đọc trước khi code để không lặp lại |
-| `DONE.md` | Danh sách task đã hoàn thành, AI đọc để biết không làm lại |
+| `DONE.md` | Danh sách task đã hoàn thành, AI đọc để biết không làm lại            |
 
 > **Quy tắc bắt buộc:** Mỗi khi bắt đầu prompt mới, dán nội dung BUGS.md và DONE.md vào đầu prompt để AI có context đầy đủ.
 
 **Prompt mẫu khi bắt đầu mỗi ngày:**
+
 ```
 [TEMPLATE CHUẨN]
 
@@ -1234,6 +1531,15 @@ Thêm script vào package.json: "seed": "node src/scripts/seedData.js"
 
 Bây giờ hãy làm: [yêu cầu mới]
 ```
+
+---
+
+## 🐙 GIT & GITIGNORE
+
+> Xem hướng dẫn đầy đủ trong file **`GIT.md`**
+> Bao gồm: 4 file .gitignore, thứ tự khởi tạo, quy tắc branch, commit message, xử lý sự cố.
+
+⚠️ **Nhớ tạo `.gitignore` TRƯỚC khi `git init`** — nếu không `node_modules` sẽ bị đẩy lên GitHub.
 
 ---
 
@@ -1280,4 +1586,4 @@ Fix: Đổi JWT_EXPIRES_IN=30d trong .env
 
 ---
 
-*Chúc bạn 100 điểm! 🎯*
+_Chúc bạn 100 điểm! 🎯_

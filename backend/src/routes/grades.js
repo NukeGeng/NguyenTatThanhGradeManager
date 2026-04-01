@@ -1,15 +1,17 @@
 const express = require("express");
-const fs = require("fs");
-const path = require("path");
 const multer = require("multer");
+const XLSX = require("xlsx");
 const auth = require("../middleware/auth");
 const Grade = require("../models/Grade");
 const Student = require("../models/Student");
 const Class = require("../models/Class");
+const SchoolYear = require("../models/SchoolYear");
 const {
+  getSubjectMap,
   parseExcelFile,
   validateRows,
   importValidRows,
+  generateTemplateWorkbook,
 } = require("../services/importService");
 
 const router = express.Router();
@@ -41,19 +43,12 @@ router.use(auth);
 
 router.get("/import/template", async (req, res, next) => {
   try {
-    const templatePath = path.join(
-      __dirname,
-      "..",
-      "templates",
-      "grade_import_template.xlsx",
-    );
-
-    if (!fs.existsSync(templatePath)) {
-      return res.status(404).json({
-        success: false,
-        message: "Template file not found",
-      });
-    }
+    const subjectMap = await getSubjectMap();
+    const workbook = generateTemplateWorkbook(subjectMap);
+    const fileBuffer = XLSX.write(workbook, {
+      bookType: "xlsx",
+      type: "buffer",
+    });
 
     res.setHeader(
       "Content-Disposition",
@@ -64,7 +59,7 @@ router.get("/import/template", async (req, res, next) => {
       "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
     );
 
-    return res.sendFile(templatePath);
+    return res.status(200).send(fileBuffer);
   } catch (error) {
     return next(error);
   }
@@ -89,12 +84,14 @@ router.post("/import/preview", async (req, res, next) => {
       });
     }
 
-    const rows = parseExcelFile(req.file.buffer);
+    const subjectMap = await getSubjectMap();
+    const rows = parseExcelFile(req.file.buffer, subjectMap);
     const { validRows, errorRows } = await validateRows(
       rows,
       classId,
       semester,
       schoolYearId,
+      subjectMap,
     );
 
     return res.status(200).json({
@@ -142,12 +139,14 @@ router.post("/import/excel", async (req, res, next) => {
       });
     }
 
-    const rows = parseExcelFile(req.file.buffer);
+    const subjectMap = await getSubjectMap();
+    const rows = parseExcelFile(req.file.buffer, subjectMap);
     const { validRows, errorRows } = await validateRows(
       rows,
       classId,
       semester,
       schoolYearId,
+      subjectMap,
     );
 
     const { importedCount, duplicateErrors } = await importValidRows(
@@ -171,6 +170,7 @@ router.post("/import/excel", async (req, res, next) => {
       success: true,
       imported: importedCount,
       skipped,
+      duplicates: duplicateMapped,
       errors: allErrors,
     });
   } catch (error) {
@@ -197,22 +197,24 @@ router.post("/", async (req, res, next) => {
       studentId,
       classId,
       semester,
-      schoolYear,
-      subjects,
+      schoolYearId,
+      scores,
+      departmentId,
       attendanceAbsent,
       conductScore,
     } = req.body;
 
-    if (!studentId || !classId || !semester || !schoolYear) {
+    if (!studentId || !classId || !semester || !schoolYearId) {
       return res.status(400).json({
         success: false,
-        message: "studentId, classId, semester, schoolYear are required",
+        message: "studentId, classId, semester, schoolYearId are required",
       });
     }
 
-    const [student, classData] = await Promise.all([
+    const [student, classData, schoolYear] = await Promise.all([
       Student.findById(studentId),
       Class.findById(classId),
+      SchoolYear.findById(schoolYearId),
     ]);
 
     if (!student) {
@@ -229,10 +231,30 @@ router.post("/", async (req, res, next) => {
       });
     }
 
+    if (!schoolYear) {
+      return res.status(404).json({
+        success: false,
+        message: "SchoolYear not found",
+      });
+    }
+
+    if (req.user.role !== "admin") {
+      const allowedDepartmentIds = (req.user.departmentIds || []).map((item) =>
+        item?._id ? String(item._id) : String(item),
+      );
+
+      if (!allowedDepartmentIds.includes(String(classData.departmentId))) {
+        return res.status(403).json({
+          success: false,
+          message: "Bạn không có quyền nhập điểm cho lớp này",
+        });
+      }
+    }
+
     const existedGrade = await Grade.findOne({
       studentId,
       semester: Number(semester),
-      schoolYear: String(schoolYear).trim(),
+      schoolYearId,
     });
 
     if (existedGrade) {
@@ -245,16 +267,20 @@ router.post("/", async (req, res, next) => {
     const grade = await Grade.create({
       studentId,
       classId,
+      departmentId: departmentId || classData.departmentId,
+      schoolYearId,
       semester: Number(semester),
-      schoolYear: String(schoolYear).trim(),
-      subjects: subjects || {},
+      scores: scores || [],
       attendanceAbsent: attendanceAbsent ?? 0,
       conductScore: conductScore || null,
+      enteredBy: req.user._id,
     });
 
     const populatedGrade = await Grade.findById(grade._id)
       .populate("studentId")
-      .populate("classId", "name grade schoolYear");
+      .populate("classId", "name gradeLevel departmentId schoolYearId")
+      .populate("schoolYearId", "name isCurrent")
+      .populate("scores.subjectId", "_id code name coefficient");
 
     return res.status(201).json({
       success: true,
@@ -287,24 +313,18 @@ router.put("/:id", async (req, res, next) => {
     const allowedFields = [
       "studentId",
       "classId",
+      "departmentId",
       "semester",
-      "schoolYear",
-      "subjects",
+      "schoolYearId",
+      "scores",
       "attendanceAbsent",
       "conductScore",
     ];
 
     allowedFields.forEach((field) => {
       if (req.body[field] !== undefined) {
-        if (field === "subjects") {
-          grade.subjects = {
-            ...(grade.subjects?.toObject?.() || grade.subjects || {}),
-            ...req.body.subjects,
-          };
-        } else if (field === "semester") {
+        if (field === "semester") {
           grade.semester = Number(req.body.semester);
-        } else if (field === "schoolYear") {
-          grade.schoolYear = String(req.body.schoolYear).trim();
         } else {
           grade[field] = req.body[field];
         }
@@ -315,7 +335,9 @@ router.put("/:id", async (req, res, next) => {
 
     const updatedGrade = await Grade.findById(grade._id)
       .populate("studentId")
-      .populate("classId", "name grade schoolYear");
+      .populate("classId", "name gradeLevel departmentId schoolYearId")
+      .populate("schoolYearId", "name isCurrent")
+      .populate("scores.subjectId", "_id code name coefficient");
 
     return res.status(200).json({
       success: true,
@@ -338,8 +360,9 @@ router.get("/student/:studentId", async (req, res, next) => {
   try {
     const grades = await Grade.find({ studentId: req.params.studentId })
       .populate("studentId")
-      .populate("classId", "name grade schoolYear")
-      .sort({ schoolYear: 1, semester: 1 });
+      .populate("classId", "name gradeLevel departmentId schoolYearId")
+      .populate("schoolYearId", "name")
+      .sort({ createdAt: 1, semester: 1 });
 
     return res.status(200).json({
       success: true,
@@ -353,7 +376,7 @@ router.get("/student/:studentId", async (req, res, next) => {
 
 router.get("/class/:classId", async (req, res, next) => {
   try {
-    const { semester, schoolYear } = req.query;
+    const { semester, schoolYearId } = req.query;
     const query = {
       classId: req.params.classId,
     };
@@ -362,13 +385,36 @@ router.get("/class/:classId", async (req, res, next) => {
       query.semester = Number(semester);
     }
 
-    if (schoolYear) {
-      query.schoolYear = String(schoolYear).trim();
+    if (schoolYearId) {
+      query.schoolYearId = schoolYearId;
+    }
+
+    const classData = await Class.findById(req.params.classId);
+    if (!classData) {
+      return res.status(404).json({
+        success: false,
+        message: "Class not found",
+      });
+    }
+
+    if (req.user.role !== "admin") {
+      const allowedDepartmentIds = (req.user.departmentIds || []).map((item) =>
+        item?._id ? String(item._id) : String(item),
+      );
+
+      if (!allowedDepartmentIds.includes(String(classData.departmentId))) {
+        return res.status(403).json({
+          success: false,
+          message: "Bạn không có quyền xem điểm của lớp này",
+        });
+      }
     }
 
     const grades = await Grade.find(query)
       .populate("studentId", "studentCode fullName classId")
-      .populate("classId", "name grade schoolYear")
+      .populate("classId", "name gradeLevel departmentId schoolYearId")
+      .populate("schoolYearId", "name")
+      .populate("scores.subjectId", "_id code name coefficient")
       .sort({ averageScore: -1, createdAt: -1 });
 
     return res.status(200).json({

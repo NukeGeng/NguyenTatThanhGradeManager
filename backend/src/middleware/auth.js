@@ -14,7 +14,11 @@ const auth = async (req, res, next) => {
     }
 
     const payload = jwt.verify(token, process.env.JWT_SECRET);
-    const user = await User.findById(payload.userId).select("-password");
+    const userId = payload.id || payload.userId;
+
+    const user = await User.findById(userId)
+      .select("-password")
+      .populate("departmentIds", "_id code name");
 
     if (!user) {
       return res.status(401).json({
