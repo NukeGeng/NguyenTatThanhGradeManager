@@ -4,6 +4,7 @@
 > Dán file này vào đầu prompt mỗi ngày để AI không lặp lại bug cũ.
 
 **Cách ghi:**
+
 ```
 ## [BUG-XXX] Tên bug ngắn gọn
 - Ngày: DD/MM/YYYY
@@ -18,18 +19,25 @@
 
 ## DANH SÁCH BUG
 
-*(Chưa có bug nào — dự án mới bắt đầu)*
+## [BUG-001] Lỗi thiếu thư viện Python khi train model
+
+- Ngày: 02/04/2026
+- File/Vị trí: ai-engine/train.py
+- Mô tả: Pylance báo lỗi import không resolve được pandas và sklearn khi tạo train.py.
+- Nguyên nhân: Môi trường .venv chưa cài đủ package cho AI Engine.
+- Fix: Cấu hình Python environment cho workspace và cài packages: pandas, scikit-learn, numpy, pymongo, python-dotenv.
+- Trạng thái: ✅ Đã fix
 
 ---
 
 ## TEMPLATE THÊM BUG MỚI
 
 ```
-## [BUG-001] 
-- Ngày: 
-- File: 
-- Mô tả: 
-- Nguyên nhân: 
-- Fix: 
-- Trạng thái: 
+## [BUG-001]
+- Ngày:
+- File:
+- Mô tả:
+- Nguyên nhân:
+- Fix:
+- Trạng thái:
 ```

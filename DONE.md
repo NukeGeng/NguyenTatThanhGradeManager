@@ -50,6 +50,12 @@
 - File đã tạo/sửa: backend/src/models/Subject.js, backend/src/models/Class.js, backend/src/models/Grade.js, backend/src/routes/subjects.js, backend/src/routes/classes.js, backend/src/routes/grades.js, backend/src/services/importService.js, backend/src/scripts/seedData.js, ai-engine/data/generate_data.py
 - Ghi chú: Đã cập nhật model và routes theo hệ NTTU (weights TX/GK/TH/TKT, finalScore, gpa4, letterGrade, lớp học phần) và nâng generate_data.py sang đọc môn active từ MongoDB + lưu subject_codes.json.
 
+## [DONE-006] Ngày 4 - AI Engine Train Model theo feature động
+
+- Ngày: 02/04/2026
+- File đã tạo/sửa: ai-engine/train.py
+- Ghi chú: Đã tạo train.py đọc data/students.csv + data/subject_codes.json, train RandomForest, in accuracy/classification_report/feature_importances và lưu model.pkl, feature_names.pkl, label_encoder.pkl.
+
 ---
 
 ## FRONTEND
