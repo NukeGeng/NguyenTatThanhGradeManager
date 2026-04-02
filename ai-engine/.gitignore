@@ -16,6 +16,7 @@ models/*.joblib
 
 # Data gia de train - khong can push
 data/*.csv
+data/subject_codes.json
 
 # Jupyter
 .ipynb_checkpoints/

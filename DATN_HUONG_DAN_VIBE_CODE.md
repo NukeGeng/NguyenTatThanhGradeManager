@@ -122,13 +122,18 @@ student-ai-system/
 │
 ├── ai-engine/                      # Python + FastAPI
 │   ├── data/
-│   │   └── generate_data.py        # Tạo dữ liệu giả để train
+│   │   ├── generate_data.py        # Đọc môn từ MongoDB → gen CSV
+│   │   ├── students.csv            # Dataset đã gen (gitignore)
+│   │   └── subject_codes.json      # Thứ tự features đã dùng khi gen
 │   ├── models/
-│   │   └── model.pkl               # Model đã train (tự sinh)
-│   ├── train.py                    # Script train model
-│   ├── main.py                     # FastAPI server
+│   │   ├── model.pkl               # Trained model (gitignore)
+│   │   ├── feature_names.pkl       # List feature đúng thứ tự (gitignore)
+│   │   └── label_encoder.pkl       # Dict số → nhãn (gitignore)
+│   ├── train.py                    # Đọc subject_codes.json → train
+│   ├── main.py                     # FastAPI, input động theo feature_names.pkl
+│   ├── schemas.py                  # PredictRequest dùng dict scores
 │   ├── requirements.txt
-│   └── schemas.py                  # Pydantic schemas
+│   └── .env → trỏ về backend/.env  # Dùng chung MONGO_URI
 │
 └── frontend/                       # Angular v21
     └── src/
@@ -278,41 +283,67 @@ Ràng buộc: Chỉ 1 SchoolYear có isCurrent = true tại một thời điểm
 ```
 {
   _id:            ObjectId,
-  code:           String (unique, required),      // "toan", "ltcb", "ktpm"
-  name:           String (required),              // "Toán", "Lập trình cơ bản"
-  departmentId:   ObjectId (ref: Department, required),  // Môn thuộc khoa nào
-  semester:       Enum[1, 2, 'both']              // Học kỳ nào dạy môn này
-                  (default: 'both'),
-  coefficient:    Number (default: 1, min:1, max:3),
-  category:       Enum['science','social','language','specialized','other'],
-  gradeLevel:     [Number] (default: [10,11,12]),
+  code:           String (unique, required),      // "ltcb", "ktpm", "tieng_anh_cn"
+  name:           String (required),              // "Lập trình cơ bản"
+  departmentId:   ObjectId (ref: Department, required),
+  credits:        Number (required, min:1, max:5),  // Số tín chỉ
+  semester:       Enum[1, 2, 'both'] (default: 'both'),
+  category:       Enum['theory','practice','both'] (default: 'theory'),
+
+  // Trọng số % mặc định — giáo viên có thể override khi nhập điểm
+  defaultWeights: {
+    tx:   Number (default: 10, min:0, max:100),   // Thường xuyên %
+    gk:   Number (default: 30, min:0, max:100),   // Giữa kỳ %
+    th:   Number (default: 0,  min:0, max:100),   // Thực hành %
+    tkt:  Number (default: 60, min:0, max:100),   // Thi kết thúc HP %
+  },
+  // Ràng buộc: tx + gk + th + tkt = 100
+
+  // Cấu hình số lần đánh giá TX
+  txCount:        Number (default: 3, min:1, max:5),  // Số cột TX
+
   isActive:       Boolean (default: true),
   createdAt:      Date
 }
 Index: code (unique), departmentId, semester
 Dữ liệu mẫu khoa CNTT:
-  { code: "ltcb",  name: "Lập trình cơ bản",    semester: 1, departmentId: CNTT }
-  { code: "csdl",  name: "Cơ sở dữ liệu",       semester: 2, departmentId: CNTT }
-  { code: "mmt",   name: "Mạng máy tính",        semester: 2, departmentId: CNTT }
-  { code: "ktpm",  name: "Kỹ thuật phần mềm",    semester: 2, departmentId: CNTT }
+  { code: "ltcb",  name: "Lập trình cơ bản",    credits: 3, semester: 1,
+    defaultWeights: { tx:10, gk:30, th:0, tkt:60 } }
+  { code: "csdl",  name: "Cơ sở dữ liệu",       credits: 3, semester: 2,
+    defaultWeights: { tx:10, gk:30, th:0, tkt:60 } }
+  { code: "ltth",  name: "Lập trình thực hành",  credits: 2, semester: 1,
+    category: 'practice',
+    defaultWeights: { tx:10, gk:20, th:30, tkt:40 } }
 ```
 
-### 5. Class (Lớp học)
+### 5. Class (Lớp học phần)
 
 ```
 {
   _id:            ObjectId,
-  name:           String (required),              // "CNTT01", "KTKT02"
-  departmentId:   ObjectId (ref: Department, required),  // Lớp thuộc khoa
-  gradeLevel:     Number (required, enum:[10,11,12]),
+  code:           String (required),              // "012307749505" — Mã lớp học phần
+  subjectId:      ObjectId (ref: Subject, required),
+  departmentId:   ObjectId (ref: Department, required),
   schoolYearId:   ObjectId (ref: SchoolYear, required),
-  teacherId:      ObjectId (ref: User),           // GVCN (phải thuộc khoa này)
+  semester:       Number (enum:[1,2], required),
+  teacherId:      ObjectId (ref: User, required), // Giáo viên dạy lớp này
+
+  // Trọng số % do GV tự cấu hình (override defaultWeights của Subject)
+  weights: {
+    tx:   Number,   // % thường xuyên
+    gk:   Number,   // % giữa kỳ
+    th:   Number,   // % thực hành
+    tkt:  Number,   // % thi kết thúc HP
+  },
+  txCount:        Number,                         // Số cột TX (override Subject.txCount)
+
   studentCount:   Number (default: 0),
   isActive:       Boolean (default: true),
   createdAt:      Date,
   updatedAt:      Date
 }
-Index: { name, schoolYearId } (unique)
+Index: { code, schoolYearId, semester } (unique)
+Pre-save: copy defaultWeights + txCount từ Subject nếu weights chưa được set
 ```
 
 ### 6. Student (Học sinh)
@@ -338,35 +369,69 @@ Index: { name, schoolYearId } (unique)
 Index: studentCode (unique), classId, status
 ```
 
-### 7. Grade (Bảng điểm)
+### 7. Grade (Bảng điểm — theo hệ đại học NTTU)
 
 ```
 {
   _id:              ObjectId,
   studentId:        ObjectId (ref: Student, required),
-  classId:          ObjectId (ref: Class, required),
-  departmentId:     ObjectId (ref: Department),       // Cache để query nhanh
+  classId:          ObjectId (ref: Class, required),    // Lớp học phần
+  subjectId:        ObjectId (ref: Subject, required),
+  departmentId:     ObjectId (ref: Department),         // Cache
   schoolYearId:     ObjectId (ref: SchoolYear, required),
   semester:         Number (enum:[1,2], required),
-  scores: [
-    {
-      subjectId:    ObjectId (ref: Subject),
-      subjectCode:  String,
-      score:        Number (min:0, max:10)
-    }
-  ],
-  attendanceTotal:   Number (default: 0),
-  attendanceAbsent:  Number (default: 0),
-  attendanceRate:    Number,
-  conductScore:      Enum['Tốt','Khá','Trung Bình','Yếu'],
-  averageScore:      Number,
-  ranking:           Enum['Giỏi','Khá','Trung Bình','Yếu'],
-  classRank:         Number,
-  enteredBy:         ObjectId (ref: User),
-  createdAt:         Date,
-  updatedAt:         Date
+
+  // Trọng số % thực tế áp dụng (copy từ Class.weights khi tạo)
+  weights: {
+    tx:   Number,   // % thường xuyên (vd: 10)
+    gk:   Number,   // % giữa kỳ     (vd: 30)
+    th:   Number,   // % thực hành   (vd: 0)
+    tkt:  Number,   // % thi kết thúc HP (vd: 60)
+  },
+
+  // Điểm thành phần (do GV nhập)
+  txScores:         [Number],      // [TX1, TX2, TX3...] — trung bình = điểm TX
+  gkScore:          Number,        // Điểm giữa kỳ (0-10)
+  thScores:         [Number],      // [TH1, TH2, TH3] — nếu có thực hành
+  tktScore:         Number,        // Điểm thi kết thúc HP (0-10)
+
+  // Điểm trung bình từng thành phần (tự tính)
+  txAvg:            Number,        // Trung bình TX
+  thAvg:            Number,        // Trung bình TH
+
+  // Điểm tổng kết (tự tính theo công thức)
+  // = txAvg*(tx/100) + gkScore*(gk/100) + thAvg*(th/100) + tktScore*(tkt/100)
+  finalScore:       Number,        // Điểm tổng kết thang 10 (làm tròn 2 chữ số)
+
+  // Quy đổi sang thang 4 + chữ
+  // Quy tắc đặc biệt:
+  //   tktScore === 4 → letterGrade = 'C', gpa4 = 2.0 (dù finalScore cao hơn)
+  //   tktScore < 4   → letterGrade = 'F', gpa4 = 0.0
+  //   finalScore >= 8.5 → A (4.0)
+  //   finalScore >= 7.0 → B (3.0)
+  //   finalScore >= 5.0 → C (2.0)
+  //   finalScore < 5.0  → F (0.0)
+  gpa4:             Number,        // 0.0 / 2.0 / 3.0 / 4.0
+  letterGrade:      Enum['A','B','C','F'],
+
+  // Trạng thái
+  isDuThi:          Boolean (default: true),   // Được dự thi kết thúc HP
+  isVangThi:        Boolean (default: false),  // Vắng thi
+  enteredBy:        ObjectId (ref: User),
+  createdAt:        Date,
+  updatedAt:        Date
 }
-Index: { studentId, semester, schoolYearId } (unique)
+Index: { studentId, classId } (unique) — 1 SV chỉ có 1 bảng điểm/lớp học phần
+
+Pre-save hook — tính tự động:
+  1. txAvg = trung bình txScores (bỏ null)
+  2. thAvg = trung bình thScores (bỏ null)
+  3. finalScore = txAvg*(tx/100) + gkScore*(gk/100) + thAvg*(th/100) + tktScore*(tkt/100)
+  4. Áp quy tắc đặc biệt tktScore rồi xếp letterGrade + gpa4
+
+Công thức tính điểm tổng kết học kỳ (tính ở route, không lưu vào Grade):
+  diemTBHK = Σ(finalScore × credits) / Σ(credits)
+  gpaHK    = Σ(gpa4 × credits) / Σ(credits)
 ```
 
 ### 8. Prediction (Kết quả AI)
@@ -375,13 +440,25 @@ Index: { studentId, semester, schoolYearId } (unique)
 {
   _id:              ObjectId,
   studentId:        ObjectId (ref: Student, required),
-  gradeId:          ObjectId (ref: Grade, required),
   schoolYearId:     ObjectId (ref: SchoolYear),
   semester:         Number,
-  predictedRank:    Enum['Giỏi','Khá','Trung Bình','Yếu'],
-  confidence:       Number,
+
+  // Dự đoán tổng hợp toàn học kỳ
+  predictedGpaHK:   Number,              // GPA học kỳ dự đoán (0-4)
+  predictedDiemTB:  Number,              // Điểm TB học kỳ dự đoán (0-10)
+  predictedRank:    Enum['Xuất sắc','Giỏi','Khá','Trung bình','Yếu/Kém'],
+  confidence:       Number,              // 0-100%
   riskLevel:        Enum['low','medium','high'],
-  weakSubjects:     [String],
+
+  // Môn học có nguy cơ rớt
+  atRiskSubjects: [{
+    subjectId:      ObjectId,
+    subjectName:    String,
+    currentGpa4:    Number,
+    predictedGpa4:  Number,
+    reason:         String  // "TKT hiện tại thấp", "Chưa có điểm GK"
+  }],
+
   suggestions:      [String],
   analysis:         String,
   modelVersion:     String (default: '1.0'),
@@ -389,7 +466,7 @@ Index: { studentId, semester, schoolYearId } (unique)
   isRead:           Boolean (default: false),
   createdAt:        Date
 }
-Index: studentId, gradeId, riskLevel, isRead
+Index: studentId, schoolYearId, semester, riskLevel
 ```
 
 ### 9. Notification (Thông báo)
@@ -440,16 +517,48 @@ Retention: TTL 90 ngày
 
 ### Tóm tắt quan hệ
 
-| Bảng           | Quan hệ với                                                                                |
-| -------------- | ------------------------------------------------------------------------------------------ |
-| **User**       | Department (n:n qua departmentIds[]), Class (1-n GVCN), AuditLog (1-n), Notification (1-n) |
-| **Department** | Subject (1-n), Class (1-n), User/Teacher (n:n)                                             |
-| **SchoolYear** | Class (1-n), Grade (1-n)                                                                   |
-| **Subject**    | Department (n:1), Grade.scores (n-n qua array)                                             |
-| **Class**      | Department (n:1), Student (1-n), Grade (1-n)                                               |
-| **Student**    | Class (n:1), Grade (1-n), Prediction (1-n)                                                 |
-| **Grade**      | Prediction (1-1), Notification (qua data)                                                  |
-| **Prediction** | Notification (1-1 khi tạo)                                                                 |
+| Bảng           | Quan hệ với                                                                                     |
+| -------------- | ----------------------------------------------------------------------------------------------- |
+| **User**       | Department (n:n qua departmentIds[]), Class (1-n giảng dạy), AuditLog (1-n), Notification (1-n) |
+| **Department** | Subject (1-n), Class (1-n), User/Teacher (n:n)                                                  |
+| **SchoolYear** | Class (1-n), Grade (1-n)                                                                        |
+| **Subject**    | Department (n:1), Class (1-n lớp HP), Grade (1-n) — 1 môn nhiều lớp HP                          |
+| **Class**      | Subject (n:1), Department (n:1), Grade (1-n) — lớp học phần                                     |
+| **Student**    | Grade (1-n), Prediction (1-n)                                                                   |
+| **Grade**      | Class (n:1), Subject (n:1), Student (n:1)                                                       |
+| **Prediction** | Student (n:1), tổng hợp nhiều Grade trong 1 học kỳ                                              |
+
+---
+
+### 📐 Công thức tính điểm chuẩn NTTU
+
+```
+// 1. Điểm tổng kết môn
+txAvg     = mean(txScores)            // trung bình thường xuyên
+thAvg     = mean(thScores)            // trung bình thực hành (nếu có)
+finalScore = txAvg*(tx/100) + gkScore*(gk/100)
+           + thAvg*(th/100) + tktScore*(tkt/100)
+
+// 2. Quy tắc đặc biệt (kiểm tra theo thứ tự ưu tiên)
+if (isVangThi)              → F, gpa4 = 0.0
+else if (tktScore < 4)      → F, gpa4 = 0.0
+else if (tktScore === 4)    → C, gpa4 = 2.0   // dù finalScore cao hơn
+else if (finalScore >= 8.5) → A, gpa4 = 4.0
+else if (finalScore >= 7.0) → B, gpa4 = 3.0
+else if (finalScore >= 5.0) → C, gpa4 = 2.0
+else                        → F, gpa4 = 0.0
+
+// 3. Điểm học kỳ (tổng hợp từ tất cả môn)
+diemTBHK = Σ(finalScore × credits) / Σ(credits)
+gpaHK    = Σ(gpa4 × credits) / Σ(credits)
+
+// 4. Xếp loại học kỳ theo gpaHK
+gpaHK >= 3.6 → Xuất sắc
+gpaHK >= 3.2 → Giỏi
+gpaHK >= 2.5 → Khá
+gpaHK >= 2.0 → Trung bình
+gpaHK <  2.0 → Yếu/Kém
+```
 
 ---
 
@@ -849,31 +958,52 @@ Tạo tương tự src/routes/classes.js với CRUD đầy đủ cho Class.
 
 ### 📅 NGÀY 3 — Grades API
 
-**Prompt 3.1 — Grade Model (dùng Subject động từ DB):**
+**Prompt 3.1 — Grade Model (hệ đại học NTTU):**
 
 ```
 [DÙNG TEMPLATE CHUẨN]
 
-Tạo src/models/Grade.js:
+Tạo src/models/Grade.js theo hệ tính điểm đại học NTTU:
+
+Fields:
 - studentId(ObjectId,ref:Student,required)
-- classId(ObjectId,ref:Class,required)
+- classId(ObjectId,ref:Class,required)       // Lớp học phần
+- subjectId(ObjectId,ref:Subject,required)
+- departmentId(ObjectId,ref:Department)      // Cache
+- schoolYearId(ObjectId,ref:SchoolYear,required)
 - semester(Number,enum:[1,2],required)
-- schoolYear(String,required)
-- subjects: Map (key=subjectCode, value=Number 0-10)
-  Dùng kiểu Map thay vì Object cứng để linh hoạt theo môn học trong DB
-  Ví dụ: subjects = { "toan": 8.5, "van": 7.0, "tin": 9.0 }
-- attendanceAbsent(Number,default:0)
-- conductScore(enum:['Tốt','Khá','Trung Bình','Yếu'])
-- averageScore(Number)   — tính tự động có hệ số
-- ranking(enum:['Giỏi','Khá','Trung Bình','Yếu'])  — tự xếp loại
+- weights: { tx:Number, gk:Number, th:Number, tkt:Number }
+  Copy từ Class.weights khi tạo (không cho sửa sau khi tạo)
+- txScores([Number])          // [TX1, TX2, TX3...] — số lượng theo Class.txCount
+- gkScore(Number,min:0,max:10)
+- thScores([Number])          // [TH1, TH2, TH3] — nếu môn có thực hành
+- tktScore(Number,min:0,max:10)
+- txAvg(Number)               // tự tính
+- thAvg(Number)               // tự tính
+- finalScore(Number)          // tự tính theo weights
+- gpa4(Number)                // 0.0 / 2.0 / 3.0 / 4.0
+- letterGrade(enum:['A','B','C','F'])
+- isDuThi(Boolean,default:true)
+- isVangThi(Boolean,default:false)
 - enteredBy(ObjectId,ref:User)
 - timestamps:true
-- Index unique: {studentId, semester, schoolYear}
+Index unique: { studentId, classId }
 
-Thêm pre-save hook:
-  1. Load tất cả Subject isActive=true từ DB
-  2. Tính averageScore theo hệ số: Σ(điểm × hệ số) / Σ(hệ số) — bỏ qua môn null
-  3. Tự xếp ranking: ≥8.0 → Giỏi, ≥6.5 → Khá, ≥5.0 → Trung Bình, <5.0 → Yếu
+Pre-save hook — tính tự động theo thứ tự:
+  1. txAvg = mean(txScores.filter(v => v != null))
+  2. thAvg = mean(thScores.filter(v => v != null)) || 0
+  3. finalScore = round(txAvg*(weights.tx/100) + gkScore*(weights.gk/100)
+                      + thAvg*(weights.th/100) + tktScore*(weights.tkt/100), 2)
+  4. Áp quy tắc NTTU theo thứ tự ưu tiên:
+     if isVangThi            → F, 0.0
+     else if tktScore < 4    → F, 0.0
+     else if tktScore === 4  → C, 2.0
+     else if finalScore >= 8.5 → A, 4.0
+     else if finalScore >= 7.0 → B, 3.0
+     else if finalScore >= 5.0 → C, 2.0
+     else                      → F, 0.0
+  5. Chỉ tính nếu tktScore đã có giá trị (không null)
+     Nếu chưa có tktScore → để finalScore/gpa4/letterGrade = null (chưa có kết quả)
 ```
 
 **Prompt 3.2 — Grades Routes:**
@@ -965,76 +1095,154 @@ Tạo src/routes/grades.js bổ sung 3 import routes:
 **Prompt 4.1 — Generate Data:**
 
 ```
-Tôi cần file Python ai-engine/data/generate_data.py để tạo dữ liệu giả train ML model.
-
-Tạo dataset 1000 học sinh với các cột:
-- toan, van, anh, ly, hoa, sinh (float, 3.0-10.0)
-- diem_hk_truoc (float, 3.0-10.0) — điểm học kỳ trước
-- so_buoi_vang (int, 0-20)
-- hanh_kiem (int: 0=Yếu, 1=TB, 2=Khá, 3=Tốt)
-- ket_qua (label: 'Giỏi', 'Khá', 'Trung Bình', 'Yếu')
-
-Logic gán nhãn thực tế:
-- Tính tb_ky_nay = trung bình 6 môn
-- Nếu tb >= 8.0 và vắng <= 3 và hành kiểm >= 2: Giỏi
-- Nếu tb >= 6.5 và vắng <= 7 và hành kiểm >= 1: Khá
-- Nếu tb >= 5.0 và vắng <= 12: Trung Bình
-- Còn lại: Yếu
-- Thêm random noise nhỏ (10% ngẫu nhiên đổi nhãn 1 bậc) để model không overfit
-
-Lưu ra data/students.csv và in ra phân phối nhãn.
+⚠️ QUAN TRỌNG — KHÔNG hardcode môn học trong file này.
+Môn học do Admin quản lý trong MongoDB, generate_data.py phải đọc từ DB.
 ```
 
-**Prompt 4.2 — Train Model:**
+**Prompt 4.1 — Generate Data (đọc môn từ MongoDB):**
 
 ```
-Tôi cần file Python ai-engine/train.py để train ML model phân loại học lực.
+Tôi cần file Python ai-engine/data/generate_data.py
+KHÔNG hardcode danh sách môn học — phải đọc từ MongoDB.
+
+Yêu cầu:
+
+1. Kết nối MongoDB:
+   - Đọc MONGO_URI từ file .env (dùng python-dotenv)
+   - MONGO_URI nằm ở thư mục backend/.env
+   - Kết nối bằng pymongo, đọc collection "subjects"
+   - Lọc: { isActive: true }
+   - Lấy danh sách field: code, name, coefficient
+   - Nếu không kết nối được → raise RuntimeError rõ ràng
+
+2. Tạo dataset NUM_STUDENTS=1000 học sinh:
+   - Với mỗi môn trong subjects từ DB:
+     Tạo cột điểm tên = subject["code"] (float, 3.0-10.0)
+   - Các cột cố định (không thay đổi dù môn thay đổi):
+     diem_hk_truoc (float, 3.0-10.0)
+     so_buoi_vang (int, 0-20)
+     hanh_kiem (int: 0=Yếu, 1=TB, 2=Khá, 3=Tốt)
+     ket_qua (label)
+
+3. Tính điểm trung bình CÓ HỆ SỐ:
+   tb_ky_nay = Σ(điểm_môn × coefficient) / Σ(coefficient)
+   Sử dụng coefficient đọc từ DB, không hardcode
+
+4. Logic gán nhãn (giống cũ):
+   tb >= 8.0 và vắng <= 3 và hành kiểm >= 2 → Giỏi
+   tb >= 6.5 và vắng <= 7 và hành kiểm >= 1 → Khá
+   tb >= 5.0 và vắng <= 12                   → Trung Bình
+   còn lại                                    → Yếu
+   Thêm 10% noise (đổi nhãn 1 bậc ngẫu nhiên)
+
+5. Lưu ra:
+   - data/students.csv (các cột điểm động theo môn từ DB)
+   - data/subject_codes.json: danh sách code theo đúng thứ tự đã dùng
+     Ví dụ: ["ltcb", "csdl", "mmt", "diem_hk_truoc", "so_buoi_vang", "hanh_kiem"]
+     File này dùng cho train.py để biết feature nào theo thứ tự nào
+
+6. In ra:
+   - Danh sách môn đọc được từ DB
+   - Số mẫu, phân phối nhãn
+   - Cảnh báo nếu < 3 môn active trong DB
+
+Dependencies cần cài:
+   pip install pymongo pandas numpy python-dotenv
+```
+
+**Prompt 4.2 — Train Model (đọc feature từ subject_codes.json):**
+
+```
+Tôi cần file Python ai-engine/train.py — KHÔNG hardcode feature names.
 
 Yêu cầu:
 1. Load data/students.csv
-2. Features: toan, van, anh, ly, hoa, sinh, diem_hk_truoc, so_buoi_vang, hanh_kiem
-3. Label: ket_qua
+2. Load data/subject_codes.json để biết đúng thứ tự features
+   feature_names = subject_codes.json (đã bao gồm cả diem_hk_truoc, so_buoi_vang, hanh_kiem)
+3. X = df[feature_names], y = df["ket_qua"]
 4. Encode label: Giỏi=3, Khá=2, Trung Bình=1, Yếu=0
 5. Train/test split: 80/20, stratify=True, random_state=42
 6. Train RandomForestClassifier(n_estimators=200, max_depth=10, random_state=42)
-7. In ra: accuracy, classification_report
-8. Lưu model vào models/model.pkl bằng pickle
-9. Lưu thêm models/feature_names.pkl (list tên feature theo đúng thứ tự)
-10. Lưu models/label_encoder.pkl (dict mapping số → tên xếp loại)
+7. In accuracy + classification_report + feature_importances
+8. Lưu:
+   - models/model.pkl       — trained model
+   - models/feature_names.pkl  — list tên feature ĐÚNG THỨ TỰ (đọc từ subject_codes.json)
+   - models/label_encoder.pkl  — dict { 0:"Yếu", 1:"Trung Bình", 2:"Khá", 3:"Giỏi" }
 
-In ra feature importance để kiểm tra model học đúng không.
+⚠️ Lý do lưu feature_names.pkl riêng:
+   Khi predict, FastAPI phải build input vector đúng thứ tự này
+   Nếu Admin thêm môn mới → phải chạy lại generate_data.py + train.py
+   → feature_names.pkl tự cập nhật, FastAPI tự nhận môn mới
+
+Thêm vào cuối train.py:
+   print("\\n[DONE] Retrain xong. Khởi động lại FastAPI để load model mới.")
+   print(f"Features ({len(feature_names)}): {feature_names}")
 ```
 
 ---
 
 ### 📅 NGÀY 5 — Python FastAPI
 
-**Prompt 5.1 — FastAPI Server:**
+**Prompt 5.1 — FastAPI Server (input động theo feature_names.pkl):**
 
 ```
 Tôi cần file Python ai-engine/main.py — FastAPI server chạy port 5000.
+KHÔNG hardcode danh sách môn — dùng feature_names.pkl để biết input cần gì.
 
-File ai-engine/schemas.py trước:
-- PredictRequest: toan,van,anh,ly,hoa,sinh,diem_hk_truoc,so_buoi_vang,hanh_kiem (đều float/int)
-- PredictResponse: predicted_rank(str), confidence(float), risk_level(str),
-  weak_subjects(list[str]), suggestions(list[str]), analysis(str)
+File ai-engine/schemas.py:
+- PredictRequest:
+  scores: dict[str, float]   # { "ltcb": 8.5, "csdl": 7.0, ... } — key là subject code
+  diem_hk_truoc: float
+  so_buoi_vang: int
+  hanh_kiem: int             # 0=Yếu, 1=TB, 2=Khá, 3=Tốt
+
+- PredictResponse:
+  predicted_rank: str        # "Giỏi" / "Khá" / "Trung Bình" / "Yếu"
+  confidence: float          # 0-100
+  risk_level: str            # "low" / "medium" / "high"
+  weak_subjects: list[str]   # code các môn điểm < 5.0
+  suggestions: list[str]
+  analysis: str
 
 File main.py:
-1. Load model.pkl, feature_names.pkl, label_encoder.pkl khi khởi động
-2. GET /health: trả {"status": "ok", "model_loaded": true}
-3. POST /predict: nhận PredictRequest, trả PredictResponse
-   Logic:
-   - Tính toán theo đúng thứ tự feature_names
-   - predict_proba → lấy confidence = max probability * 100
+1. Khi khởi động: load model.pkl, feature_names.pkl, label_encoder.pkl
+   In ra: "Model loaded. Features ({n}): {feature_names}"
+
+2. GET /health:
+   { "status": "ok", "model_loaded": true, "feature_count": n, "features": [...] }
+
+3. POST /predict:
+   - Nhận PredictRequest
+   - Build input vector ĐÚNG THỨ TỰ feature_names:
+     Với mỗi feature trong feature_names:
+       Nếu là "diem_hk_truoc" → dùng request.diem_hk_truoc
+       Nếu là "so_buoi_vang"  → dùng request.so_buoi_vang
+       Nếu là "hanh_kiem"     → dùng request.hanh_kiem
+       Còn lại                → dùng request.scores.get(feature, 0.0)
+   - predict_proba → confidence = max probability * 100
    - risk_level: confidence < 60 → 'high', < 75 → 'medium', else → 'low'
-   - weak_subjects: các môn có điểm < 5.0
-   - suggestions: list gợi ý dựa trên weak_subjects và so_buoi_vang
-   - analysis: đoạn văn tiếng Việt tóm tắt tình hình học sinh
+   - weak_subjects: [code for code, score in scores.items() if score < 5.0]
+   - suggestions: tạo list gợi ý dựa trên weak_subjects + so_buoi_vang
+   - analysis: đoạn văn tiếng Việt ~3 câu tóm tắt tình hình
 
-4. POST /predict-batch: nhận list PredictRequest, trả list PredictResponse
-   (dùng cho dự đoán cả lớp)
+4. POST /predict-batch: nhận list[PredictRequest], trả list[PredictResponse]
 
-Dùng uvicorn, thêm CORS cho phép origin http://localhost:3000
+5. GET /retrain-required:
+   So sánh feature_names.pkl hiện tại với subject codes trong DB
+   Trả { needs_retrain: bool, reason: str }
+   ⚠️ Endpoint này để Node.js gọi kiểm tra sau khi Admin thêm/xóa môn
+
+CORS: cho phép origin http://localhost:3000 và http://localhost:4200
+```
+
+**⚠️ Quy trình khi Admin thêm môn mới:**
+
+```
+1. Admin thêm môn qua UI → lưu vào Subject collection
+2. Chạy lại: python data/generate_data.py   ← đọc môn mới từ DB
+3. Chạy lại: python train.py                ← train lại với môn mới
+4. Restart FastAPI: uvicorn main:app --reload ← load model.pkl mới
+5. Model tự nhận môn mới, không cần sửa code
 ```
 
 ---
@@ -1274,24 +1482,49 @@ Tạo features/students/:
 
 ### 📅 NGÀY 11 — Nhập Điểm + Import Excel + Gọi AI
 
-**Prompt 11.1 — Grade Entry (nhập tay):**
+**Prompt 11.1 — Grade Entry (nhập điểm hệ đại học NTTU):**
 
 ```
 [DÙNG TEMPLATE CHUẨN]
 
-Tạo features/grades/grade-entry.component.ts:
-1. Step 1 — Chọn: dropdown lớp → dropdown học sinh → chọn học kỳ + năm học
-2. Step 2 — Nhập điểm: form 8 môn (Toán, Văn, Anh, Lý, Hóa, Sinh, Sử, Địa)
-   Mỗi ô input: type=number, min=0, max=10, step=0.1
-   Hiển thị điểm TB tính real-time khi nhập
-   Thêm: số buổi vắng, hạnh kiểm (dropdown)
-3. Step 3 — Xác nhận + Dự đoán AI:
-   Nút "Lưu điểm": gọi POST /api/grades
-   Sau khi lưu thành công → tự động gọi POST /api/predictions/predict
-   Hiển thị loading "Đang phân tích bằng AI..."
-   Kết quả hiện ngay trên trang
+Tạo features/grades/grade-entry/grade-entry.component.ts (standalone):
 
-Dùng MatStepper cho 3 bước.
+BƯỚC 1 — Chọn lớp học phần:
+  - Dropdown: Năm học → Học kỳ → Lớp học phần (load theo khoa GV đang đăng nhập)
+  - Sau khi chọn lớp: hiển thị thông tin:
+    Tên môn | Số tín chỉ | Trọng số: TX(10%) GK(30%) TH(0%) TKT(60%)
+  - Nút "Chỉnh trọng số" → mở dialog điều chỉnh % (tổng phải = 100%)
+
+BƯỚC 2 — Chọn sinh viên:
+  - Danh sách SV trong lớp (MatTable)
+  - Click vào SV → chuyển sang form nhập điểm của SV đó
+  - Badge màu: xanh = đã có điểm TKT, vàng = nhập một phần, xám = chưa nhập
+
+BƯỚC 3 — Nhập điểm 1 sinh viên:
+  Form gồm các phần:
+  a. Điểm thường xuyên: [TX1] [TX2] [TX3] (số lượng theo txCount của lớp)
+     Hiện trung bình TX real-time
+  b. Điểm giữa kỳ: [GK]
+  c. Điểm thực hành: [TH1] [TH2] [TH3] (ẩn nếu weights.th === 0)
+     Hiện trung bình TH real-time
+  d. Điểm thi kết thúc HP: [TKT]
+     Nếu isVangThi = true → disable ô TKT, hiển thị "Vắng thi"
+  e. Checkbox: Được dự thi HP, Vắng thi
+
+  Preview điểm real-time (cập nhật khi nhập):
+  ┌─────────────────────────────────────────┐
+  │ Điểm tổng kết: 8.70  │  Thang 4: 4.0   │
+  │ Xếp loại chữ: A      │  Kết quả: Đạt   │
+  │ ⚠️ Nếu TKT = 4 → C dù điểm TB cao      │
+  └─────────────────────────────────────────┘
+
+  Nút Lưu → POST /api/grades
+  Sau khi lưu → tự gọi POST /api/predictions/predict cho SV đó
+
+Lưu ý:
+  - Cho phép lưu điểm từng phần (chỉ TX, chưa có GK, TKT)
+  - finalScore/letterGrade chỉ hiện khi đã có đủ điểm TKT
+  - Validate: mỗi điểm 0-10, không âm
 ```
 
 **Prompt 11.2 — Import Excel/CSV:**

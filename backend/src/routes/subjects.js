@@ -79,16 +79,25 @@ router.post("/", adminOnly, async (req, res, next) => {
       name,
       departmentId,
       semester,
+      credits,
       coefficient,
       category,
+      defaultWeights,
+      txCount,
       gradeLevel,
       isActive,
     } = req.body;
 
-    if (!code || !name || !departmentId || semester === undefined) {
+    if (
+      !code ||
+      !name ||
+      !departmentId ||
+      semester === undefined ||
+      credits === undefined
+    ) {
       return res.status(400).json({
         success: false,
-        message: "code, name, departmentId, semester are required",
+        message: "code, name, departmentId, semester, credits are required",
       });
     }
 
@@ -107,13 +116,32 @@ router.post("/", adminOnly, async (req, res, next) => {
       });
     }
 
+    const parsedWeights = defaultWeights || undefined;
+    if (parsedWeights) {
+      const weightSum =
+        Number(parsedWeights.tx || 0) +
+        Number(parsedWeights.gk || 0) +
+        Number(parsedWeights.th || 0) +
+        Number(parsedWeights.tkt || 0);
+
+      if (weightSum !== 100) {
+        return res.status(400).json({
+          success: false,
+          message: "defaultWeights phải có tổng bằng 100",
+        });
+      }
+    }
+
     const subject = await Subject.create({
       code: String(code).trim().toLowerCase(),
       name: String(name).trim(),
       departmentId,
       semester,
+      credits: Number(credits),
       coefficient,
       category,
+      defaultWeights: parsedWeights,
+      txCount,
       gradeLevel,
       isActive,
     });
@@ -153,8 +181,11 @@ router.put("/:id", adminOnly, async (req, res, next) => {
 
     const allowedFields = [
       "name",
+      "credits",
       "coefficient",
       "category",
+      "defaultWeights",
+      "txCount",
       "gradeLevel",
       "semester",
       "departmentId",
@@ -220,7 +251,7 @@ router.delete("/:id", adminOnly, async (req, res, next) => {
     }
 
     const gradeCount = await Grade.countDocuments({
-      "scores.subjectCode": subject.code,
+      $or: [{ subjectId: subject._id }, { "scores.subjectCode": subject.code }],
     });
 
     if (gradeCount > 0) {

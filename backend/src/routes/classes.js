@@ -5,6 +5,7 @@ const Class = require("../models/Class");
 const Student = require("../models/Student");
 const Department = require("../models/Department");
 const SchoolYear = require("../models/SchoolYear");
+const Subject = require("../models/Subject");
 
 const router = express.Router();
 
@@ -40,10 +41,11 @@ router.get("/", async (req, res, next) => {
     }
 
     const classes = await Class.find(query)
+      .populate("subjectId", "_id code name credits")
       .populate("departmentId", "_id code name")
       .populate("schoolYearId", "_id name isCurrent")
       .populate("teacherId", "name email")
-      .sort({ gradeLevel: 1, name: 1 });
+      .sort({ semester: 1, code: 1, createdAt: -1 });
 
     return res.status(200).json({
       success: true,
@@ -58,6 +60,7 @@ router.get("/", async (req, res, next) => {
 router.get("/:id", async (req, res, next) => {
   try {
     const classData = await Class.findById(req.params.id)
+      .populate("subjectId", "_id code name credits")
       .populate("departmentId", "_id code name")
       .populate("schoolYearId", "_id name isCurrent")
       .populate("teacherId", "name email");
@@ -118,19 +121,38 @@ router.get("/:id/students", async (req, res, next) => {
 
 router.post("/", adminOnly, async (req, res, next) => {
   try {
-    const { name, departmentId, gradeLevel, schoolYearId, teacherId } =
-      req.body;
+    const {
+      code,
+      name,
+      subjectId,
+      departmentId,
+      schoolYearId,
+      semester,
+      teacherId,
+      weights,
+      txCount,
+    } = req.body;
 
-    if (!name || !departmentId || !gradeLevel || !schoolYearId) {
+    const normalizedCode = String(code || name || "").trim();
+
+    if (
+      !normalizedCode ||
+      !subjectId ||
+      !departmentId ||
+      !schoolYearId ||
+      !semester
+    ) {
       return res.status(400).json({
         success: false,
-        message: "name, departmentId, gradeLevel, schoolYearId are required",
+        message:
+          "code, subjectId, departmentId, schoolYearId, semester are required",
       });
     }
 
-    const [department, schoolYear] = await Promise.all([
+    const [department, schoolYear, subject] = await Promise.all([
       Department.findById(departmentId),
       SchoolYear.findById(schoolYearId),
+      Subject.findById(subjectId),
     ]);
 
     if (!department) {
@@ -147,15 +169,34 @@ router.post("/", adminOnly, async (req, res, next) => {
       });
     }
 
+    if (!subject) {
+      return res.status(404).json({
+        success: false,
+        message: "Subject not found",
+      });
+    }
+
+    if (String(subject.departmentId) !== String(departmentId)) {
+      return res.status(400).json({
+        success: false,
+        message: "Môn học không thuộc khoa đã chọn",
+      });
+    }
+
     const classData = await Class.create({
-      name: name.trim(),
+      code: normalizedCode,
+      name: String(name || normalizedCode).trim(),
+      subjectId,
       departmentId,
-      gradeLevel: Number(gradeLevel),
       schoolYearId,
+      semester: Number(semester),
       teacherId: teacherId || null,
+      weights,
+      txCount,
     });
 
     const populatedClass = await Class.findById(classData._id)
+      .populate("subjectId", "_id code name credits")
       .populate("departmentId", "_id code name")
       .populate("schoolYearId", "_id name isCurrent")
       .populate("teacherId", "name email");
@@ -169,7 +210,7 @@ router.post("/", adminOnly, async (req, res, next) => {
     if (error.code === 11000) {
       return res.status(409).json({
         success: false,
-        message: "Class name already exists in this school year",
+        message: "Class code already exists in this semester and school year",
       });
     }
 
@@ -187,11 +228,15 @@ router.put("/:id", async (req, res, next) => {
     }
 
     const allowedFields = [
+      "code",
       "name",
+      "subjectId",
       "departmentId",
-      "gradeLevel",
       "schoolYearId",
+      "semester",
       "teacherId",
+      "weights",
+      "txCount",
       "studentCount",
       "isActive",
     ];
@@ -207,12 +252,34 @@ router.put("/:id", async (req, res, next) => {
       payload.name = String(payload.name).trim();
     }
 
-    if (payload.departmentId !== undefined) {
-      const department = await Department.findById(payload.departmentId);
+    const checkDepartmentId = payload.departmentId || undefined;
+
+    if (checkDepartmentId !== undefined) {
+      const department = await Department.findById(checkDepartmentId);
       if (!department) {
         return res.status(404).json({
           success: false,
           message: "Department not found",
+        });
+      }
+    }
+
+    if (payload.subjectId !== undefined) {
+      const subject = await Subject.findById(payload.subjectId);
+      if (!subject) {
+        return res.status(404).json({
+          success: false,
+          message: "Subject not found",
+        });
+      }
+
+      if (
+        checkDepartmentId &&
+        String(subject.departmentId) !== String(checkDepartmentId)
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Môn học không thuộc khoa đã chọn",
         });
       }
     }
@@ -227,9 +294,8 @@ router.put("/:id", async (req, res, next) => {
       }
     }
 
-    if (payload.gradeLevel !== undefined) {
-      payload.gradeLevel = Number(payload.gradeLevel);
-    }
+    if (payload.semester !== undefined)
+      payload.semester = Number(payload.semester);
 
     if (payload.studentCount !== undefined) {
       payload.studentCount = Math.max(0, Number(payload.studentCount));
@@ -239,6 +305,7 @@ router.put("/:id", async (req, res, next) => {
       new: true,
       runValidators: true,
     })
+      .populate("subjectId", "_id code name credits")
       .populate("departmentId", "_id code name")
       .populate("schoolYearId", "_id name isCurrent")
       .populate("teacherId", "name email");

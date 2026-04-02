@@ -59,12 +59,10 @@ const buildStudents = (classes) => {
   });
 };
 
-const buildSampleScores = (subjects) =>
-  subjects.map((subject) => ({
-    subjectId: subject._id,
-    subjectCode: subject.code,
-    score: Number((6 + Math.random() * 3.5).toFixed(1)),
-  }));
+const buildScoreArray = (count) =>
+  Array.from({ length: count }, () =>
+    Number((5 + Math.random() * 4.8).toFixed(1)),
+  );
 
 const seed = async () => {
   await connectDatabase();
@@ -89,56 +87,80 @@ const seed = async () => {
       name: "Lập trình cơ bản",
       departmentCode: "CNTT",
       semester: 1,
+      credits: 3,
       coefficient: 2,
+      defaultWeights: { tx: 10, gk: 30, th: 0, tkt: 60 },
+      txCount: 3,
     },
     {
       code: "csdl",
       name: "Cơ sở dữ liệu",
       departmentCode: "CNTT",
       semester: 2,
+      credits: 3,
       coefficient: 2,
+      defaultWeights: { tx: 10, gk: 30, th: 0, tkt: 60 },
+      txCount: 3,
     },
     {
       code: "mmt",
       name: "Mạng máy tính",
       departmentCode: "CNTT",
       semester: 2,
+      credits: 2,
       coefficient: 1,
+      defaultWeights: { tx: 10, gk: 30, th: 0, tkt: 60 },
+      txCount: 3,
     },
     {
       code: "ktpm",
       name: "Kỹ thuật phần mềm",
       departmentCode: "CNTT",
       semester: 2,
+      credits: 3,
       coefficient: 2,
+      defaultWeights: { tx: 10, gk: 20, th: 30, tkt: 40 },
+      txCount: 3,
     },
     {
       code: "co",
       name: "Cơ học",
       departmentCode: "KTKT",
       semester: 1,
+      credits: 3,
       coefficient: 2,
+      defaultWeights: { tx: 10, gk: 30, th: 0, tkt: 60 },
+      txCount: 3,
     },
     {
       code: "vl",
       name: "Vật lý đại cương",
       departmentCode: "KTKT",
       semester: 1,
+      credits: 2,
       coefficient: 1,
+      defaultWeights: { tx: 10, gk: 30, th: 0, tkt: 60 },
+      txCount: 3,
     },
     {
       code: "ktvm",
       name: "Kinh tế vi mô",
       departmentCode: "QTKD",
       semester: 1,
+      credits: 3,
       coefficient: 2,
+      defaultWeights: { tx: 10, gk: 30, th: 0, tkt: 60 },
+      txCount: 3,
     },
     {
       code: "ktvm2",
       name: "Kinh tế vĩ mô",
       departmentCode: "QTKD",
       semester: 2,
+      credits: 3,
       coefficient: 2,
+      defaultWeights: { tx: 10, gk: 30, th: 0, tkt: 60 },
+      txCount: 3,
     },
   ]
     .filter((item) => departmentMap.has(item.departmentCode))
@@ -147,8 +169,11 @@ const seed = async () => {
       name: item.name,
       departmentId: departmentMap.get(item.departmentCode)._id,
       semester: item.semester,
+      credits: item.credits,
       coefficient: item.coefficient,
-      category: "specialized",
+      category: "theory",
+      defaultWeights: item.defaultWeights,
+      txCount: item.txCount,
     }));
 
   await Subject.insertMany(subjectSeeds, { ordered: false }).catch(() => {});
@@ -219,31 +244,70 @@ const seed = async () => {
 
   const classPayloads = [
     {
-      name: "CNTT01",
+      code: "CNTT-LTCB-01",
+      name: "Lớp Lập trình cơ bản 01",
+      subjectCode: "ltcb",
       departmentId: departmentMap.get("CNTT")?._id,
-      gradeLevel: 11,
       schoolYearId: schoolYear?._id,
+      semester: 1,
       teacherId: teacher1?._id || null,
     },
     {
-      name: "CNTT02",
+      code: "CNTT-CSDL-01",
+      name: "Lớp Cơ sở dữ liệu 01",
+      subjectCode: "csdl",
       departmentId: departmentMap.get("CNTT")?._id,
-      gradeLevel: 11,
       schoolYearId: schoolYear?._id,
+      semester: 2,
       teacherId: teacher2?._id || null,
     },
     {
-      name: "KTKT01",
+      code: "KTKT-CO-01",
+      name: "Lớp Cơ học 01",
+      subjectCode: "co",
       departmentId: departmentMap.get("KTKT")?._id,
-      gradeLevel: 12,
       schoolYearId: schoolYear?._id,
+      semester: 1,
       teacherId: teacher2?._id || null,
     },
   ].filter((item) => item.departmentId && item.schoolYearId);
 
-  for (const payload of classPayloads) {
+  const subjectDocs = await Subject.find({
+    code: { $in: classPayloads.map((item) => item.subjectCode) },
+  }).select("_id code defaultWeights txCount departmentId");
+
+  const subjectByCode = new Map(
+    subjectDocs.map((subject) => [subject.code, subject]),
+  );
+
+  const normalizedClassPayloads = classPayloads
+    .map((payload) => {
+      const subject = subjectByCode.get(payload.subjectCode);
+      if (!subject) {
+        return null;
+      }
+
+      return {
+        code: payload.code,
+        name: payload.name,
+        subjectId: subject._id,
+        departmentId: payload.departmentId,
+        schoolYearId: payload.schoolYearId,
+        semester: payload.semester,
+        teacherId: payload.teacherId,
+        weights: subject.defaultWeights,
+        txCount: subject.txCount,
+      };
+    })
+    .filter(Boolean);
+
+  for (const payload of normalizedClassPayloads) {
     await Class.updateOne(
-      { name: payload.name, schoolYearId: payload.schoolYearId },
+      {
+        code: payload.code,
+        schoolYearId: payload.schoolYearId,
+        semester: payload.semester,
+      },
       { $setOnInsert: payload },
       { upsert: true },
     );
@@ -259,7 +323,6 @@ const seed = async () => {
     await classDoc.save();
   }
 
-  const allSubjects = await Subject.find({ isActive: true });
   const allStudents = await Student.find({
     classId: { $in: classes.map((item) => item._id) },
   });
@@ -268,20 +331,21 @@ const seed = async () => {
     const classDoc = classes.find(
       (item) => String(item._id) === String(student.classId),
     );
-    const classSubjects = allSubjects.filter(
-      (subject) =>
-        String(subject.departmentId) === String(classDoc.departmentId),
-    );
+    const txCount = Number(classDoc.txCount || 3);
+    const hasPractice = Number(classDoc.weights?.th || 0) > 0;
 
     return {
       studentId: student._id,
       classId: classDoc._id,
+      subjectId: classDoc.subjectId,
       departmentId: classDoc.departmentId,
       schoolYearId: schoolYear._id,
-      semester: 1,
-      scores: buildSampleScores(classSubjects),
-      attendanceAbsent: Math.floor(Math.random() * 5),
-      conductScore: ["Tốt", "Khá", "Trung Bình"][Math.floor(Math.random() * 3)],
+      semester: classDoc.semester,
+      weights: classDoc.weights,
+      txScores: buildScoreArray(txCount),
+      gkScore: Number((5 + Math.random() * 4.5).toFixed(1)),
+      thScores: hasPractice ? buildScoreArray(2) : [],
+      tktScore: Number((4 + Math.random() * 5.5).toFixed(1)),
       enteredBy: teacher1?._id || null,
     };
   });

@@ -280,7 +280,7 @@ const importValidRows = async (validRows, enteredBy) => {
       .filter((writeError) => writeError.code === 11000)
       .map((writeError) => ({
         index: writeError.index,
-        message: "Đã tồn tại bảng điểm học kỳ này",
+        message: "Đã tồn tại bảng điểm của sinh viên trong lớp học phần này",
       }));
 
     const importedCount = docs.length - error.writeErrors.length;

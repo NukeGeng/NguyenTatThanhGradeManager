@@ -38,7 +38,17 @@
 
 ## AI ENGINE
 
-_(Chưa có task nào hoàn thành)_
+## [DONE-004] Ngày 4 - AI Engine Generate Data Train Model
+
+- Ngày: 02/04/2026
+- File đã tạo/sửa: ai-engine/data/generate_data.py
+- Ghi chú: Đã tạo script sinh dữ liệu giả 1000 học sinh, gán nhãn theo rule học lực + noise 10%, lưu ra data/students.csv và in phân phối nhãn.
+
+## [DONE-005] Đồng bộ update mới ngày 1-4.1 (NTTU)
+
+- Ngày: 02/04/2026
+- File đã tạo/sửa: backend/src/models/Subject.js, backend/src/models/Class.js, backend/src/models/Grade.js, backend/src/routes/subjects.js, backend/src/routes/classes.js, backend/src/routes/grades.js, backend/src/services/importService.js, backend/src/scripts/seedData.js, ai-engine/data/generate_data.py
+- Ghi chú: Đã cập nhật model và routes theo hệ NTTU (weights TX/GK/TH/TKT, finalScore, gpa4, letterGrade, lớp học phần) và nâng generate_data.py sang đọc môn active từ MongoDB + lưu subject_codes.json.
 
 ---
 
