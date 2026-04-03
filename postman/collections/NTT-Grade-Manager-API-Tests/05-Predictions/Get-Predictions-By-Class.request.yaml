@@ -1,0 +1,53 @@
+$kind: http-request
+name: Get Predictions By Class
+method: GET
+url: '{{baseUrl}}/api/predictions/class/{{classId}}'
+order: 4000
+headers:
+  - key: Authorization
+    value: 'Bearer {{authToken}}'
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Status code is 200", function () {
+        pm.response.to.have.status(200);
+      });
+
+      pm.test("Response has success true", function () {
+        const json = pm.response.json();
+        pm.expect(json.success).to.be.true;
+      });
+
+      pm.test("Response data is an array", function () {
+        const json = pm.response.json();
+        pm.expect(json.data).to.be.an("array");
+      });
+
+      pm.test("Message is correct", function () {
+        const json = pm.response.json();
+        pm.expect(json.message).to.equal("Get class latest predictions successfully");
+      });
+
+      pm.test("Returns latest prediction per student (no duplicates)", function () {
+        const json = pm.response.json();
+        if (json.data.length > 1) {
+          const studentIds = json.data.map(function (p) {
+            return p.studentId && p.studentId._id
+              ? p.studentId._id
+              : String(p.studentId);
+          });
+          const uniqueIds = new Set(studentIds);
+          pm.expect(uniqueIds.size).to.equal(studentIds.length);
+        }
+      });
+
+      pm.test("Each prediction has required fields", function () {
+        const json = pm.response.json();
+        if (json.data.length > 0) {
+          const prediction = json.data[0];
+          pm.expect(prediction).to.have.property("studentId");
+          pm.expect(prediction).to.have.property("predictedRank");
+          pm.expect(prediction).to.have.property("riskLevel");
+        }
+      });

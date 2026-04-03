@@ -1,6 +1,7 @@
 const express = require("express");
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose");
 const User = require("../models/User");
 const Department = require("../models/Department");
 const AuditLog = require("../models/AuditLog");
@@ -61,18 +62,40 @@ router.post("/register", async (req, res, next) => {
 
     const normalizedRole = role === "admin" ? "admin" : "teacher";
 
-    if (normalizedRole === "teacher" && departmentIds.length === 0) {
+    if (!Array.isArray(departmentIds)) {
+      return res.status(400).json({
+        success: false,
+        message: "departmentIds must be an array",
+      });
+    }
+
+    const normalizedDepartmentIds = departmentIds
+      .map((item) => String(item || "").trim())
+      .filter(Boolean);
+
+    const hasInvalidDepartmentId = normalizedDepartmentIds.some(
+      (item) => !mongoose.Types.ObjectId.isValid(item),
+    );
+
+    if (hasInvalidDepartmentId) {
+      return res.status(400).json({
+        success: false,
+        message: "departmentIds phải là ObjectId hợp lệ",
+      });
+    }
+
+    if (normalizedRole === "teacher" && normalizedDepartmentIds.length === 0) {
       return res.status(400).json({
         success: false,
         message: "Teacher must belong to at least one department",
       });
     }
 
-    if (departmentIds.length > 0) {
+    if (normalizedDepartmentIds.length > 0) {
       const count = await Department.countDocuments({
-        _id: { $in: departmentIds },
+        _id: { $in: normalizedDepartmentIds },
       });
-      if (count !== departmentIds.length) {
+      if (count !== normalizedDepartmentIds.length) {
         return res.status(400).json({
           success: false,
           message: "Some departmentIds are invalid",
@@ -96,7 +119,7 @@ router.post("/register", async (req, res, next) => {
       email: email.toLowerCase().trim(),
       password: hashedPassword,
       role: normalizedRole,
-      departmentIds: normalizedRole === "admin" ? [] : departmentIds,
+      departmentIds: normalizedRole === "admin" ? [] : normalizedDepartmentIds,
     });
 
     const token = signToken(user);

@@ -1,0 +1,58 @@
+$kind: http-request
+name: Predict Valid Grade
+method: POST
+url: "{{baseUrl}}/api/predictions/predict"
+order: 1000
+headers:
+  - key: Content-Type
+    value: application/json
+  - key: Authorization
+    value: "Bearer {{authToken}}"
+body:
+  type: json
+  content: |-
+    {
+      "gradeId": "{{gradeId}}"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Status code is 201", function () {
+        pm.response.to.have.status(201);
+      });
+
+      pm.test("Response has success true", function () {
+        const json = pm.response.json();
+        pm.expect(json.success).to.be.true;
+      });
+
+      pm.test("Response contains prediction data", function () {
+        const json = pm.response.json();
+        pm.expect(json.data).to.be.an("object");
+        pm.expect(json.message).to.equal("Predict student successfully");
+      });
+
+      pm.test("Prediction has required AI fields", function () {
+        const json = pm.response.json();
+        pm.expect(json.data).to.have.property("predictedRank");
+        pm.expect(json.data).to.have.property("confidence");
+        pm.expect(json.data).to.have.property("riskLevel");
+        pm.expect(json.data).to.have.property("weakSubjects");
+        pm.expect(json.data).to.have.property("suggestions");
+      });
+
+      pm.test("Prediction has student and grade references", function () {
+        const json = pm.response.json();
+        pm.expect(json.data).to.have.property("studentId");
+        pm.expect(json.data).to.have.property("gradeId");
+      });
+
+      // Save prediction ID for later use
+      if (pm.response.code === 201) {
+        const json = pm.response.json();
+        if (json.data && json.data._id) {
+          pm.collectionVariables.set("predictionId", json.data._id);
+          pm.environment.set("predictionId", json.data._id);
+        }
+      }

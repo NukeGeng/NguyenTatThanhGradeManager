@@ -1,0 +1,48 @@
+$kind: http-request
+name: Create Grade Success
+method: POST
+url: "{{baseUrl}}/api/grades"
+order: 1000
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: "{{authToken}}"
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "studentId": "{{studentId}}",
+      "classId": "{{classId}}",
+      "txScores": [8, 7, 9],
+      "gkScore": 7.5,
+      "thScores": [8],
+      "tktScore": 8
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Status code is 201", function () {
+          pm.response.to.have.status(201);
+      });
+      pm.test("success is true", function () {
+          var json = pm.response.json();
+          pm.expect(json.success).to.eql(true);
+      });
+      pm.test("data.finalScore exists (auto-calculated)", function () {
+          var json = pm.response.json();
+          pm.expect(json.data).to.have.property("finalScore");
+      });
+      pm.test("data.letterGrade exists", function () {
+          var json = pm.response.json();
+          pm.expect(json.data).to.have.property("letterGrade");
+      });
+      pm.test("Save gradeId", function () {
+          var json = pm.response.json();
+          pm.collectionVariables.set("gradeId", json.data._id);
+          pm.environment.set("gradeId", json.data._id);
+      });

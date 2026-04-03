@@ -1,0 +1,36 @@
+$kind: http-request
+name: Register Teacher
+method: POST
+url: "{{baseUrl}}/api/auth/register"
+order: 3000
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: "{{authToken}}"
+headers:
+  - key: Authorization
+    value: "Bearer {{authToken}}"
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "name": "Teacher Test",
+      "email": "gvtest@nttu.edu.vn",
+      "password": "Teacher@123",
+      "role": "teacher",
+      "departmentIds": ["{{departmentId}}"]
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Status code is 201 or 400/409", function () {
+          pm.expect([201, 400, 409]).to.include(pm.response.code);
+      });
+      pm.test("success field exists", function () {
+          var json = pm.response.json();
+          pm.expect(json).to.have.property("success");
+      });

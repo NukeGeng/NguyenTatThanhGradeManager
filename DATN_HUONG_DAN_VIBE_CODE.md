@@ -744,6 +744,8 @@ Ngày 14 │ Viết báo cáo + chuẩn bị slide demo
 > Stack: Angular v21 | Node.js Express | Python FastAPI | MongoDB Mongoose | JWT Auth
 > Yêu cầu code: TypeScript strict (không dùng any), comment tiếng Việt, có xử lý lỗi
 > Chỉ trả code, không giải thích dài.
+> Luôn ghi công việc vừa hoàn thành vào DONE.md
+> Luôn ghi BUGS nếu gặp vào BUGS.md
 > ```
 
 ---

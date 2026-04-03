@@ -1,0 +1,35 @@
+$kind: http-request
+name: Update Student
+method: PUT
+url: '{{baseUrl}}/api/students/{{studentId}}'
+order: 5000
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: '{{authToken}}'
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "fullName": "Nguyen Van A Updated",
+      "status": "inactive"
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.response.to.have.status(200);
+      });
+      pm.test("success is true", function () {
+          var json = pm.response.json();
+          pm.expect(json.success).to.eql(true);
+      });
+      pm.test("data.fullName equals 'Nguyen Van A Updated'", function () {
+          var json = pm.response.json();
+          pm.expect(json.data.fullName).to.eql("Nguyen Van A Updated");
+      });

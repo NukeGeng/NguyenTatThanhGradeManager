@@ -1,0 +1,49 @@
+$kind: http-request
+name: Get Grades By Class
+method: GET
+url: '{{baseUrl}}/api/grades/class/{{classId}}'
+order: 5000
+headers:
+  - key: Authorization
+    value: 'Bearer {{authToken}}'
+queryParams:
+  - key: semester
+    value: '1'
+    description: 'Optional: filter by semester number'
+    disabled: true
+  - key: schoolYearId
+    value: '{{schoolYearId}}'
+    description: 'Optional: filter by school year ID'
+    disabled: true
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Status code is 200", function () {
+        pm.response.to.have.status(200);
+      });
+
+      pm.test("Response has success true", function () {
+        const json = pm.response.json();
+        pm.expect(json.success).to.be.true;
+      });
+
+      pm.test("Response data is an array", function () {
+        const json = pm.response.json();
+        pm.expect(json.data).to.be.an("array");
+      });
+
+      pm.test("Message is correct", function () {
+        const json = pm.response.json();
+        pm.expect(json.message).to.equal("Get class grades successfully");
+      });
+
+      pm.test("Each grade has classId matching requested class", function () {
+        const json = pm.response.json();
+        if (json.data.length > 0) {
+          const grade = json.data[0];
+          pm.expect(grade).to.have.property("classId");
+          pm.expect(grade).to.have.property("studentId");
+          pm.expect(grade).to.have.property("subjectId");
+        }
+      });

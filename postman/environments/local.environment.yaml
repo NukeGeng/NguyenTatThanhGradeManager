@@ -1,0 +1,11 @@
+name: local
+values:
+  - key: baseUrl
+    value: 'http://localhost:3000'
+    enabled: true
+  - key: authToken
+    value: ''
+    enabled: true
+  - key: adminId
+    value: ''
+    enabled: true

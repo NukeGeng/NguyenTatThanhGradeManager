@@ -1,0 +1,28 @@
+$kind: http-request
+name: Get Subjects And Save SubjectId
+method: GET
+url: "{{baseUrl}}/api/subjects?departmentId={{departmentId}}&isActive=true"
+order: 800
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: "{{authToken}}"
+headers:
+  - key: Authorization
+    value: "Bearer {{authToken}}"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.response.to.have.status(200);
+      });
+      pm.test("Save first subjectId", function () {
+          var json = pm.response.json();
+          pm.expect(json.success).to.eql(true);
+          pm.expect(Array.isArray(json.data)).to.eql(true);
+          pm.expect(json.data.length).to.be.above(0);
+          pm.collectionVariables.set("subjectId", json.data[0]._id);
+          pm.environment.set("subjectId", json.data[0]._id);
+      });

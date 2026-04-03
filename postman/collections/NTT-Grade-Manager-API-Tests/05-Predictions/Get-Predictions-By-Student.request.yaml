@@ -1,0 +1,42 @@
+$kind: http-request
+name: Get Predictions By Student
+method: GET
+url: '{{baseUrl}}/api/predictions/student/{{studentId}}'
+order: 3000
+headers:
+  - key: Authorization
+    value: 'Bearer {{authToken}}'
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Status code is 200", function () {
+        pm.response.to.have.status(200);
+      });
+
+      pm.test("Response has success true", function () {
+        const json = pm.response.json();
+        pm.expect(json.success).to.be.true;
+      });
+
+      pm.test("Response data is an array", function () {
+        const json = pm.response.json();
+        pm.expect(json.data).to.be.an("array");
+      });
+
+      pm.test("Message is correct", function () {
+        const json = pm.response.json();
+        pm.expect(json.message).to.equal("Get student predictions successfully");
+      });
+
+      pm.test("Each prediction has required fields", function () {
+        const json = pm.response.json();
+        if (json.data.length > 0) {
+          const prediction = json.data[0];
+          pm.expect(prediction).to.have.property("studentId");
+          pm.expect(prediction).to.have.property("gradeId");
+          pm.expect(prediction).to.have.property("predictedRank");
+          pm.expect(prediction).to.have.property("riskLevel");
+          pm.expect(prediction).to.have.property("confidence");
+        }
+      });

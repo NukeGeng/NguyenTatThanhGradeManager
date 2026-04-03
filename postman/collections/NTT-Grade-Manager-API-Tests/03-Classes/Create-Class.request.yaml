@@ -1,0 +1,39 @@
+$kind: http-request
+name: Create Class
+method: POST
+url: "{{baseUrl}}/api/classes"
+order: 1000
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: "{{authToken}}"
+headers:
+  - key: Content-Type
+    value: application/json
+body:
+  type: json
+  content: |-
+    {
+      "code": "PM{{$timestamp}}",
+      "subjectId": "{{subjectId}}",
+      "departmentId": "{{departmentId}}",
+      "schoolYearId": "{{schoolYearId}}",
+      "semester": 1
+    }
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Status code is 201", function () {
+          pm.response.to.have.status(201);
+      });
+      pm.test("success is true", function () {
+          var json = pm.response.json();
+          pm.expect(json.success).to.eql(true);
+      });
+      pm.test("Save classId", function () {
+          var json = pm.response.json();
+          pm.collectionVariables.set("classId", json.data._id);
+          pm.environment.set("classId", json.data._id);
+      });

@@ -1,0 +1,36 @@
+$kind: http-request
+name: Login Admin Success
+method: POST
+url: "{{baseUrl}}/api/auth/login"
+order: 1000
+headers:
+  Content-Type: application/json
+body:
+  type: json
+  content: |-
+    {
+      "email": "admin@nttu.edu.vn",
+      "password": "Admin@123"
+    }
+scripts:
+  - type: afterResponse
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.response.to.have.status(200);
+      });
+      pm.test("success is true", function () {
+          var json = pm.response.json();
+          pm.expect(json.success).to.eql(true);
+      });
+      pm.test("Response has data.token", function () {
+          var json = pm.response.json();
+          pm.expect(json.data).to.have.property("token");
+      });
+      pm.test("Save authToken and adminId", function () {
+          var json = pm.response.json();
+          pm.collectionVariables.set("authToken", json.data.token);
+          pm.collectionVariables.set("adminId", json.data.user._id);
+          pm.environment.set("authToken", json.data.token);
+          pm.environment.set("adminId", json.data.user._id);
+      });
+    language: text/javascript

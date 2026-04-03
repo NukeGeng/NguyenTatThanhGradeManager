@@ -1,0 +1,28 @@
+$kind: http-request
+name: Get Classes And Save ClassId
+method: GET
+url: "{{baseUrl}}/api/classes"
+order: 900
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: "{{authToken}}"
+headers:
+  - key: Authorization
+    value: "Bearer {{authToken}}"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.response.to.have.status(200);
+      });
+      pm.test("Save first classId", function () {
+          var json = pm.response.json();
+          pm.expect(json.success).to.eql(true);
+          pm.expect(Array.isArray(json.data)).to.eql(true);
+          pm.expect(json.data.length).to.be.above(0);
+          pm.collectionVariables.set("classId", json.data[0]._id);
+          pm.environment.set("classId", json.data[0]._id);
+      });

@@ -11,6 +11,7 @@ const subjectRoutes = require("./routes/subjects");
 const classRoutes = require("./routes/classes");
 const gradeRoutes = require("./routes/grades");
 const studentRoutes = require("./routes/students");
+const predictionRoutes = require("./routes/predictions");
 const errorHandler = require("./middleware/errorHandler");
 
 dotenv.config();
@@ -36,6 +37,7 @@ app.use("/api/subjects", subjectRoutes);
 app.use("/api/classes", classRoutes);
 app.use("/api/grades", gradeRoutes);
 app.use("/api/students", studentRoutes);
+app.use("/api/predictions", predictionRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

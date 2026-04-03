@@ -1,0 +1,23 @@
+$kind: collection
+name: NTT Grade Manager - API Tests
+variables:
+  - key: baseUrl
+    value: 'http://localhost:3000'
+  - key: authToken
+    value: ''
+  - key: adminId
+    value: ''
+  - key: studentId
+    value: ''
+  - key: classId
+    value: ''
+  - key: gradeId
+    value: ''
+  - key: departmentId
+    value: ''
+  - key: subjectId
+    value: ''
+  - key: schoolYearId
+    value: ''
+  - key: teacherId
+    value: ''

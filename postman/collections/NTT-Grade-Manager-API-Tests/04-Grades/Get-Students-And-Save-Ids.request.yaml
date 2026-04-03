@@ -1,0 +1,41 @@
+$kind: http-request
+name: Get Students And Save Ids
+method: GET
+url: "{{baseUrl}}/api/students"
+order: 900
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: "{{authToken}}"
+headers:
+  - key: Authorization
+    value: "Bearer {{authToken}}"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.response.to.have.status(200);
+      });
+      pm.test("Save studentId and classId", function () {
+          var existingStudentId = pm.collectionVariables.get("studentId") || pm.environment.get("studentId");
+          var existingClassId = pm.collectionVariables.get("classId") || pm.environment.get("classId");
+
+          if (existingStudentId && existingClassId) {
+              pm.collectionVariables.set("studentId", existingStudentId);
+              pm.environment.set("studentId", existingStudentId);
+              pm.collectionVariables.set("classId", existingClassId);
+              pm.environment.set("classId", existingClassId);
+              return;
+          }
+
+          var json = pm.response.json();
+          pm.expect(json.success).to.eql(true);
+          pm.expect(Array.isArray(json.data)).to.eql(true);
+          pm.expect(json.data.length).to.be.above(0);
+          pm.collectionVariables.set("studentId", json.data[0]._id);
+          pm.environment.set("studentId", json.data[0]._id);
+          pm.collectionVariables.set("classId", json.data[0].classId._id || json.data[0].classId);
+          pm.environment.set("classId", json.data[0].classId._id || json.data[0].classId);
+      });

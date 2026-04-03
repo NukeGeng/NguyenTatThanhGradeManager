@@ -1,0 +1,72 @@
+$kind: http-request
+name: Get Students And Save GradeId
+method: GET
+url: "{{baseUrl}}/api/students"
+order: 900
+auth:
+  type: bearer
+  credentials:
+    - key: token
+      value: "{{authToken}}"
+headers:
+  - key: Authorization
+    value: "Bearer {{authToken}}"
+scripts:
+  - type: afterResponse
+    language: text/javascript
+    code: |-
+      pm.test("Status code is 200", function () {
+          pm.response.to.have.status(200);
+      });
+      pm.test("Save studentId/classId and fetch gradeId", function () {
+          var existingGradeId = pm.collectionVariables.get("gradeId") || pm.environment.get("gradeId");
+          var existingStudentId = pm.collectionVariables.get("studentId") || pm.environment.get("studentId");
+          var existingClassId = pm.collectionVariables.get("classId") || pm.environment.get("classId");
+
+          if (existingGradeId && existingStudentId && existingClassId) {
+              pm.collectionVariables.set("gradeId", existingGradeId);
+              pm.environment.set("gradeId", existingGradeId);
+              pm.collectionVariables.set("studentId", existingStudentId);
+              pm.environment.set("studentId", existingStudentId);
+              pm.collectionVariables.set("classId", existingClassId);
+              pm.environment.set("classId", existingClassId);
+              return;
+          }
+
+          var json = pm.response.json();
+          pm.expect(json.success).to.eql(true);
+          pm.expect(Array.isArray(json.data)).to.eql(true);
+          pm.expect(json.data.length).to.be.above(0);
+
+          var studentId = json.data[0]._id;
+          var classId = json.data[0].classId && json.data[0].classId._id
+              ? json.data[0].classId._id
+              : json.data[0].classId;
+
+          pm.collectionVariables.set("studentId", studentId);
+          pm.environment.set("studentId", studentId);
+          pm.collectionVariables.set("classId", classId);
+          pm.environment.set("classId", classId);
+
+          var baseUrl = pm.collectionVariables.get("baseUrl") || pm.environment.get("baseUrl");
+          var authToken = pm.collectionVariables.get("authToken") || pm.environment.get("authToken");
+
+          pm.sendRequest({
+              url: baseUrl + "/api/grades/student/" + studentId,
+              method: "GET",
+              header: {
+                  Authorization: "Bearer " + authToken
+              }
+          }, function (err, res) {
+              pm.test("Fetch gradeId for prediction", function () {
+                  pm.expect(err).to.eql(null);
+                  pm.expect(res.code).to.eql(200);
+                  var gradeJson = res.json();
+                  pm.expect(Array.isArray(gradeJson.data)).to.eql(true);
+                  pm.expect(gradeJson.data.length).to.be.above(0);
+                  var gradeId = gradeJson.data[0]._id;
+                  pm.collectionVariables.set("gradeId", gradeId);
+                  pm.environment.set("gradeId", gradeId);
+              });
+          });
+      });

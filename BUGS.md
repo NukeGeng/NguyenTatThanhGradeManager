@@ -28,6 +28,87 @@
 - Fix: Cấu hình Python environment cho workspace và cài packages: pandas, scikit-learn, numpy, pymongo, python-dotenv.
 - Trạng thái: ✅ Đã fix
 
+## [BUG-002] Lỗi thiếu FastAPI/Uvicorn khi tạo AI API
+
+- Ngày: 03/04/2026
+- File/Vị trí: ai-engine/main.py
+- Mô tả: Pylance báo không resolve import fastapi, fastapi.middleware.cors và uvicorn.
+- Nguyên nhân: Môi trường .venv chưa cài package cho web API.
+- Fix: Cài thêm packages fastapi và uvicorn trong environment hiện tại.
+- Trạng thái: ✅ Đã fix
+
+## [BUG-003] Thiếu backend/.env nên không có MONGO_URI
+
+- Ngày: 03/04/2026
+- File/Vị trí: backend/.env (không tồn tại)
+- Mô tả: Thao tác thêm môn mới vào Subject collection lỗi Mongoose vì uri undefined.
+- Nguyên nhân: Chưa có file backend/.env nên dotenv không nạp được MONGO_URI.
+- Fix: Đã tạo backend/.env với MONGO_URI hợp lệ rồi chạy lại quy trình add subject -> generate_data -> train thành công.
+- Trạng thái: ✅ Đã fix
+
+## [BUG-004] Thiếu dữ liệu khoa CNTT khi thêm môn mới
+
+- Ngày: 03/04/2026
+- File/Vị trí: collection departments
+- Mô tả: Script thêm môn mới báo lỗi Department CNTT not found.
+- Nguyên nhân: DB chưa có bản ghi khoa CNTT.
+- Fix: Upsert khoa CNTT trước khi insert Subject mới trong script adminAddSubject.js.
+- Trạng thái: ✅ Đã fix
+
+## [BUG-005] Register teacher trả 500 khi departmentIds không hợp lệ
+
+- Ngày: 03/04/2026
+- File/Vị trí: backend/src/routes/auth.js
+- Mô tả: API /api/auth/register bị lỗi 500 khi body gửi departmentIds rỗng hoặc placeholder chưa resolve (ví dụ "{{departmentId}}").
+- Nguyên nhân: Query countDocuments cast ObjectId thất bại do departmentIds không đúng định dạng, lỗi đi thẳng vào errorHandler.
+- Fix: Bổ sung validate departmentIds là mảng, chuẩn hóa chuỗi id, kiểm tra ObjectId hợp lệ trước khi query DB, và trả 400 message rõ ràng.
+- Trạng thái: ✅ Đã fix
+
+## [BUG-006] Login admin trả 401 do thiếu dữ liệu seed user
+
+- Ngày: 03/04/2026
+- File/Vị trí: MongoDB collection users
+- Mô tả: Test /api/auth/login với admin@nttu.edu.vn trả 401.
+- Nguyên nhân: DB không có user admin (collection users rỗng).
+- Fix: Chạy lại script seed backend (npm run seed) để tạo user mặc định admin/teacher.
+- Trạng thái: ✅ Đã fix
+
+## [BUG-007] Postman Auth bị Unauthorized do lệch scope biến
+
+- Ngày: 03/04/2026
+- File/Vị trí: postman/collections/NTT-Grade-Manager-API-Tests/01-Auth/\*.request.yaml
+- Mô tả: Sau khi login vẫn bị 401 ở các request có token; register teacher báo thiếu departmentIds.
+- Nguyên nhân: authToken/departmentId được set ở collectionVariables nhưng môi trường Postman đang có biến cùng tên rỗng, làm override giá trị thực.
+- Fix: Đồng bộ set biến vào cả collection + environment và thêm header Authorization: Bearer {{authToken}} tường minh cho các request Auth cần token.
+- Trạng thái: ✅ Đã fix
+
+## [BUG-008] Collection lỗi dây chuyền do thiếu setup biến liên folder
+
+- Ngày: 03/04/2026
+- File/Vị trí: postman/collections/NTT-Grade-Manager-API-Tests/02-Students, 03-Classes, 04-Grades, 05-Predictions
+- Mô tả: Chạy full collection bị fail ở Create Class/Create Grade/Predict vì thiếu subjectId, schoolYearId, classId, gradeId hoặc bị override biến.
+- Nguyên nhân: Request phụ thuộc biến được tạo ở folder khác, nhưng chưa có bước setup/fallback đồng bộ cho từng folder.
+- Fix: Thêm các request setup lấy id động (class/subject/schoolYear/student/grade), lưu biến vào cả collection+environment; bỏ teacherId cứng khỏi Create Class; đổi code lớp sang dynamic để tránh trùng.
+- Trạng thái: ✅ Đã fix
+
+## [BUG-009] Frontend build lỗi do app.html còn template placeholder lẫn router shell
+
+- Ngày: 03/04/2026
+- File/Vị trí: frontend/src/app/app.html
+- Mô tả: `ng build` báo NG5002 (Invalid ICU/Unexpected closing tag) khi setup Day 8.
+- Nguyên nhân: app.html còn lẫn nội dung placeholder mặc định của Angular sau khi chèn router-outlet.
+- Fix: Ghi đè app.html về shell tối giản `<router-outlet></router-outlet>` rồi build lại thành công.
+- Trạng thái: ✅ Đã fix
+
+## [BUG-010] TS6 báo lỗi outDir ở tsconfig app/spec
+
+- Ngày: 03/04/2026
+- File/Vị trí: frontend/tsconfig.app.json, frontend/tsconfig.spec.json
+- Mô tả: VS Code báo lỗi tại outDir yêu cầu phải set rootDir tường minh cho layout output.
+- Nguyên nhân: TypeScript 6 yêu cầu explicit rootDir khi common source directory bị suy luận khác nhau giữa app/spec project.
+- Fix: Thêm `rootDir: "./src"` vào compilerOptions của cả tsconfig.app.json và tsconfig.spec.json.
+- Trạng thái: ✅ Đã fix
+
 ---
 
 ## TEMPLATE THÊM BUG MỚI
