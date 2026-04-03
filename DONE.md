@@ -110,11 +110,17 @@
 - File đã tạo/sửa: frontend/tsconfig.app.json, frontend/tsconfig.spec.json, BUGS.md
 - Ghi chú: Đã thêm rootDir cho cả app/spec tsconfig để hết lỗi TS6 tại outDir và xác nhận build frontend thành công.
 
+## [DONE-016] Ngày 8.2 - Login UI Angular Material
+
+- Ngày: 04/04/2026
+- File đã tạo/sửa: frontend/src/app/features/auth/login/login.component.ts, frontend/src/app/features/auth/login/login.component.html, frontend/src/app/features/auth/login/login.component.scss, frontend/src/app/app.config.ts, frontend/src/styles.scss, frontend/package.json
+- Ghi chú: Đã triển khai form đăng nhập bằng Reactive Forms + Validators, gọi AuthService.login(), điều hướng /dashboard khi thành công, hiển thị lỗi sai credentials, loading spinner khi submit, và cấu hình Angular Material theme/animations.
+
 ---
 
 ## FRONTEND
 
-_(Chưa có task nào hoàn thành)_
+- Đã hoàn thành Prompt 8.2 Login UI (xem DONE-016).
 
 ---
 
