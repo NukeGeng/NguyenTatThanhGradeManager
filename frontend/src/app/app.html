@@ -1,1 +1,22 @@
+@if (showShell) {
+  <header class="app-topbar">
+    <div class="container topbar-inner">
+      <a class="brand" routerLink="/dashboard">NTTU Grade Manager</a>
+
+      <nav class="main-nav">
+        <a
+          *ngFor="let item of visibleNavItems"
+          [routerLink]="item.path"
+          routerLinkActive="active"
+          class="nav-link"
+        >
+          {{ item.label }}
+        </a>
+      </nav>
+
+      <button type="button" class="logout-btn" (click)="logout()">Đăng xuất</button>
+    </div>
+  </header>
+}
+
 <router-outlet></router-outlet>

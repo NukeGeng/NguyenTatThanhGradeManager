@@ -1,9 +1,14 @@
 import { Routes } from '@angular/router';
-import { PredictionReportComponent } from './prediction-report.component';
 
 export const PREDICTIONS_ROUTES: Routes = [
   {
     path: '',
-    component: PredictionReportComponent,
+    loadComponent: () =>
+      import('./class-predictions.component').then((m) => m.ClassPredictionsComponent),
+  },
+  {
+    path: 'report/:gradeId',
+    loadComponent: () =>
+      import('./prediction-report.component').then((m) => m.PredictionReportComponent),
   },
 ];

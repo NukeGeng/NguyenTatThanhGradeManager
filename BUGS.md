@@ -119,6 +119,15 @@
 - Kiểm thử: Xác nhận backend health 200, login admin lấy token thành công, gọi đủ endpoints dashboard (students/classes/predictions/alerts) trả 200 với thời gian phản hồi ~0.18s-0.27s, build frontend pass.
 - Trạng thái: ✅ Đã fix
 
+## [BUG-012] Dữ liệu chỉ hiện sau khi user tương tác UI
+
+- Ngày: 04/04/2026
+- File/Vị trí: frontend/angular.json, frontend/src/app/app.config.ts, frontend/src/main.ts, frontend/package.json
+- Mô tả: Các trang gọi API xong nhưng giao diện vẫn đứng loading, chỉ khi bấm/nhập vào trang thì danh sách mới hiện ra.
+- Nguyên nhân: Frontend chưa nạp zone.js nên change detection không tự chạy sau callback async.
+- Fix: Thêm `zone.js` vào dependencies frontend, cấu hình `polyfills: ["zone.js"]` trong angular.json, và ép provider `provideZoneChangeDetection(...)` trong app config để khóa zone-based change detection toàn app.
+- Trạng thái: ✅ Đã fix
+
 ---
 
 ## TEMPLATE THÊM BUG MỚI

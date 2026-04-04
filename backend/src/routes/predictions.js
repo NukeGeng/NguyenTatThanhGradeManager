@@ -108,6 +108,95 @@ router.post("/predict", async (req, res, next) => {
   }
 });
 
+router.post("/predict-class", async (req, res, next) => {
+  try {
+    const { classId } = req.body;
+
+    if (!classId) {
+      return res.status(400).json({
+        success: false,
+        message: "classId là bắt buộc",
+      });
+    }
+
+    const classData = await Class.findById(classId).select(
+      "_id departmentId code name",
+    );
+
+    if (!classData) {
+      return res.status(404).json({
+        success: false,
+        message: "Class not found",
+      });
+    }
+
+    if (req.user.role !== "admin") {
+      const allowedDepartmentIds = getAllowedDepartmentIds(req.user);
+      if (!allowedDepartmentIds.includes(String(classData.departmentId))) {
+        return res.status(403).json({
+          success: false,
+          message: "Bạn không có quyền dự đoán cho lớp này",
+        });
+      }
+    }
+
+    const grades = await Grade.find({ classId: classData._id })
+      .populate("subjectId", "code name")
+      .populate("studentId", "_id classId")
+      .select(
+        "studentId classId departmentId subjectId finalScore gkScore tktScore txAvg conductScore hanhKiem so_buoi_vang attendanceAbsent diem_hk_truoc previousSemesterScore",
+      );
+
+    if (!grades.length) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          processed: 0,
+          failed: 0,
+          failures: [],
+        },
+        message: "Lớp chưa có bảng điểm để dự đoán",
+      });
+    }
+
+    const failures = [];
+    let processed = 0;
+
+    for (const grade of grades) {
+      try {
+        const aiResult = await predictStudent(grade);
+        const mappedPrediction = mapPredictionFromAI(aiResult);
+
+        await Prediction.create({
+          studentId: grade.studentId?._id || grade.studentId,
+          gradeId: grade._id,
+          ...mappedPrediction,
+        });
+
+        processed += 1;
+      } catch (error) {
+        failures.push({
+          gradeId: String(grade._id),
+          studentId: String(grade.studentId?._id || grade.studentId),
+          message: error?.message || "Không thể dự đoán",
+        });
+      }
+    }
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        processed,
+        failed: failures.length,
+        failures,
+      },
+      message: "Predict class completed",
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.get("/student/:studentId", async (req, res, next) => {
   try {
     const student = await Student.findById(req.params.studentId)

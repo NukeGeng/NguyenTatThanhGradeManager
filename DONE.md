@@ -152,6 +152,18 @@
 - File đã tạo/sửa: frontend/src/app/features/dashboard/dashboard.component.ts, BUGS.md, DONE.md
 - Ghi chú: Bổ sung try/catch khi apply dữ liệu và render/update Chart.js để lỗi runtime không giữ UI ở trạng thái loading; xác nhận backend data có thật (students/classes) và tất cả endpoint dashboard trả 200.
 
+## [DONE-023] Ngày 11 - Grade Entry + Import Excel/CSV + gọi AI lớp
+
+- Ngày: 04/04/2026
+- File đã tạo/sửa: frontend/src/app/features/grades/grade-entry/grade-entry.component.ts, frontend/src/app/features/grades/grade-import/grade-import.component.ts, frontend/src/app/features/grades/grades.routes.ts, backend/src/routes/predictions.js, DONE.md
+- Ghi chú: Đã triển khai luồng nhập điểm 3 bước theo lớp/sinh viên với preview điểm realtime + chỉnh trọng số + lưu điểm và gọi AI sau khi lưu; đã triển khai import 4 bước bằng MatStepper (tải mẫu, upload, preview, import) và bổ sung API POST /api/predictions/predict-class để chạy AI cả lớp.
+
+## [DONE-024] Fix global loading treo do thiếu zone.js
+
+- Ngày: 04/04/2026
+- File đã tạo/sửa: frontend/angular.json, frontend/src/app/app.config.ts, frontend/src/main.ts, frontend/package.json, BUGS.md, DONE.md
+- Ghi chú: Đã khóa fix ở mức framework bằng zone.js dependency + polyfills angular.json + provideZoneChangeDetection trong app config để toàn bộ trang tự cập nhật UI sau callback async, không cần chờ user tương tác.
+
 ---
 
 ## FRONTEND
@@ -161,6 +173,8 @@
 - Đã hoàn thành Day 10 quản lý Khoa/Môn/Lớp/Học sinh (xem DONE-020).
 - Đã fix dashboard treo loading và kiểm thử runtime (xem DONE-021).
 - Đã cứng hóa dashboard chống treo do lỗi render runtime (xem DONE-022).
+- Đã hoàn thành Day 11 nhập điểm + import + gọi AI lớp (xem DONE-023).
+- Đã fix lỗi global loading chỉ cập nhật khi user tương tác (xem DONE-024).
 
 ---
 
