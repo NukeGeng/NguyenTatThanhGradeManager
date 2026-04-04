@@ -744,8 +744,6 @@ Ngày 14 │ Viết báo cáo + chuẩn bị slide demo
 > Stack: Angular v21 | Node.js Express | Python FastAPI | MongoDB Mongoose | JWT Auth
 > Yêu cầu code: TypeScript strict (không dùng any), comment tiếng Việt, có xử lý lỗi
 > Chỉ trả code, không giải thích dài.
-> Luôn ghi công việc vừa hoàn thành vào DONE.md
-> Luôn ghi BUGS nếu gặp vào BUGS.md
 > ```
 
 ---
@@ -1296,50 +1294,85 @@ Format: method | endpoint | body | expected response
 
 ---
 
+## 🎨 DESIGN SYSTEM
+
+> Xem toàn bộ quy tắc CSS, màu sắc, button, icon trong file **`DESIGN_SYSTEM.md`**
+> Dán nội dung file đó vào đầu MỌI prompt Angular frontend.
+
+---
+
 ### 📅 NGÀY 8 — Setup Angular + Auth UI
 
-**Prompt 8.1 — Setup Angular:**
+**Prompt 8.1 — Setup Angular + Design System:**
 
 ```
-[DÙNG TEMPLATE CHUẨN]
+[TEMPLATE CHUẨN DỰ ÁN]
 
-Tạo Angular v21 standalone app với cấu trúc sau:
-1. app.config.ts: provideRouter với routes, provideHttpClient với withInterceptors
-2. app.routes.ts: lazy load các feature modules:
-   - /login → AuthModule
-   - /dashboard → DashboardModule (canActivate: authGuard)
-   - /students → StudentsModule (canActivate: authGuard)
-   - /classes → ClassesModule (canActivate: authGuard)
-   - /grades → GradesModule (canActivate: authGuard)
-   - /predictions → PredictionsModule (canActivate: authGuard)
-   - '' → redirect /dashboard
+Tạo Angular v21 standalone app với design system chuẩn NTTU:
 
-3. core/services/api.service.ts: base URL http://localhost:3000/api,
-   methods: get<T>, post<T>, put<T>, delete<T> — dùng HttpClient
+1. Cài packages:
+   npm install lucide-angular
+   (Google Font Be Vietnam Pro đã có trong index.html)
 
-4. core/services/auth.service.ts: login(), register(), logout(),
-   getCurrentUser(), isLoggedIn(): boolean, lưu token vào localStorage
+2. index.html: thêm vào <head>
+   <link href="https://fonts.googleapis.com/css2?family=Be+Vietnam+Pro:wght@400;500;600;700;800&display=swap" rel="stylesheet">
 
-5. core/guards/auth.guard.ts: kiểm tra isLoggedIn, redirect /login nếu chưa đăng nhập
+3. styles.scss — global styles:
+   - CSS variables đầy đủ: --navy, --blue, --blue-pale, --gold, --gray-*, --text, --text-sub
+   - Container: .container { max-width:1200px; margin-inline:auto; padding-inline:clamp(1rem,4vw,2rem) }
+   - Button base: display:inline-flex; align-items:center; gap:.4rem; line-height:1; white-space:nowrap
+   - Override Angular Material: font Be Vietnam Pro, mat-button dùng inline-flex, mat-icon size 18px
+   - Body: font-family Be Vietnam Pro, color var(--text), background #fff
 
-6. core/interceptors/jwt.interceptor.ts: tự gắn Authorization: Bearer token vào mọi request
+4. app.config.ts: provideRouter, provideHttpClient với withInterceptors,
+   provideAnimationsAsync
 
-7. shared/models/interfaces.ts: đầy đủ TypeScript interfaces cho
-   User, Student, Class, Grade, Prediction, ApiResponse<T>
+5. app.routes.ts: lazy load:
+   /login       → AuthModule
+   /dashboard   → DashboardModule  (authGuard)
+   /departments → DepartmentsModule (authGuard, adminOnly)
+   /users       → UsersModule       (authGuard, adminOnly)
+   /subjects    → SubjectsModule    (authGuard, adminOnly)
+   /classes     → ClassesModule     (authGuard)
+   /students    → StudentsModule    (authGuard)
+   /grades      → GradesModule      (authGuard)
+   /predictions → PredictionsModule (authGuard)
+   /notifications → NotificationsModule (authGuard)
+   ''           → redirect /dashboard
+
+6. core/services/api.service.ts: baseURL http://localhost:3000/api
+7. core/services/auth.service.ts: login, logout, getCurrentUser, isLoggedIn
+8. core/guards/auth.guard.ts + admin-only.guard.ts
+9. core/interceptors/jwt.interceptor.ts: gắn Bearer token tự động
+10. shared/models/interfaces.ts: interfaces cho 10 bảng đầy đủ
 ```
 
-**Prompt 8.2 — Login UI:**
+**Prompt 8.2 — Login Page:**
 
 ```
-[DÙNG TEMPLATE CHUẨN]
+[TEMPLATE CHUẨN DỰ ÁN]
 
-Tạo features/auth/login/login.component.ts (standalone, Angular v21):
-- Form: email + password dùng ReactiveForm với Validators
-- Gọi AuthService.login(), navigate /dashboard khi thành công
-- Hiện thông báo lỗi nếu sai credentials
-- Loading spinner khi đang gọi API
-- UI dùng Angular Material: mat-card, mat-form-field, mat-button, mat-progress-spinner
-- Thiết kế đẹp: centered card, logo/title ở trên, nền gradient nhẹ
+Tạo features/auth/login/login.component.ts (standalone):
+
+Layout: full-screen split 2 cột
+- Cột trái (40%): nền navy #0f2144, hiển thị logo NTTU + tên hệ thống
+  + tagline "Quản lý học tập thông minh"
+  + 3 bullet điểm tính năng với lucide-icon
+- Cột phải (60%): nền trắng, form login căn giữa
+
+Form:
+- Logo nhỏ + "Đăng nhập" tiêu đề
+- mat-form-field email với lucide-icon mail prefix
+- mat-form-field password với toggle show/hide dùng lucide-icon eye/eye-off
+- mat-checkbox "Ghi nhớ đăng nhập"
+- Button "Đăng nhập" full-width, nền navy, dùng inline-flex + align-items:center
+- Error message khi sai credentials
+
+Sau login thành công:
+- role=admin → navigate /dashboard
+- role=teacher → navigate /dashboard
+
+Responsive: mobile → 1 cột, ẩn cột trái
 ```
 
 ---

@@ -116,11 +116,51 @@
 - File đã tạo/sửa: frontend/src/app/features/auth/login/login.component.ts, frontend/src/app/features/auth/login/login.component.html, frontend/src/app/features/auth/login/login.component.scss, frontend/src/app/app.config.ts, frontend/src/styles.scss, frontend/package.json
 - Ghi chú: Đã triển khai form đăng nhập bằng Reactive Forms + Validators, gọi AuthService.login(), điều hướng /dashboard khi thành công, hiển thị lỗi sai credentials, loading spinner khi submit, và cấu hình Angular Material theme/animations.
 
+## [DONE-017] Bổ sung đầy đủ Day 8.1 + nâng cấp Day 8.2 theo design system NTTU
+
+- Ngày: 04/04/2026
+- File đã tạo/sửa: frontend/package.json, frontend/src/index.html, frontend/src/styles.scss, frontend/src/app/app.config.ts, frontend/src/app/app.routes.ts, frontend/src/app/core/services/auth.service.ts, frontend/src/app/core/guards/admin-only.guard.ts, frontend/src/app/shared/models/interfaces.ts, frontend/src/app/features/departments/department-list.component.ts, frontend/src/app/features/departments/departments.routes.ts, frontend/src/app/features/users/user-list.component.ts, frontend/src/app/features/users/users.routes.ts, frontend/src/app/features/subjects/subject-list.component.ts, frontend/src/app/features/subjects/subjects.routes.ts, frontend/src/app/features/notifications/notification-list.component.ts, frontend/src/app/features/notifications/notifications.routes.ts, frontend/src/app/features/auth/login/login.component.ts, frontend/src/app/features/auth/login/login.component.html, frontend/src/app/features/auth/login/login.component.scss
+- Ghi chú: Đã cài lucide-angular, thêm Google Font Be Vietnam Pro, áp dụng CSS variables + Material overrides chuẩn NTTU, mở rộng lazy routes/guards (auth + adminOnly), bổ sung interfaces cho 10 bảng, và cập nhật Login thành layout split 2 cột với lucide-icon, show/hide password, remember me, xử lý lỗi và điều hướng theo role.
+
+## [DONE-018] Bổ sung file môi trường + thư viện còn thiếu (Day 1-8)
+
+- Ngày: 04/04/2026
+- File đã tạo/sửa: backend/.env, ai-engine/.env, ai-engine/requirements.txt, DONE.md
+- Ghi chú: Đã tạo backend/.env với Mongo URI thực tế, tạo ai-engine/.env dùng chung MONGO_URI, tạo ai-engine/requirements.txt theo source thực tế (FastAPI, Uvicorn, scikit-learn, pandas, numpy, pymongo, python-dotenv), cài npm install cho backend/frontend, tạo ai-engine/.venv và cài toàn bộ Python dependencies.
+
+## [DONE-019] Ngày 9.1 - Dashboard tổng quan + cảnh báo + donut chart
+
+- Ngày: 04/04/2026
+- File đã tạo/sửa: frontend/package.json, frontend/src/app/app.config.ts, frontend/src/app/features/dashboard/dashboard.component.ts, frontend/src/app/features/dashboard/dashboard.component.html, frontend/src/app/features/dashboard/dashboard.component.scss, frontend/src/app/shared/models/interfaces.ts
+- Ghi chú: Đã làm dashboard gọi API students/classes/predictions alerts/grades class, hiển thị 4 card thống kê, bảng học sinh rủi ro, và biểu đồ donut phân bố Giỏi/Khá/TB/Yếu bằng Chart.js, dùng Angular Material + Lucide icons + màu theo design system.
+
+## [DONE-020] Ngày 10 - Quản lý Khoa, Môn học, Lớp và Học sinh
+
+- Ngày: 04/04/2026
+- File đã tạo/sửa: frontend/src/app/core/services/api.service.ts, frontend/src/app/shared/models/interfaces.ts, frontend/src/app/app.config.ts, frontend/src/app/features/departments/departments.routes.ts, frontend/src/app/features/departments/department-list.component.ts, frontend/src/app/features/departments/department-detail.component.ts, frontend/src/app/features/users/user-list.component.ts, frontend/src/app/features/subjects/subject-list.component.ts, frontend/src/app/features/classes/classes.routes.ts, frontend/src/app/features/classes/class-list.component.ts, frontend/src/app/features/classes/class-detail.component.ts, frontend/src/app/features/students/students.routes.ts, frontend/src/app/features/students/student-list.component.ts, frontend/src/app/features/students/student-form.component.ts, frontend/src/app/features/students/student-detail.component.ts
+- Ghi chú: Đã triển khai đầy đủ admin screens cho Day 10 với bảng dữ liệu + dialog CRUD + filter + validate + toggle trạng thái theo API backend thật; mở rộng routes detail/form cho classes/students/departments và build frontend thành công với TypeScript strict.
+
+## [DONE-021] Fix dashboard treo loading + kiểm thử runtime
+
+- Ngày: 04/04/2026
+- File đã tạo/sửa: frontend/src/app/features/dashboard/dashboard.component.ts, BUGS.md, DONE.md
+- Ghi chú: Đã rà soát lại toàn bộ luồng dashboard, bổ sung fallback chống treo (catchError cho forkJoin grades + watchdog timer + clear timer khi finalize/onDestroy), kiểm thử API thật bằng login token admin và build frontend pass.
+
+## [DONE-022] Cứng hóa dashboard runtime để tránh treo do lỗi render
+
+- Ngày: 04/04/2026
+- File đã tạo/sửa: frontend/src/app/features/dashboard/dashboard.component.ts, BUGS.md, DONE.md
+- Ghi chú: Bổ sung try/catch khi apply dữ liệu và render/update Chart.js để lỗi runtime không giữ UI ở trạng thái loading; xác nhận backend data có thật (students/classes) và tất cả endpoint dashboard trả 200.
+
 ---
 
 ## FRONTEND
 
-- Đã hoàn thành Prompt 8.2 Login UI (xem DONE-016).
+- Đã hoàn thành Day 8.1 + 8.2 theo design system NTTU (xem DONE-017).
+- Đã hoàn thành Day 9.1 Dashboard (xem DONE-019).
+- Đã hoàn thành Day 10 quản lý Khoa/Môn/Lớp/Học sinh (xem DONE-020).
+- Đã fix dashboard treo loading và kiểm thử runtime (xem DONE-021).
+- Đã cứng hóa dashboard chống treo do lỗi render runtime (xem DONE-022).
 
 ---
 

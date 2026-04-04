@@ -12,6 +12,8 @@ import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatCheckboxModule } from '@angular/material/checkbox';
+import { LucideAngularModule } from 'lucide-angular';
 
 @Component({
   selector: 'app-login',
@@ -24,6 +26,8 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
     MatInputModule,
     MatButtonModule,
     MatProgressSpinnerModule,
+    MatCheckboxModule,
+    LucideAngularModule,
   ],
   templateUrl: './login.component.html',
   styleUrls: ['./login.component.scss'],
@@ -36,9 +40,11 @@ export class LoginComponent {
   readonly loginForm = this.formBuilder.group({
     email: ['', [Validators.required, Validators.email]],
     password: ['', [Validators.required, Validators.minLength(6)]],
+    rememberMe: [true],
   });
 
   isSubmitting = false;
+  isPasswordVisible = false;
   errorMessage = '';
 
   onSubmit(): void {
@@ -47,21 +53,42 @@ export class LoginComponent {
       return;
     }
 
-    const payload: LoginRequest = this.loginForm.getRawValue();
+    const formValue = this.loginForm.getRawValue();
+    const payload: LoginRequest = {
+      email: formValue.email,
+      password: formValue.password,
+    };
+
     this.errorMessage = '';
     this.isSubmitting = true;
 
     this.authService
-      .login(payload)
+      .login(payload, formValue.rememberMe)
       .pipe(finalize(() => (this.isSubmitting = false)))
       .subscribe({
-        next: () => {
-          void this.router.navigate(['/dashboard']);
+        next: (response) => {
+          const role = response.data.user.role;
+
+          if (role === 'admin') {
+            void this.router.navigate(['/dashboard']);
+            return;
+          }
+
+          if (role === 'teacher') {
+            void this.router.navigate(['/dashboard']);
+            return;
+          }
+
+          this.errorMessage = 'Không xác định được quyền truy cập của tài khoản.';
         },
         error: (error: unknown) => {
           this.errorMessage = this.getLoginErrorMessage(error);
         },
       });
+  }
+
+  togglePasswordVisibility(): void {
+    this.isPasswordVisible = !this.isPasswordVisible;
   }
 
   hasControlError(controlName: 'email' | 'password', errorKey: string): boolean {

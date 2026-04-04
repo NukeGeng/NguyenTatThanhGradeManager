@@ -1,52 +1,115 @@
 <section class="login-page">
-  <div class="backdrop-blob backdrop-blob-left"></div>
-  <div class="backdrop-blob backdrop-blob-right"></div>
+  <div class="login-layout">
+    <aside class="brand-panel">
+      <div class="brand-panel-content">
+        <div class="brand-header">
+          <div class="logo-circle">
+            <lucide-icon name="graduation-cap" [size]="22"></lucide-icon>
+          </div>
+          <div>
+            <p class="brand-name">NTTU</p>
+            <h2>Grade Manager</h2>
+          </div>
+        </div>
 
-  <mat-card class="login-card" appearance="outlined">
-    <div class="brand-block">
-      <p class="brand-overline">NTTU Grade Manager</p>
-      <h1>Đăng nhập hệ thống</h1>
-      <p class="brand-subtitle">Quản lý điểm và theo dõi cảnh báo học sinh theo thời gian thực.</p>
-    </div>
+        <p class="tagline">Quản lý học tập thông minh</p>
 
-    <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" novalidate>
-      <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Email</mat-label>
-        <input matInput type="email" formControlName="email" placeholder="admin@nttu.edu.vn" />
-        <mat-error *ngIf="hasControlError('email', 'required')">Email là bắt buộc.</mat-error>
-        <mat-error *ngIf="hasControlError('email', 'email')">Email không đúng định dạng.</mat-error>
-      </mat-form-field>
+        <ul class="feature-list">
+          <li>
+            <lucide-icon name="shield-check" [size]="18"></lucide-icon>
+            <span>Bảo mật tài khoản với xác thực JWT theo vai trò.</span>
+          </li>
+          <li>
+            <lucide-icon name="chart-column-increasing" [size]="18"></lucide-icon>
+            <span>Theo dõi điểm số và phân tích xu hướng học tập theo lớp.</span>
+          </li>
+          <li>
+            <lucide-icon name="bell-ring" [size]="18"></lucide-icon>
+            <span>Cảnh báo sớm học sinh rủi ro để giáo viên can thiệp kịp thời.</span>
+          </li>
+        </ul>
+      </div>
+    </aside>
 
-      <mat-form-field appearance="outline" class="full-width">
-        <mat-label>Mật khẩu</mat-label>
-        <input matInput type="password" formControlName="password" placeholder="Nhập mật khẩu" />
-        <mat-error *ngIf="hasControlError('password', 'required')">Mật khẩu là bắt buộc.</mat-error>
-        <mat-error *ngIf="hasControlError('password', 'minlength')">
-          Mật khẩu phải có ít nhất 6 ký tự.
-        </mat-error>
-      </mat-form-field>
+    <section class="form-panel">
+      <mat-card class="login-card" appearance="outlined">
+        <div class="form-header">
+          <div class="logo-circle logo-circle-light">
+            <lucide-icon name="book-open-check" [size]="18"></lucide-icon>
+          </div>
+          <div>
+            <p class="small-brand">NTTU Grade Manager</p>
+            <h1>Đăng nhập</h1>
+          </div>
+        </div>
 
-      <p *ngIf="errorMessage" class="error-message">{{ errorMessage }}</p>
+        <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" novalidate>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Email</mat-label>
+            <lucide-icon matPrefix name="mail" [size]="18" class="field-icon"></lucide-icon>
+            <input matInput type="email" formControlName="email" placeholder="admin@nttu.edu.vn" />
+            <mat-error *ngIf="hasControlError('email', 'required')">Email là bắt buộc.</mat-error>
+            <mat-error *ngIf="hasControlError('email', 'email')"
+              >Email không đúng định dạng.</mat-error
+            >
+          </mat-form-field>
 
-      <button mat-flat-button type="submit" class="submit-button" [disabled]="isSubmitting">
-        <ng-container *ngIf="!isSubmitting; else loadingTpl">Đăng nhập</ng-container>
-      </button>
+          <mat-form-field appearance="outline" class="full-width">
+            <mat-label>Mật khẩu</mat-label>
+            <input
+              matInput
+              [type]="isPasswordVisible ? 'text' : 'password'"
+              formControlName="password"
+              placeholder="Nhập mật khẩu"
+            />
+            <button
+              mat-icon-button
+              matSuffix
+              type="button"
+              (click)="togglePasswordVisibility()"
+              [attr.aria-label]="isPasswordVisible ? 'Ẩn mật khẩu' : 'Hiện mật khẩu'"
+            >
+              <lucide-icon
+                [name]="isPasswordVisible ? 'eye-off' : 'eye'"
+                [size]="18"
+                class="field-icon"
+              ></lucide-icon>
+            </button>
+            <mat-error *ngIf="hasControlError('password', 'required')"
+              >Mật khẩu là bắt buộc.</mat-error
+            >
+            <mat-error *ngIf="hasControlError('password', 'minlength')">
+              Mật khẩu phải có ít nhất 6 ký tự.
+            </mat-error>
+          </mat-form-field>
 
-      <ng-template #loadingTpl>
-        <span class="button-loading">
-          <mat-progress-spinner
-            mode="indeterminate"
-            diameter="18"
-            strokeWidth="3"
-          ></mat-progress-spinner>
-          <span>Đang đăng nhập...</span>
-        </span>
-      </ng-template>
-    </form>
+          <mat-checkbox formControlName="rememberMe" class="remember-check">
+            Ghi nhớ đăng nhập
+          </mat-checkbox>
 
-    <p class="register-hint">
-      Chưa có tài khoản?
-      <a routerLink="/login/register">Tạo tài khoản giáo viên</a>
-    </p>
-  </mat-card>
+          <p *ngIf="errorMessage" class="error-message">{{ errorMessage }}</p>
+
+          <button mat-flat-button type="submit" class="submit-button" [disabled]="isSubmitting">
+            <ng-container *ngIf="!isSubmitting; else loadingTpl">Đăng nhập</ng-container>
+          </button>
+
+          <ng-template #loadingTpl>
+            <span class="button-loading">
+              <mat-progress-spinner
+                mode="indeterminate"
+                diameter="18"
+                strokeWidth="3"
+              ></mat-progress-spinner>
+              <span>Đang đăng nhập...</span>
+            </span>
+          </ng-template>
+        </form>
+
+        <p class="register-hint">
+          Chưa có tài khoản?
+          <a routerLink="/login/register">Tạo tài khoản giáo viên</a>
+        </p>
+      </mat-card>
+    </section>
+  </div>
 </section>

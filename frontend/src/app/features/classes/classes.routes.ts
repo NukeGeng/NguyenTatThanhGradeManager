@@ -6,4 +6,8 @@ export const CLASSES_ROUTES: Routes = [
     path: '',
     component: ClassListComponent,
   },
+  {
+    path: ':id',
+    loadComponent: () => import('./class-detail.component').then((m) => m.ClassDetailComponent),
+  },
 ];

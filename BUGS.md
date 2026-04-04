@@ -109,6 +109,16 @@
 - Fix: Thêm `rootDir: "./src"` vào compilerOptions của cả tsconfig.app.json và tsconfig.spec.json.
 - Trạng thái: ✅ Đã fix
 
+## [BUG-011] Dashboard isLoading không tắt
+
+- Ngày: 04/04/2026
+- File/Vị trí: frontend/src/app/features/dashboard/dashboard.component.ts
+- Mô tả: Dashboard có lúc xoay loading mãi, không hiển thị dữ liệu cũng không thoát trạng thái tải.
+- Nguyên nhân: Có rủi ro nhánh request grades lồng trong switchMap bị treo/đứt luồng trong tình huống bất thường, cộng với việc frontend chạy nhầm instance ng serve cũ trên port 4200 nên người dùng tiếp tục thấy trạng thái loading cũ.
+- Fix: Thêm catchError bọc forkJoin(gradeRequests), fallback grades rỗng, giữ finalize sau switchMap, thêm error callback dự phòng set isLoading = false, bổ sung watchdog timer ép thoát loading sau timeout và clear timer ở finalize/onDestroy; thêm try/catch khi apply dữ liệu và khi render/update Chart để chặn runtime exception làm treo UI; đồng thời restart sạch frontend trên đúng port 4200.
+- Kiểm thử: Xác nhận backend health 200, login admin lấy token thành công, gọi đủ endpoints dashboard (students/classes/predictions/alerts) trả 200 với thời gian phản hồi ~0.18s-0.27s, build frontend pass.
+- Trạng thái: ✅ Đã fix
+
 ---
 
 ## TEMPLATE THÊM BUG MỚI
