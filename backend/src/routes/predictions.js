@@ -26,6 +26,116 @@ const mapPredictionFromAI = (payload) => ({
   analysis: payload?.analysis || "",
 });
 
+const toObjectId = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (value?._id) {
+    return String(value._id);
+  }
+
+  return null;
+};
+
+const toValidScore = (value) => {
+  const numeric = Number(value);
+  if (Number.isNaN(numeric)) {
+    return null;
+  }
+
+  if (numeric < 0) return 0;
+  if (numeric > 10) return 10;
+  return Number(numeric.toFixed(2));
+};
+
+const resolveGradeScoreForAI = (gradeDoc) => {
+  const finalScore = toValidScore(gradeDoc?.finalScore);
+  if (finalScore !== null) {
+    return finalScore;
+  }
+
+  const tktScore = toValidScore(gradeDoc?.tktScore);
+  if (tktScore !== null) {
+    return tktScore;
+  }
+
+  const gkScore = toValidScore(gradeDoc?.gkScore);
+  if (gkScore !== null) {
+    return gkScore;
+  }
+
+  const txAvg = toValidScore(gradeDoc?.txAvg);
+  if (txAvg !== null) {
+    return txAvg;
+  }
+
+  return null;
+};
+
+const buildRealtimePredictInput = async (baseGrade) => {
+  const studentId = toObjectId(baseGrade?.studentId);
+  const schoolYearId = toObjectId(baseGrade?.schoolYearId);
+  const semester = Number(baseGrade?.semester || 0);
+
+  if (!studentId || !schoolYearId || !semester) {
+    return baseGrade;
+  }
+
+  const siblingGrades = await Grade.find({
+    studentId,
+    schoolYearId,
+    semester,
+  })
+    .populate("subjectId", "code")
+    .select("subjectId finalScore tktScore gkScore txAvg");
+
+  const scores = {};
+
+  for (const item of siblingGrades) {
+    const subjectCode = String(item?.subjectId?.code || "").trim();
+    if (!subjectCode) {
+      continue;
+    }
+
+    const score = resolveGradeScoreForAI(item);
+    if (score === null) {
+      continue;
+    }
+
+    scores[subjectCode] = score;
+  }
+
+  const scoreValues = Object.values(scores).map((value) => Number(value));
+  const avgCurrentScore =
+    scoreValues.length > 0
+      ? Number(
+          (
+            scoreValues.reduce((sum, value) => sum + value, 0) /
+            scoreValues.length
+          ).toFixed(2),
+        )
+      : null;
+
+  const plainBase =
+    typeof baseGrade?.toObject === "function"
+      ? baseGrade.toObject()
+      : { ...baseGrade };
+
+  return {
+    ...plainBase,
+    scores,
+    diem_hk_truoc:
+      plainBase?.diem_hk_truoc ??
+      plainBase?.previousSemesterScore ??
+      avgCurrentScore,
+  };
+};
+
 const populatePredictionQuery = (query) =>
   query
     .populate({
@@ -61,7 +171,7 @@ router.post("/predict", async (req, res, next) => {
       .populate("subjectId", "code name")
       .populate("studentId", "_id classId")
       .select(
-        "studentId classId departmentId subjectId finalScore gkScore tktScore txAvg conductScore hanhKiem so_buoi_vang attendanceAbsent diem_hk_truoc previousSemesterScore",
+        "studentId classId departmentId subjectId schoolYearId semester finalScore gkScore tktScore txAvg conductScore hanhKiem so_buoi_vang attendanceAbsent diem_hk_truoc previousSemesterScore",
       );
 
     if (!grade) {
@@ -85,7 +195,8 @@ router.post("/predict", async (req, res, next) => {
       }
     }
 
-    const aiResult = await predictStudent(grade);
+    const predictInput = await buildRealtimePredictInput(grade);
+    const aiResult = await predictStudent(predictInput);
     const mappedPrediction = mapPredictionFromAI(aiResult);
 
     const prediction = await Prediction.create({
@@ -144,7 +255,7 @@ router.post("/predict-class", async (req, res, next) => {
       .populate("subjectId", "code name")
       .populate("studentId", "_id classId")
       .select(
-        "studentId classId departmentId subjectId finalScore gkScore tktScore txAvg conductScore hanhKiem so_buoi_vang attendanceAbsent diem_hk_truoc previousSemesterScore",
+        "studentId classId departmentId subjectId schoolYearId semester finalScore gkScore tktScore txAvg conductScore hanhKiem so_buoi_vang attendanceAbsent diem_hk_truoc previousSemesterScore",
       );
 
     if (!grades.length) {
@@ -164,7 +275,8 @@ router.post("/predict-class", async (req, res, next) => {
 
     for (const grade of grades) {
       try {
-        const aiResult = await predictStudent(grade);
+        const predictInput = await buildRealtimePredictInput(grade);
+        const aiResult = await predictStudent(predictInput);
         const mappedPrediction = mapPredictionFromAI(aiResult);
 
         await Prediction.create({

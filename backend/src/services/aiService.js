@@ -48,20 +48,53 @@ const mapConductScore = (value) => {
   return 2;
 };
 
+const normalizeScoresMap = (scores) => {
+  if (!scores || typeof scores !== "object") {
+    return {};
+  }
+
+  return Object.entries(scores).reduce((accumulator, [key, value]) => {
+    const subjectCode = String(key || "").trim();
+    if (!subjectCode) {
+      return accumulator;
+    }
+
+    accumulator[subjectCode] = clampScore(value, 0);
+    return accumulator;
+  }, {});
+};
+
+const meanScoreFromMap = (scores) => {
+  const values = Object.values(scores)
+    .map((item) => Number(item))
+    .filter((item) => !Number.isNaN(item));
+
+  if (!values.length) {
+    return 0;
+  }
+
+  const total = values.reduce((sum, item) => sum + item, 0);
+  return Number((total / values.length).toFixed(2));
+};
+
 const buildPredictRequest = (gradeData) => {
+  const providedScores = normalizeScoresMap(gradeData?.scores);
+
   const subjectCode = gradeData?.subjectId?.code;
   const subjectScore =
     gradeData?.finalScore ?? gradeData?.tktScore ?? gradeData?.gkScore ?? 0;
 
-  const scores = {};
-  if (subjectCode) {
+  const scores = { ...providedScores };
+  if (!Object.keys(scores).length && subjectCode) {
     scores[subjectCode] = clampScore(subjectScore, 0);
   }
+
+  const representativeCurrentScore = meanScoreFromMap(scores);
 
   const previousSemesterScore =
     gradeData?.diem_hk_truoc ??
     gradeData?.previousSemesterScore ??
-    subjectScore;
+    representativeCurrentScore;
 
   return {
     scores,

@@ -92,6 +92,17 @@ def _safe_label(predicted_id: Any) -> str:
 
 
 def _build_input_vector(request_data: PredictRequest) -> np.ndarray:
+    valid_scores = [
+        float(score)
+        for score in request_data.scores.values()
+        if score is not None
+    ]
+
+    if valid_scores:
+        fallback_subject_score = float(np.mean(valid_scores))
+    else:
+        fallback_subject_score = float(request_data.diem_hk_truoc)
+
     values: list[float] = []
 
     for feature in feature_names:
@@ -102,7 +113,7 @@ def _build_input_vector(request_data: PredictRequest) -> np.ndarray:
         elif feature == "hanh_kiem":
             values.append(float(request_data.hanh_kiem))
         else:
-            values.append(float(request_data.scores.get(feature, 0.0)))
+            values.append(float(request_data.scores.get(feature, fallback_subject_score)))
 
     return np.array(values, dtype=np.float64).reshape(1, -1)
 
