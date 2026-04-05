@@ -164,6 +164,42 @@
 - File đã tạo/sửa: frontend/angular.json, frontend/src/app/app.config.ts, frontend/src/main.ts, frontend/package.json, BUGS.md, DONE.md
 - Ghi chú: Đã khóa fix ở mức framework bằng zone.js dependency + polyfills angular.json + provideZoneChangeDetection trong app config để toàn bộ trang tự cập nhật UI sau callback async, không cần chờ user tương tác.
 
+## [DONE-025] Ngày 12 - Trang Kết Quả AI (Prediction Report + Class Predictions)
+
+- Ngày: 04/04/2026
+- File đã tạo/sửa: frontend/src/app/features/predictions/prediction-report.component.ts, frontend/src/app/features/predictions/class-predictions.component.ts, frontend/src/app/features/predictions/predictions.routes.ts, frontend/src/app/app.config.ts, DONE.md
+- Ghi chú: Đã triển khai màn hình báo cáo dự đoán theo gradeId (header, badge xếp loại, confidence bar, risk badge, môn yếu, gợi ý, phân tích) và màn hình dự đoán cả lớp (table sort, filter chỉ rủi ro cao, nút xem chi tiết, xuất PDF bằng window.print), đồng thời nối route /predictions và /predictions/report/:gradeId.
+
+## [DONE-026] Ngày 13 - Layout Shell + Global Error Handling
+
+- Ngày: 05/04/2026
+- File đã tạo/sửa: frontend/src/app/shared/components/layout/layout.component.ts, frontend/src/app/shared/components/error-handling/global-error-handler.ts, frontend/src/app/shared/components/empty-state.component.ts, frontend/src/app/core/interceptors/jwt.interceptor.ts, frontend/src/app/app.config.ts, frontend/src/app/app.ts, frontend/src/app/app.html, frontend/src/app/app.scss, BUGS.md, DONE.md
+- Ghi chú: Đã thay shell root sang layout dùng MatSidenav responsive (sidebar trái + topbar + logout), thêm badge đỏ cảnh báo rủi ro trên menu Dự đoán AI, bổ sung GlobalErrorHandler và nâng interceptor bắt lỗi 401/500/network theo yêu cầu.
+
+## [DONE-027] Landing Page Home từ TEMPLATEHTML + route mặc định
+
+- Ngày: 05/04/2026
+- File đã tạo/sửa: frontend/src/app/features/home/home.component.ts, frontend/src/app/features/home/home.component.html, frontend/src/app/features/home/home.component.scss, frontend/src/app/app.routes.ts, frontend/src/app/app.config.ts, frontend/angular.json, frontend/src/assets/images/logo-nttu.png, BUGS.md, DONE.md
+- Ghi chú: Đã chuyển HTML template sang Angular standalone HomeComponent (lucide-icon + routerLink + anchor section), thêm route `path: ''` về homepage, bổ sung đăng ký icon Lucide dùng cho trang chủ, thêm `src/assets` vào build assets, và build frontend thành công.
+
+## [DONE-028] Fix Scrollbar Layout Shift + Smooth Scroll navbar trang chủ
+
+- Ngày: 05/04/2026
+- File đã tạo/sửa: frontend/src/styles.scss, frontend/src/app/features/home/home.component.scss, DONE.md
+- Ghi chú: Đã thêm `scrollbar-gutter: stable` (kèm fallback `overflow-y: scroll`) để tránh layout shift khi scrollbar xuất hiện/biến mất toàn website; bật smooth scroll toàn cục và đặt `scroll-margin-top` cho các section anchor của homepage để cuộn mượt, không bị che bởi sticky navbar.
+
+## [DONE-029] Fix smooth scroll navbar homepage bằng handler component
+
+- Ngày: 05/04/2026
+- File đã tạo/sửa: frontend/src/app/features/home/home.component.ts, frontend/src/app/features/home/home.component.html, frontend/src/app/features/home/home.component.scss, BUGS.md, DONE.md
+- Ghi chú: Đã gắn click handler cho các link section (`Tính năng`, `Cách hoạt động`, `Phân quyền`, `AI dự đoán`, `Công nghệ`) để cuộn mượt bằng `scrollIntoView`, thêm cuộn mượt về đầu trang khi bấm logo, giữ fallback hash khi lỗi và bỏ bullet mặc định của danh sách navbar.
+
+## [DONE-030] Cứng hóa smooth scroll bằng animation thủ công
+
+- Ngày: 05/04/2026
+- File đã tạo/sửa: frontend/src/app/features/home/home.component.ts, BUGS.md, DONE.md
+- Ghi chú: Đã thay cuộn native smooth sang animation `requestAnimationFrame` (easing) để tránh bị nhảy tức thì do phụ thuộc setting/browser; đồng thời giữ offset navbar sticky để section dừng đúng vị trí.
+
 ---
 
 ## FRONTEND
@@ -175,6 +211,8 @@
 - Đã cứng hóa dashboard chống treo do lỗi render runtime (xem DONE-022).
 - Đã hoàn thành Day 11 nhập điểm + import + gọi AI lớp (xem DONE-023).
 - Đã fix lỗi global loading chỉ cập nhật khi user tương tác (xem DONE-024).
+- Đã hoàn thành Day 12 trang kết quả AI (xem DONE-025).
+- Đã hoàn thành Day 13 layout shell + error handling (xem DONE-026).
 
 ---
 

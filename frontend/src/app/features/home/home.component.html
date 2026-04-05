@@ -1,0 +1,562 @@
+<!-- NAVBAR -->
+<header class="navbar">
+  <div class="container">
+    <nav class="navbar__inner">
+      <a href="#" class="navbar__logo" (click)="scrollToTop($event)">
+        <img src="assets/images/logo-nttu.png" alt="Logo NTTU" />
+        <div class="navbar__logo-text">
+          <small>Trường ĐH Nguyễn Tất Thành</small>
+          <strong>NttuGradeManager</strong>
+        </div>
+      </a>
+
+      <ul class="navbar__links">
+        <li><a href="#features" (click)="scrollToSection($event, 'features')">Tính năng</a></li>
+        <li>
+          <a href="#how-it-works" (click)="scrollToSection($event, 'how-it-works')">
+            Cách hoạt động
+          </a>
+        </li>
+        <li><a href="#roles" (click)="scrollToSection($event, 'roles')">Phân quyền</a></li>
+        <li><a href="#ai" (click)="scrollToSection($event, 'ai')">AI dự đoán</a></li>
+        <li><a href="#tech" (click)="scrollToSection($event, 'tech')">Công nghệ</a></li>
+      </ul>
+
+      <a routerLink="/login" class="btn btn--primary">
+        <lucide-icon name="log-in" [size]="15"></lucide-icon>
+        Đăng nhập
+      </a>
+    </nav>
+  </div>
+</header>
+
+<!-- HERO -->
+<section class="hero">
+  <div class="container">
+    <div class="hero__inner">
+      <div>
+        <div class="hero__badge">
+          <lucide-icon name="zap" [size]="12"></lucide-icon>
+          Hệ thống quản lý học tập thông minh
+        </div>
+
+        <h1 class="hero__title">
+          Quản lý điểm số &<br />
+          <span class="accent">Dự đoán học lực</span><br />
+          bằng AI
+        </h1>
+
+        <p class="hero__desc">
+          Nền tảng số hóa toàn diện cho Khoa CNTT – NTTU. Quản lý sinh viên, nhập điểm theo chuẩn
+          tín chỉ, và sử dụng Machine Learning để phát hiện sớm sinh viên có nguy cơ.
+        </p>
+
+        <div class="hero__actions">
+          <a routerLink="/login" class="btn btn--white btn--lg">
+            <lucide-icon name="layout-dashboard" [size]="16"></lucide-icon>
+            Vào hệ thống
+          </a>
+          <a
+            href="#features"
+            class="btn btn--ghost-white btn--lg"
+            (click)="scrollToSection($event, 'features')"
+          >
+            Tìm hiểu thêm
+            <lucide-icon name="arrow-down" [size]="15"></lucide-icon>
+          </a>
+        </div>
+
+        <div class="hero__stats">
+          <div>
+            <div class="hero__stat-val">10+</div>
+            <div class="hero__stat-label">Bảng dữ liệu</div>
+          </div>
+          <div>
+            <div class="hero__stat-val">3</div>
+            <div class="hero__stat-label">Khoa quản lý</div>
+          </div>
+          <div>
+            <div class="hero__stat-val">AI</div>
+            <div class="hero__stat-label">Random Forest</div>
+          </div>
+        </div>
+      </div>
+
+      <div class="hero__card">
+        <div class="hero__card-title">Bảng điểm học kỳ 1 — CNTT01</div>
+
+        <div class="grade-row">
+          <span class="grade-row__name">Lập trình cơ bản</span>
+          <span class="grade-badge grade-badge--a">A — 4.0</span>
+        </div>
+        <div class="grade-row">
+          <span class="grade-row__name">Cơ sở dữ liệu</span>
+          <span class="grade-badge grade-badge--b">B — 3.0</span>
+        </div>
+        <div class="grade-row">
+          <span class="grade-row__name">Mạng máy tính</span>
+          <span class="grade-badge grade-badge--a">A — 4.0</span>
+        </div>
+        <div class="grade-row">
+          <span class="grade-row__name">Kỹ thuật phần mềm</span>
+          <span class="grade-badge grade-badge--c">C — 2.0</span>
+        </div>
+        <div class="grade-row">
+          <span class="grade-row__name">NodeJS & React</span>
+          <span class="grade-badge grade-badge--b">B — 3.0</span>
+        </div>
+
+        <div class="ai-chip">
+          <lucide-icon name="brain-circuit" [size]="14"></lucide-icon>
+          AI: GPA dự đoán HK2 →
+          <strong style="color: #fcd34d; margin-left: 0.3rem">3.2 / Khá</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FEATURES -->
+<section class="section" id="features">
+  <div class="container">
+    <div class="section__hd--center" style="text-align: center">
+      <div class="section__label" style="margin-inline: auto">
+        <lucide-icon name="layers" [size]="11"></lucide-icon>
+        Tính năng
+      </div>
+      <h2 class="section__heading">Đầy đủ mọi nghiệp vụ quản lý</h2>
+      <p class="section__sub" style="margin-inline: auto">
+        Từ quản lý hành chính đến nhập điểm và phân tích học lực — tất cả trên một nền tảng.
+      </p>
+    </div>
+
+    <div class="features-grid">
+      <div class="feat-card">
+        <div class="feat-card__icon">
+          <lucide-icon name="building-2" [size]="20"></lucide-icon>
+        </div>
+        <div class="feat-card__title">Quản lý Khoa & Môn học</div>
+        <div class="feat-card__body">
+          Admin tạo khoa, thêm môn học với số tín chỉ và trọng số % tùy chỉnh. Giáo viên được phân
+          quyền theo khoa.
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-card__icon">
+          <lucide-icon name="users" [size]="20"></lucide-icon>
+        </div>
+        <div class="feat-card__title">Quản lý Sinh viên</div>
+        <div class="feat-card__body">
+          CRUD sinh viên theo lớp học phần. Import hàng loạt từ Excel/CSV với preview lỗi từng dòng
+          trước khi lưu.
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-card__icon">
+          <lucide-icon name="clipboard-list" [size]="20"></lucide-icon>
+        </div>
+        <div class="feat-card__title">Nhập điểm theo chuẩn NTTU</div>
+        <div class="feat-card__body">
+          TX, GK, TH, TKT với trọng số % linh hoạt. Tự động tính điểm tổng kết, xếp loại A/B/C/F
+          theo quy tắc đặc biệt.
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-card__icon">
+          <lucide-icon name="file-spreadsheet" [size]="20"></lucide-icon>
+        </div>
+        <div class="feat-card__title">Import Excel thông minh</div>
+        <div class="feat-card__body">
+          Tải template động theo môn học hiện tại. Upload → Preview → Xác nhận import với báo cáo
+          lỗi chi tiết từng dòng.
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-card__icon">
+          <lucide-icon name="bell" [size]="20"></lucide-icon>
+        </div>
+        <div class="feat-card__title">Cảnh báo & Thông báo</div>
+        <div class="feat-card__body">
+          Tự động tạo cảnh báo khi sinh viên có nguy cơ. Notification bell real-time ngay trên
+          dashboard.
+        </div>
+      </div>
+
+      <div class="feat-card">
+        <div class="feat-card__icon">
+          <lucide-icon name="shield-check" [size]="20"></lucide-icon>
+        </div>
+        <div class="feat-card__title">Bảo mật & Audit Log</div>
+        <div class="feat-card__body">
+          JWT Authentication, phân quyền theo khoa. Toàn bộ thao tác được ghi log tự động, giữ lại
+          90 ngày.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- HOW IT WORKS -->
+<section class="section section--gray" id="how-it-works">
+  <div class="container">
+    <div style="text-align: center">
+      <div class="section__label" style="margin-inline: auto">
+        <lucide-icon name="workflow" [size]="11"></lucide-icon>
+        Quy trình
+      </div>
+      <h2 class="section__heading">Cách hệ thống hoạt động</h2>
+    </div>
+
+    <div class="steps">
+      <div class="step">
+        <div class="step__num">1</div>
+        <div class="step__title">Admin thiết lập</div>
+        <div class="step__desc">
+          Tạo khoa, môn học, lớp học phần. Phân quyền giáo viên theo khoa.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step__num">2</div>
+        <div class="step__title">Giáo viên nhập điểm</div>
+        <div class="step__desc">
+          Nhập từng sinh viên hoặc import Excel hàng loạt với preview trước khi lưu.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step__num">3</div>
+        <div class="step__title">AI phân tích</div>
+        <div class="step__desc">
+          Random Forest tự động dự đoán GPA học kỳ tới và phát hiện sinh viên có nguy cơ.
+        </div>
+      </div>
+
+      <div class="step">
+        <div class="step__num">4</div>
+        <div class="step__title">Cảnh báo sớm</div>
+        <div class="step__desc">
+          Giáo viên nhận thông báo, xem báo cáo chi tiết và gợi ý can thiệp kịp thời.
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ROLES -->
+<section class="section" id="roles">
+  <div class="container--md container">
+    <div>
+      <div class="section__label">
+        <lucide-icon name="shield" [size]="11"></lucide-icon>
+        Phân quyền
+      </div>
+      <h2 class="section__heading">Hai vai trò rõ ràng</h2>
+      <p class="section__sub">
+        Admin quản lý toàn hệ thống. Giáo viên chỉ truy cập đúng khoa được gán.
+      </p>
+    </div>
+
+    <div class="roles-split">
+      <div class="role-card role-card--admin">
+        <div class="role-card__header">
+          <div class="role-card__avatar">
+            <lucide-icon name="shield-check" [size]="20"></lucide-icon>
+          </div>
+          <div>
+            <div class="role-card__name">Admin</div>
+            <div class="role-card__role">Quản trị hệ thống</div>
+          </div>
+        </div>
+        <div class="role-list">
+          <div class="role-item">
+            <lucide-icon name="check-circle" [size]="14"></lucide-icon>
+            Tạo / xóa khoa, môn học, lớp học phần
+          </div>
+          <div class="role-item">
+            <lucide-icon name="check-circle" [size]="14"></lucide-icon>
+            Tạo tài khoản giáo viên & phân khoa
+          </div>
+          <div class="role-item">
+            <lucide-icon name="check-circle" [size]="14"></lucide-icon>
+            Xem toàn bộ dữ liệu mọi khoa
+          </div>
+          <div class="role-item">
+            <lucide-icon name="check-circle" [size]="14"></lucide-icon>
+            Báo cáo tổng hợp toàn trường
+          </div>
+          <div class="role-item">
+            <lucide-icon name="check-circle" [size]="14"></lucide-icon>
+            Xem lịch sử thao tác hệ thống (Audit Log)
+          </div>
+        </div>
+      </div>
+
+      <div class="role-card role-card--teacher">
+        <div class="role-card__header">
+          <div class="role-card__avatar">
+            <lucide-icon name="user" [size]="20"></lucide-icon>
+          </div>
+          <div>
+            <div class="role-card__name">Giáo viên</div>
+            <div class="role-card__role">Giảng viên — phân quyền theo khoa</div>
+          </div>
+        </div>
+        <div class="role-list">
+          <div class="role-item">
+            <lucide-icon name="check-circle" [size]="14"></lucide-icon>
+            Xem lớp học phần & sinh viên thuộc khoa mình
+          </div>
+          <div class="role-item">
+            <lucide-icon name="check-circle" [size]="14"></lucide-icon>
+            Nhập điểm TX, GK, TH, TKT theo trọng số tùy chỉnh
+          </div>
+          <div class="role-item">
+            <lucide-icon name="check-circle" [size]="14"></lucide-icon>
+            Import điểm hàng loạt từ Excel/CSV
+          </div>
+          <div class="role-item">
+            <lucide-icon name="check-circle" [size]="14"></lucide-icon>
+            Xem kết quả AI dự đoán và cảnh báo rủi ro
+          </div>
+          <div class="role-item">
+            <lucide-icon name="check-circle" [size]="14"></lucide-icon>
+            Nhận thông báo real-time khi có sinh viên nguy cơ
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- AI PREDICTION -->
+<section class="section section--gray" id="ai">
+  <div class="container">
+    <div class="ai-split">
+      <div class="ai-mockup">
+        <div class="ai-mockup__header">
+          <lucide-icon name="brain-circuit" [size]="16"></lucide-icon>
+          Kết quả dự đoán AI — Lớp CNTT01 / HK1
+        </div>
+
+        <div class="predict-item">
+          <div>
+            <div class="predict-item__name">Nguyễn Văn An</div>
+            <div class="predict-item__meta">GPA hiện tại: 1.8 · TX thiếu 2 buổi</div>
+          </div>
+          <span class="predict-badge predict-badge--high">
+            <lucide-icon name="alert-triangle" [size]="10"></lucide-icon>
+            Nguy cơ cao
+          </span>
+        </div>
+
+        <div class="predict-item">
+          <div>
+            <div class="predict-item__name">Trần Thị Bích</div>
+            <div class="predict-item__meta">GPA hiện tại: 2.5 · TKT môn CSDL = 5.2</div>
+          </div>
+          <span class="predict-badge predict-badge--med">
+            <lucide-icon name="alert-circle" [size]="10"></lucide-icon>
+            Trung bình
+          </span>
+        </div>
+
+        <div class="predict-item">
+          <div>
+            <div class="predict-item__name">Lê Minh Cường</div>
+            <div class="predict-item__meta">GPA hiện tại: 3.6 · Tất cả môn đạt</div>
+          </div>
+          <span class="predict-badge predict-badge--low">
+            <lucide-icon name="check-circle" [size]="10"></lucide-icon>
+            Ổn định
+          </span>
+        </div>
+
+        <div class="predict-item">
+          <div>
+            <div class="predict-item__name">Phạm Thị Dung</div>
+            <div class="predict-item__meta">GPA hiện tại: 2.1 · Vắng 5 buổi</div>
+          </div>
+          <span class="predict-badge predict-badge--high">
+            <lucide-icon name="alert-triangle" [size]="10"></lucide-icon>
+            Nguy cơ cao
+          </span>
+        </div>
+
+        <div
+          style="
+            margin-top: 1rem;
+            padding-top: 0.85rem;
+            border-top: 1px solid var(--gray-200);
+            font-size: 0.75rem;
+            color: var(--text-muted);
+            display: flex;
+            align-items: center;
+            gap: 0.4rem;
+          "
+        >
+          <lucide-icon name="cpu" [size]="12" style="color: var(--blue)"></lucide-icon>
+          Mô hình: Random Forest · Accuracy: 81.4% · v1.0
+        </div>
+      </div>
+
+      <div>
+        <div class="section__label">
+          <lucide-icon name="sparkles" [size]="11"></lucide-icon>
+          Machine Learning
+        </div>
+        <h2 class="section__heading">
+          AI phát hiện<br />
+          <em>nguy cơ sớm</em>
+        </h2>
+        <p class="section__sub">
+          Thay vì đợi kỳ thi kết thúc mới biết sinh viên yếu, hệ thống dự đoán từ đầu học kỳ để can
+          thiệp kịp thời.
+        </p>
+
+        <div class="ai-bullets">
+          <div class="ai-bullet">
+            <div class="ai-bullet__icon">
+              <lucide-icon name="database" [size]="16"></lucide-icon>
+            </div>
+            <div>
+              <div class="ai-bullet__title">Train từ dữ liệu thật</div>
+              <div class="ai-bullet__desc">
+                Tự đọc môn học từ MongoDB, tính TB có hệ số, không hardcode — Admin thêm môn mới là
+                model tự cập nhật.
+              </div>
+            </div>
+          </div>
+
+          <div class="ai-bullet">
+            <div class="ai-bullet__icon">
+              <lucide-icon name="trending-up" [size]="16"></lucide-icon>
+            </div>
+            <div>
+              <div class="ai-bullet__title">Dự đoán GPA học kỳ</div>
+              <div class="ai-bullet__desc">
+                Dự báo GPA học kỳ tới, phân loại mức rủi ro (Cao / Trung bình / Thấp) với độ tin cậy
+                %.
+              </div>
+            </div>
+          </div>
+
+          <div class="ai-bullet">
+            <div class="ai-bullet__icon">
+              <lucide-icon name="lightbulb" [size]="16"></lucide-icon>
+            </div>
+            <div>
+              <div class="ai-bullet__title">Gợi ý can thiệp</div>
+              <div class="ai-bullet__desc">
+                Chỉ ra môn yếu cụ thể và đề xuất hành động: ôn thêm, liên hệ phụ huynh, theo dõi
+                chuyên cần.
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- TECH STACK -->
+<section class="section section--navy" id="tech">
+  <div class="container">
+    <div style="text-align: center">
+      <div class="section__label" style="margin-inline: auto">
+        <lucide-icon name="code-2" [size]="11"></lucide-icon>
+        Công nghệ
+      </div>
+      <h2 class="section__heading">Stack hiện đại, kiến trúc 3 tầng</h2>
+      <p class="section__sub" style="margin-inline: auto">
+        Angular v21 · Node.js Express · Python FastAPI · MongoDB Atlas
+      </p>
+    </div>
+
+    <div class="tech-badges">
+      <span class="tech-badge">
+        <lucide-icon name="triangle" [size]="12"></lucide-icon>
+        Angular v21
+      </span>
+      <span class="tech-badge">
+        <lucide-icon name="server" [size]="12"></lucide-icon>
+        Node.js Express
+      </span>
+      <span class="tech-badge">
+        <lucide-icon name="cpu" [size]="12"></lucide-icon>
+        Python FastAPI
+      </span>
+      <span class="tech-badge">
+        <lucide-icon name="database" [size]="12"></lucide-icon>
+        MongoDB Atlas
+      </span>
+      <span class="tech-badge">
+        <lucide-icon name="brain-circuit" [size]="12"></lucide-icon>
+        scikit-learn
+      </span>
+      <span class="tech-badge">
+        <lucide-icon name="lock" [size]="12"></lucide-icon>
+        JWT Auth
+      </span>
+      <span class="tech-badge">
+        <lucide-icon name="file-spreadsheet" [size]="12"></lucide-icon>
+        xlsx / multer
+      </span>
+      <span class="tech-badge">
+        <lucide-icon name="layers" [size]="12"></lucide-icon>
+        Angular Material
+      </span>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<section class="section">
+  <div class="container container--md">
+    <div class="cta-box">
+      <h2 class="cta-box__title">Bắt đầu sử dụng ngay</h2>
+      <p class="cta-box__sub">
+        Đăng nhập bằng tài khoản được cấp bởi Admin khoa.<br />
+        Hỗ trợ:
+        <strong style="color: rgba(255, 255, 255, 0.85)">
+          <a href="mailto:admin@nttu.edu.vn">admin@nttu.edu.vn</a>
+        </strong>
+      </p>
+      <div class="cta-box__actions">
+        <a routerLink="/login" class="btn btn--white btn--lg">
+          <lucide-icon name="log-in" [size]="16"></lucide-icon>
+          Đăng nhập hệ thống
+        </a>
+        <a
+          href="#features"
+          class="btn btn--ghost-white btn--lg"
+          (click)="scrollToSection($event, 'features')"
+        >
+          Xem tính năng
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FOOTER -->
+<footer class="footer">
+  <div class="container">
+    <div class="footer__inner">
+      <div class="footer__logo">
+        <img src="assets/images/logo-nttu.png" alt="NTTU" />
+        <span>NttuGradeManager — Khoa CNTT, Trường ĐH Nguyễn Tất Thành</span>
+      </div>
+
+      <div class="footer__links">
+        <a href="#">Giới thiệu</a>
+        <a href="#">Hỗ trợ</a>
+        <a href="mailto:admin@nttu.edu.vn">admin@nttu.edu.vn</a>
+      </div>
+    </div>
+  </div>
+</footer>

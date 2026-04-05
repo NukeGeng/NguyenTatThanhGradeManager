@@ -4,6 +4,10 @@ import { adminOnlyGuard } from './core/guards/admin-only.guard';
 
 export const routes: Routes = [
   {
+    path: '',
+    loadComponent: () => import('./features/home/home.component').then((m) => m.HomeComponent),
+  },
+  {
     path: 'login',
     loadChildren: () => import('./features/auth/auth.routes').then((m) => m.AUTH_ROUTES),
   },
@@ -59,12 +63,7 @@ export const routes: Routes = [
       import('./features/notifications/notifications.routes').then((m) => m.NOTIFICATIONS_ROUTES),
   },
   {
-    path: '',
-    redirectTo: '/dashboard',
-    pathMatch: 'full',
-  },
-  {
     path: '**',
-    redirectTo: '/dashboard',
+    redirectTo: '',
   },
 ];

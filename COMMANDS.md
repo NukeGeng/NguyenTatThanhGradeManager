@@ -77,7 +77,7 @@ uvicorn main:app --port 5000 --reload
 
 # Terminal 3 — Frontend
 cd frontend
-ng serve
+npx ng serve
 # → App chạy tại http://localhost:4200
 
 # Terminal 4 — (tuỳ chọn) Seed data

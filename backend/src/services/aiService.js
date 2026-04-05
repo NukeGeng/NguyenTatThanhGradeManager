@@ -131,8 +131,57 @@ const predictStudent = async (gradeData) => {
 
     return response.data;
   } catch (error) {
-    const serverMessage = error?.response?.data?.detail;
-    const fallbackMessage = error?.message || "Lỗi không xác định từ AI Engine";
+    const statusCode = Number(error?.response?.status || 0);
+    const errorCode = String(error?.code || "");
+    const detail = error?.response?.data?.detail;
+
+    let serverMessage = "";
+    if (typeof detail === "string" && detail.trim()) {
+      serverMessage = detail;
+    } else if (Array.isArray(detail) && detail.length > 0) {
+      serverMessage = detail
+        .map((item) => {
+          if (typeof item === "string") {
+            return item;
+          }
+
+          if (item && typeof item === "object") {
+            const message = item.msg || item.message;
+            return typeof message === "string" ? message : "";
+          }
+
+          return "";
+        })
+        .filter(Boolean)
+        .join("; ");
+    } else if (detail && typeof detail === "object") {
+      const detailMessage = detail.message || detail.msg;
+      if (typeof detailMessage === "string" && detailMessage.trim()) {
+        serverMessage = detailMessage;
+      }
+    }
+
+    if (!serverMessage && errorCode === "ECONNREFUSED") {
+      serverMessage = "AI Engine chưa chạy hoặc không lắng nghe cổng 5000";
+    }
+
+    if (!serverMessage && errorCode === "ECONNABORTED") {
+      serverMessage = "AI Engine phản hồi quá chậm (timeout 10s)";
+    }
+
+    if (!serverMessage && statusCode === 422) {
+      serverMessage = "Dữ liệu gửi sang AI Engine không hợp lệ";
+    }
+
+    if (!serverMessage && statusCode >= 500) {
+      serverMessage = "AI Engine gặp lỗi nội bộ";
+    }
+
+    const fallbackMessage =
+      typeof error?.message === "string" && error.message.trim()
+        ? error.message
+        : "Lỗi không xác định từ AI Engine";
+
     throw new Error(
       `Không thể gọi AI Engine: ${serverMessage || fallbackMessage}`,
     );

@@ -128,6 +128,60 @@
 - Fix: Thêm `zone.js` vào dependencies frontend, cấu hình `polyfills: ["zone.js"]` trong angular.json, và ép provider `provideZoneChangeDetection(...)` trong app config để khóa zone-based change detection toàn app.
 - Trạng thái: ✅ Đã fix
 
+## [BUG-013] Thiếu shell layout chuẩn và xử lý lỗi HTTP toàn cục
+
+- Ngày: 05/04/2026
+- File/Vị trí: frontend/src/app/app.ts, frontend/src/app/app.html, frontend/src/app/core/interceptors/jwt.interceptor.ts
+- Mô tả: UI chưa có sidebar/topbar dạng shell theo yêu cầu Day 13; lỗi 401/500/network chưa được xử lý tập trung nên trải nghiệm không đồng nhất và khó debug.
+- Nguyên nhân: App đang dùng topbar đơn giản ở root, interceptor chỉ gắn token mà chưa bắt lỗi HTTP, chưa có global error handler.
+- Fix: Tạo shell component dùng MatSidenav responsive + topbar user/logout + badge cảnh báo rủi ro; nâng cấp jwt interceptor để xử lý 401/500/network và hiển thị snackbar; bổ sung GlobalErrorHandler để bắt lỗi toàn cục.
+- Trạng thái: ✅ Đã fix
+
+## [BUG-014] Cảnh báo vượt budget bundle initial khi build frontend
+
+- Ngày: 05/04/2026
+- File/Vị trí: frontend/angular.json, frontend/src/app/shared/components/layout/layout.component.ts
+- Mô tả: `ng build` cảnh báo `bundle initial exceeded maximum budget` (559.68 kB > 500 kB).
+- Nguyên nhân: Shell layout Day 13 dùng MatSidenav + topbar được load ở root làm tăng kích thước chunk khởi tạo.
+- Fix: Đã ghi nhận để tối ưu vòng sau (tách lazy shell hoặc điều chỉnh budget phù hợp kiến trúc hiện tại).
+- Trạng thái: 🔄 Đang fix
+
+## [BUG-015] TEMPLATEHTML nguồn bị cắt đoạn footer
+
+- Ngày: 05/04/2026
+- File/Vị trí: TEMPLATEHTML.md
+- Mô tả: HTML mẫu trong file bị cắt ở đoạn link email footer, thiếu phần đóng thẻ cuối nên không thể chuyển 100% nguyên văn nếu giữ y nguyên.
+- Nguyên nhân: Nội dung nguồn bị truncate tại chuỗi Cloudflare email obfuscation (`/cdn-cgi/l/email-protection...`).
+- Fix: Giữ nguyên toàn bộ cấu trúc còn đọc được, hoàn thiện footer với email chuẩn `admin@nttu.edu.vn` và đóng đủ thẻ để Angular template compile.
+- Trạng thái: ✅ Đã fix
+
+## [BUG-016] Build lỗi do vượt anyComponentStyle budget ở Home
+
+- Ngày: 05/04/2026
+- File/Vị trí: frontend/angular.json, frontend/src/app/features/home/home.component.scss
+- Mô tả: `ng build` fail với lỗi `home.component.scss exceeded maximum budget` (12.56kB > 8kB) khi giữ đầy đủ CSS landing page từ template.
+- Nguyên nhân: Budget mặc định cho `anyComponentStyle` thấp hơn kích thước CSS thực tế của landing page.
+- Fix: Nâng budget `anyComponentStyle` trong `angular.json` thành warning 12kB, error 16kB để phù hợp màn landing page; build chạy thành công.
+- Trạng thái: ✅ Đã fix
+
+## [BUG-017] Anchor navbar homepage không cuộn mượt
+
+- Ngày: 05/04/2026
+- File/Vị trí: frontend/src/app/features/home/home.component.html, frontend/src/app/features/home/home.component.ts
+- Mô tả: Click các link section trên navbar homepage nhảy tức thì tới anchor, không có hiệu ứng smooth scroll như yêu cầu.
+- Nguyên nhân: Chỉ dùng `href="#..."` mặc định của trình duyệt; trên một số môi trường render hành vi cuộn mượt từ CSS không được áp dụng ổn định cho anchor navigation.
+- Fix: Bổ sung handler `scrollToSection()` và `scrollToTop()` trong HomeComponent, dùng `scrollIntoView({ behavior: 'smooth' })`/`window.scrollTo({ behavior: 'smooth' })`, đồng thời vẫn giữ fallback hash khi có lỗi.
+- Trạng thái: ✅ Đã fix
+
+## [BUG-018] Smooth scroll vẫn nhảy tức thì trên một số máy
+
+- Ngày: 05/04/2026
+- File/Vị trí: frontend/src/app/features/home/home.component.ts
+- Mô tả: Dù đã dùng `behavior: 'smooth'`, click navbar vẫn nhảy tức thì trên môi trường người dùng.
+- Nguyên nhân: Native smooth behavior phụ thuộc browser/OS setting (motion preference), nên có thể bị downgrade thành cuộn tức thì.
+- Fix: Thay sang animation cuộn thủ công bằng `requestAnimationFrame` + easing (`easeInOutCubic`), tự tính vị trí trừ offset navbar sticky để luôn mượt và đúng điểm dừng.
+- Trạng thái: ✅ Đã fix
+
 ---
 
 ## TEMPLATE THÊM BUG MỚI

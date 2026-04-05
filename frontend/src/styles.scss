@@ -33,6 +33,24 @@
   box-sizing: border-box;
 }
 
+html {
+  /* Giữ chỗ scrollbar để tránh layout shift khi trang dài/ngắn thay đổi. */
+  scrollbar-gutter: stable;
+  scroll-behavior: smooth;
+}
+
+@supports not (scrollbar-gutter: stable) {
+  html {
+    overflow-y: scroll;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+}
+
 html,
 body {
   margin: 0;
