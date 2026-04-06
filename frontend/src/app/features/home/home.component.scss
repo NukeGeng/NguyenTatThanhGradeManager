@@ -83,6 +83,10 @@
   padding: 0;
 }
 
+.navbar__links li {
+  list-style: none;
+}
+
 .navbar__links a {
   font-size: 0.875rem;
   font-weight: 500;
@@ -90,6 +94,7 @@
   padding: 0.45rem 0.8rem;
   border-radius: var(--radius-sm);
   transition: var(--transition);
+  text-decoration: none;
 }
 
 .navbar__links a:hover {

@@ -1,0 +1,440 @@
+/* Wrapper boc toan bo noi dung 1 trang */
+.page-container {
+  display: flex;
+  flex-direction: column;
+  gap: 1.1rem;
+  max-width: 1200px;
+}
+
+.page-wrap {
+  display: grid;
+  gap: 1rem;
+  margin: 0;
+}
+
+.page-wrap .state-block {
+  min-height: 220px;
+  display: grid;
+  place-content: center;
+  justify-items: center;
+  gap: 0.75rem;
+  color: var(--text-sub);
+  text-align: center;
+}
+
+.page-wrap .state-block.error {
+  color: var(--red);
+}
+
+.page-wrap > mat-card,
+.page-wrap > .card,
+.page-wrap > .card-block,
+.page-wrap > .hero-card,
+.page-wrap > .state-card {
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  overflow: clip;
+  background: var(--white);
+}
+
+/* Header cua trang: title ben trai, action button ben phai */
+.page-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  box-shadow: var(--shadow);
+  padding: 1rem 1.2rem;
+}
+
+.page-title {
+  font-size: 1.35rem;
+  font-weight: 800;
+  color: var(--navy);
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.page-subtitle {
+  font-size: 0.875rem;
+  color: var(--text-sub);
+  margin: 0.2rem 0 0;
+}
+
+/* Breadcrumb */
+.breadcrumb {
+  display: flex;
+  align-items: center;
+  gap: 0.35rem;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  margin-bottom: -0.25rem;
+}
+
+.breadcrumb a {
+  color: var(--blue);
+  text-decoration: none;
+}
+
+.breadcrumb a:hover {
+  text-decoration: underline;
+}
+
+.breadcrumb-sep {
+  color: var(--gray-300);
+  font-size: 0.7rem;
+}
+
+/* Stats row: 4 stat cards ngang */
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1rem;
+}
+
+.stat-card {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  padding: 1.25rem 1.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  transition: var(--transition);
+}
+
+.stat-card:hover {
+  border-color: rgba(37, 99, 235, 0.2);
+  box-shadow: var(--shadow-md);
+}
+
+.stat-card__val {
+  font-size: 1.75rem;
+  font-weight: 800;
+  color: var(--navy);
+  letter-spacing: -0.03em;
+  line-height: 1;
+}
+
+.stat-card__label {
+  font-size: 0.8rem;
+  color: var(--text-sub);
+  font-weight: 500;
+}
+
+.stat-card__icon {
+  width: 36px;
+  height: 36px;
+  border-radius: var(--radius-sm);
+  background: var(--blue-pale);
+  color: var(--blue);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 0.5rem;
+}
+
+.stat-card--danger .stat-card__val {
+  color: var(--red);
+}
+
+.stat-card--danger .stat-card__icon {
+  background: var(--red-pale);
+  color: var(--red);
+}
+
+.stat-card--success .stat-card__val {
+  color: var(--green);
+}
+
+/* Content card: bang, danh sach... */
+.content-card {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  overflow: hidden;
+  box-shadow: var(--shadow);
+}
+
+.content-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 1rem 1.5rem;
+  border-bottom: 1px solid var(--gray-100);
+  flex-wrap: wrap;
+}
+
+.content-card__title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--navy);
+  margin: 0;
+}
+
+.content-card__body {
+  padding: 1.25rem 1.5rem;
+}
+
+/* Table NTTU style */
+.nttu-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 0.875rem;
+}
+
+.mat-mdc-header-row {
+  background: var(--gray-50) !important;
+  border-bottom: 2px solid var(--blue) !important;
+}
+
+.mat-mdc-header-cell {
+  color: var(--navy) !important;
+  font-weight: 700 !important;
+  font-size: 0.78rem !important;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  padding: 0.75rem 1rem !important;
+}
+
+.mat-mdc-row {
+  border-bottom: 1px solid var(--gray-100) !important;
+  transition: background 0.15s;
+}
+
+.mat-mdc-row:hover {
+  background: var(--blue-pale) !important;
+}
+
+.mat-mdc-cell {
+  padding: 0.7rem 1rem !important;
+  color: var(--text) !important;
+  font-size: 0.875rem !important;
+}
+
+/* Filter bar */
+.filter-bar {
+  background: var(--white);
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius);
+  padding: 0.875rem 1.25rem;
+  display: flex;
+  align-items: center;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.filter-bar mat-form-field {
+  min-width: 160px;
+  flex-shrink: 0;
+}
+
+.filter-bar .spacer {
+  flex: 1;
+}
+
+/* Section title with left border */
+.section-title {
+  font-size: 0.9rem;
+  font-weight: 700;
+  color: var(--navy);
+  border-left: 3px solid var(--blue);
+  padding-left: 0.75rem;
+  margin-bottom: 0.75rem;
+}
+
+/* Inline score input */
+.score-input {
+  width: 60px;
+  padding: 0.25rem 0.4rem;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+  font-size: 0.875rem;
+  text-align: center;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  transition: border-color 0.15s;
+}
+
+.score-input:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
+.score-input.warn {
+  border-color: var(--red);
+  background: var(--red-pale);
+}
+
+/* Grade badge */
+.grade-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+  padding: 0.2rem 0.65rem;
+  border-radius: 999px;
+  white-space: nowrap;
+}
+
+.grade-badge--a {
+  background: var(--green-pale);
+  color: var(--green);
+}
+
+.grade-badge--b {
+  background: var(--blue-pale);
+  color: var(--blue);
+}
+
+.grade-badge--c {
+  background: var(--yellow-pale);
+  color: var(--yellow);
+}
+
+.grade-badge--f {
+  background: var(--red-pale);
+  color: var(--red);
+}
+
+/* Weight display */
+.weight-display {
+  font-size: 0.72rem;
+  font-family: 'Courier New', monospace;
+  color: var(--text-sub);
+  letter-spacing: -0.01em;
+}
+
+/* Avatar */
+.user-avatar {
+  width: 36px;
+  height: 36px;
+  min-width: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, var(--navy), var(--blue));
+  color: #fff;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+/* Skeleton loader */
+.skeleton {
+  background: var(--gray-100);
+  border-radius: var(--radius-sm);
+  animation: skeleton-pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes skeleton-pulse {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+
+  50% {
+    opacity: 1;
+  }
+}
+
+.skeleton-row {
+  height: 44px;
+  margin-bottom: 1px;
+}
+
+/* Empty state */
+.empty-state {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 4rem 2rem;
+  text-align: center;
+  gap: 1rem;
+  color: var(--text-muted);
+}
+
+.empty-state lucide-icon {
+  opacity: 0.35;
+}
+
+.empty-state h3 {
+  font-size: 1rem;
+  font-weight: 700;
+  color: var(--text-sub);
+  margin: 0;
+}
+
+.empty-state p {
+  font-size: 0.875rem;
+  margin: 0;
+}
+
+/* Action buttons nhỏ trong bảng */
+.action-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 30px;
+  height: 30px;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+  background: var(--white);
+  color: var(--gray-600);
+  cursor: pointer;
+  transition: var(--transition);
+  padding: 0;
+}
+
+.action-btn:hover {
+  border-color: var(--blue);
+  color: var(--blue);
+  background: var(--blue-pale);
+}
+
+.action-btn--danger:hover {
+  border-color: var(--red);
+  color: var(--red);
+  background: var(--red-pale);
+}
+
+.action-btn:disabled {
+  opacity: 0.4;
+  cursor: not-allowed;
+}
+
+/* Responsive */
+@media (max-width: 768px) {
+  .stats-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .page-header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .filter-bar {
+    padding: 0.75rem 1rem;
+    gap: 0.65rem;
+  }
+
+  .filter-bar mat-form-field {
+    width: 100%;
+    min-width: 0;
+  }
+}
+
+@media (max-width: 480px) {
+  .stats-grid {
+    grid-template-columns: 1fr;
+  }
+}

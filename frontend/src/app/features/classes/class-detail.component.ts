@@ -100,10 +100,14 @@ import { ApiResponse, Class, Student } from '../../shared/models/interfaces';
 
               <ng-container matColumnDef="actions">
                 <th mat-header-cell *matHeaderCellDef>Thao tác</th>
-                <td mat-cell *matCellDef="let row">
-                  <a mat-stroked-button [routerLink]="['/students', row._id]">
-                    <lucide-icon name="chevron-right" [size]="16"></lucide-icon>
-                    Chi tiết
+                <td mat-cell *matCellDef="let row" class="actions-cell">
+                  <a
+                    class="action-btn"
+                    [routerLink]="['/students', row._id]"
+                    aria-label="Xem chi tiết sinh viên"
+                    title="Xem chi tiết sinh viên"
+                  >
+                    <lucide-icon name="eye" [size]="15"></lucide-icon>
                   </a>
                 </td>
               </ng-container>
@@ -183,6 +187,10 @@ import { ApiResponse, Class, Student } from '../../shared/models/interfaces';
 
       .full-table {
         width: 100%;
+      }
+
+      .actions-cell {
+        white-space: nowrap;
       }
 
       .badge {

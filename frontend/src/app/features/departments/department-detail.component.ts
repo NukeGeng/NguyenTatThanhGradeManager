@@ -66,10 +66,26 @@ interface SubjectUpsertPayload {
   ],
   template: `
     <section class="container page-wrap">
-      <button mat-stroked-button type="button" (click)="goBack()">
-        <lucide-icon name="arrow-left" [size]="16"></lucide-icon>
-        Quay lại danh sách khoa
-      </button>
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <span>Trang chủ</span>
+        <span class="breadcrumb-sep">/</span>
+        <span>Khoa</span>
+        <span class="breadcrumb-sep">/</span>
+        <span>Chi tiết</span>
+      </nav>
+
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">Quản lý khoa</p>
+          <h1>Trang chi tiết khoa</h1>
+          <p class="subtitle">Theo dõi môn học, lớp học phần và giáo viên thuộc khoa.</p>
+        </div>
+
+        <button mat-stroked-button type="button" (click)="goBack()">
+          <lucide-icon name="arrow-left" [size]="16"></lucide-icon>
+          Quay lại danh sách khoa
+        </button>
+      </header>
 
       @if (isLoading()) {
         <mat-card class="state-card">
@@ -106,168 +122,191 @@ interface SubjectUpsertPayload {
           </div>
         </mat-card>
 
-        <mat-tab-group>
+        <mat-tab-group class="detail-tabs">
           <mat-tab label="Môn học">
-            <div class="tab-actions">
-              <mat-form-field appearance="outline" class="filter-field">
-                <mat-label>Học kỳ</mat-label>
-                <mat-select
-                  [value]="subjectSemesterFilter()"
-                  (selectionChange)="onSemesterFilterChange($event.value)"
+            <div class="tab-pane">
+              <div class="filter-bar tab-actions">
+                <mat-form-field appearance="outline" class="filter-field">
+                  <mat-label>Học kỳ</mat-label>
+                  <mat-select
+                    [value]="subjectSemesterFilter()"
+                    (selectionChange)="onSemesterFilterChange($event.value)"
+                  >
+                    <mat-option value="all">Tất cả</mat-option>
+                    <mat-option value="1">HK1</mat-option>
+                    <mat-option value="2">HK2</mat-option>
+                  </mat-select>
+                </mat-form-field>
+
+                <div class="spacer"></div>
+
+                <button
+                  mat-flat-button
+                  type="button"
+                  class="btn-primary"
+                  (click)="openCreateSubjectDialog()"
                 >
-                  <mat-option value="all">Tất cả</mat-option>
-                  <mat-option value="1">HK1</mat-option>
-                  <mat-option value="2">HK2</mat-option>
-                </mat-select>
-              </mat-form-field>
+                  <lucide-icon name="plus" [size]="16"></lucide-icon>
+                  Thêm môn
+                </button>
+              </div>
 
-              <button
-                mat-flat-button
-                type="button"
-                class="btn-primary"
-                (click)="openCreateSubjectDialog()"
-              >
-                <lucide-icon name="plus" [size]="16"></lucide-icon>
-                Thêm môn
-              </button>
-            </div>
+              <div class="table-wrap">
+                <table mat-table [dataSource]="subjects()" class="full-table nttu-table">
+                  <ng-container matColumnDef="code">
+                    <th mat-header-cell *matHeaderCellDef>Mã môn</th>
+                    <td mat-cell *matCellDef="let row">{{ row.code }}</td>
+                  </ng-container>
 
-            <div class="table-wrap">
-              <table mat-table [dataSource]="subjects()" class="full-table">
-                <ng-container matColumnDef="code">
-                  <th mat-header-cell *matHeaderCellDef>Mã môn</th>
-                  <td mat-cell *matCellDef="let row">{{ row.code }}</td>
-                </ng-container>
+                  <ng-container matColumnDef="name">
+                    <th mat-header-cell *matHeaderCellDef>Tên môn</th>
+                    <td mat-cell *matCellDef="let row">{{ row.name }}</td>
+                  </ng-container>
 
-                <ng-container matColumnDef="name">
-                  <th mat-header-cell *matHeaderCellDef>Tên môn</th>
-                  <td mat-cell *matCellDef="let row">{{ row.name }}</td>
-                </ng-container>
+                  <ng-container matColumnDef="semester">
+                    <th mat-header-cell *matHeaderCellDef>Học kỳ</th>
+                    <td mat-cell *matCellDef="let row">{{ formatSemester(row.semester) }}</td>
+                  </ng-container>
 
-                <ng-container matColumnDef="semester">
-                  <th mat-header-cell *matHeaderCellDef>Học kỳ</th>
-                  <td mat-cell *matCellDef="let row">{{ formatSemester(row.semester) }}</td>
-                </ng-container>
+                  <ng-container matColumnDef="coefficient">
+                    <th mat-header-cell *matHeaderCellDef>Hệ số</th>
+                    <td mat-cell *matCellDef="let row">{{ row.coefficient ?? row.credits }}</td>
+                  </ng-container>
 
-                <ng-container matColumnDef="coefficient">
-                  <th mat-header-cell *matHeaderCellDef>Hệ số</th>
-                  <td mat-cell *matCellDef="let row">{{ row.coefficient ?? row.credits }}</td>
-                </ng-container>
+                  <ng-container matColumnDef="status">
+                    <th mat-header-cell *matHeaderCellDef>Trạng thái</th>
+                    <td mat-cell *matCellDef="let row">
+                      <span
+                        class="badge"
+                        [class.badge-active]="row.isActive"
+                        [class.badge-off]="!row.isActive"
+                      >
+                        {{ row.isActive ? 'Đang bật' : 'Đang tắt' }}
+                      </span>
+                    </td>
+                  </ng-container>
 
-                <ng-container matColumnDef="status">
-                  <th mat-header-cell *matHeaderCellDef>Trạng thái</th>
-                  <td mat-cell *matCellDef="let row">
-                    <span
-                      class="badge"
-                      [class.badge-active]="row.isActive"
-                      [class.badge-off]="!row.isActive"
-                    >
-                      {{ row.isActive ? 'Đang bật' : 'Đang tắt' }}
-                    </span>
-                  </td>
-                </ng-container>
+                  <ng-container matColumnDef="actions">
+                    <th mat-header-cell *matHeaderCellDef>Thao tác</th>
+                    <td mat-cell *matCellDef="let row" class="actions-cell">
+                      <div class="actions-wrap">
+                        <button
+                          type="button"
+                          class="action-btn"
+                          aria-label="Sửa môn"
+                          title="Sửa môn"
+                          (click)="openEditSubjectDialog(row)"
+                        >
+                          <lucide-icon name="pencil" [size]="15"></lucide-icon>
+                        </button>
+                        <button
+                          type="button"
+                          class="action-btn"
+                          [class.action-btn--danger]="row.isActive"
+                          [attr.aria-label]="row.isActive ? 'Tắt môn' : 'Bật môn'"
+                          [attr.title]="row.isActive ? 'Tắt môn' : 'Bật môn'"
+                          (click)="toggleSubject(row)"
+                        >
+                          <lucide-icon
+                            [name]="row.isActive ? 'x-circle' : 'check-circle'"
+                            [size]="15"
+                          ></lucide-icon>
+                        </button>
+                      </div>
+                    </td>
+                  </ng-container>
 
-                <ng-container matColumnDef="actions">
-                  <th mat-header-cell *matHeaderCellDef>Thao tác</th>
-                  <td mat-cell *matCellDef="let row" class="actions-cell">
-                    <button mat-stroked-button type="button" (click)="openEditSubjectDialog(row)">
-                      <lucide-icon name="pencil" [size]="16"></lucide-icon>
-                      Sửa
-                    </button>
-                    <button mat-stroked-button type="button" (click)="toggleSubject(row)">
-                      <lucide-icon
-                        [name]="row.isActive ? 'x-circle' : 'check-circle'"
-                        [size]="16"
-                      ></lucide-icon>
-                      {{ row.isActive ? 'Tắt' : 'Bật' }}
-                    </button>
-                  </td>
-                </ng-container>
-
-                <tr mat-header-row *matHeaderRowDef="subjectColumns"></tr>
-                <tr mat-row *matRowDef="let row; columns: subjectColumns"></tr>
-              </table>
+                  <tr mat-header-row *matHeaderRowDef="subjectColumns"></tr>
+                  <tr mat-row *matRowDef="let row; columns: subjectColumns"></tr>
+                </table>
+              </div>
             </div>
           </mat-tab>
 
           <mat-tab label="Lớp học">
-            <div class="tab-actions">
-              <mat-form-field appearance="outline" class="filter-field">
-                <mat-label>Năm học</mat-label>
-                <mat-select
-                  [value]="schoolYearFilter()"
-                  (selectionChange)="schoolYearFilter.set($event.value)"
-                >
-                  <mat-option value="all">Tất cả</mat-option>
-                  @for (year of schoolYearOptions(); track year) {
-                    <mat-option [value]="year">{{ year }}</mat-option>
-                  }
-                </mat-select>
-              </mat-form-field>
-            </div>
+            <div class="tab-pane">
+              <div class="filter-bar tab-actions">
+                <mat-form-field appearance="outline" class="filter-field">
+                  <mat-label>Năm học</mat-label>
+                  <mat-select
+                    [value]="schoolYearFilter()"
+                    (selectionChange)="schoolYearFilter.set($event.value)"
+                  >
+                    <mat-option value="all">Tất cả</mat-option>
+                    @for (year of schoolYearOptions(); track year) {
+                      <mat-option [value]="year">{{ year }}</mat-option>
+                    }
+                  </mat-select>
+                </mat-form-field>
+              </div>
 
-            <div class="table-wrap">
-              <table mat-table [dataSource]="filteredClasses()" class="full-table">
-                <ng-container matColumnDef="code">
-                  <th mat-header-cell *matHeaderCellDef>Mã lớp HP</th>
-                  <td mat-cell *matCellDef="let row">{{ row.code }}</td>
-                </ng-container>
+              <div class="table-wrap">
+                <table mat-table [dataSource]="filteredClasses()" class="full-table nttu-table">
+                  <ng-container matColumnDef="code">
+                    <th mat-header-cell *matHeaderCellDef>Mã lớp HP</th>
+                    <td mat-cell *matCellDef="let row">{{ row.code }}</td>
+                  </ng-container>
 
-                <ng-container matColumnDef="subject">
-                  <th mat-header-cell *matHeaderCellDef>Môn học</th>
-                  <td mat-cell *matCellDef="let row">{{ getSubjectName(row.subjectId) }}</td>
-                </ng-container>
+                  <ng-container matColumnDef="subject">
+                    <th mat-header-cell *matHeaderCellDef>Môn học</th>
+                    <td mat-cell *matCellDef="let row">{{ getSubjectName(row.subjectId) }}</td>
+                  </ng-container>
 
-                <ng-container matColumnDef="schoolYear">
-                  <th mat-header-cell *matHeaderCellDef>Năm học</th>
-                  <td mat-cell *matCellDef="let row">{{ getSchoolYearName(row.schoolYearId) }}</td>
-                </ng-container>
+                  <ng-container matColumnDef="schoolYear">
+                    <th mat-header-cell *matHeaderCellDef>Năm học</th>
+                    <td mat-cell *matCellDef="let row">
+                      {{ getSchoolYearName(row.schoolYearId) }}
+                    </td>
+                  </ng-container>
 
-                <ng-container matColumnDef="semester">
-                  <th mat-header-cell *matHeaderCellDef>Học kỳ</th>
-                  <td mat-cell *matCellDef="let row">HK{{ row.semester }}</td>
-                </ng-container>
+                  <ng-container matColumnDef="semester">
+                    <th mat-header-cell *matHeaderCellDef>Học kỳ</th>
+                    <td mat-cell *matCellDef="let row">HK{{ row.semester }}</td>
+                  </ng-container>
 
-                <ng-container matColumnDef="students">
-                  <th mat-header-cell *matHeaderCellDef>Sĩ số</th>
-                  <td mat-cell *matCellDef="let row">{{ row.studentCount }}</td>
-                </ng-container>
+                  <ng-container matColumnDef="students">
+                    <th mat-header-cell *matHeaderCellDef>Sĩ số</th>
+                    <td mat-cell *matCellDef="let row">{{ row.studentCount }}</td>
+                  </ng-container>
 
-                <tr mat-header-row *matHeaderRowDef="classColumns"></tr>
-                <tr mat-row *matRowDef="let row; columns: classColumns"></tr>
-              </table>
+                  <tr mat-header-row *matHeaderRowDef="classColumns"></tr>
+                  <tr mat-row *matRowDef="let row; columns: classColumns"></tr>
+                </table>
+              </div>
             </div>
           </mat-tab>
 
           <mat-tab label="Giáo viên">
-            <div class="table-wrap">
-              <table mat-table [dataSource]="teachers()" class="full-table">
-                <ng-container matColumnDef="name">
-                  <th mat-header-cell *matHeaderCellDef>Họ tên</th>
-                  <td mat-cell *matCellDef="let row">{{ row.name }}</td>
-                </ng-container>
+            <div class="tab-pane">
+              <div class="table-wrap">
+                <table mat-table [dataSource]="teachers()" class="full-table nttu-table">
+                  <ng-container matColumnDef="name">
+                    <th mat-header-cell *matHeaderCellDef>Họ tên</th>
+                    <td mat-cell *matCellDef="let row">{{ row.name }}</td>
+                  </ng-container>
 
-                <ng-container matColumnDef="email">
-                  <th mat-header-cell *matHeaderCellDef>Email</th>
-                  <td mat-cell *matCellDef="let row">{{ row.email }}</td>
-                </ng-container>
+                  <ng-container matColumnDef="email">
+                    <th mat-header-cell *matHeaderCellDef>Email</th>
+                    <td mat-cell *matCellDef="let row">{{ row.email }}</td>
+                  </ng-container>
 
-                <ng-container matColumnDef="status">
-                  <th mat-header-cell *matHeaderCellDef>Trạng thái</th>
-                  <td mat-cell *matCellDef="let row">
-                    <span
-                      class="badge"
-                      [class.badge-active]="row.isActive !== false"
-                      [class.badge-off]="row.isActive === false"
-                    >
-                      {{ row.isActive === false ? 'Tạm khóa' : 'Hoạt động' }}
-                    </span>
-                  </td>
-                </ng-container>
+                  <ng-container matColumnDef="status">
+                    <th mat-header-cell *matHeaderCellDef>Trạng thái</th>
+                    <td mat-cell *matCellDef="let row">
+                      <span
+                        class="badge"
+                        [class.badge-active]="row.isActive !== false"
+                        [class.badge-off]="row.isActive === false"
+                      >
+                        {{ row.isActive === false ? 'Tạm khóa' : 'Hoạt động' }}
+                      </span>
+                    </td>
+                  </ng-container>
 
-                <tr mat-header-row *matHeaderRowDef="teacherColumns"></tr>
-                <tr mat-row *matRowDef="let row; columns: teacherColumns"></tr>
-              </table>
+                  <tr mat-header-row *matHeaderRowDef="teacherColumns"></tr>
+                  <tr mat-row *matRowDef="let row; columns: teacherColumns"></tr>
+                </table>
+              </div>
             </div>
           </mat-tab>
         </mat-tab-group>
@@ -280,6 +319,19 @@ interface SubjectUpsertPayload {
         padding-block: 1.5rem;
         display: grid;
         gap: 1rem;
+      }
+
+      .page-header {
+        display: flex;
+        align-items: flex-start;
+        justify-content: space-between;
+        gap: 1rem;
+        flex-wrap: wrap;
+      }
+
+      .subtitle {
+        margin: 0;
+        color: var(--text-sub);
       }
 
       .state-card {
@@ -301,6 +353,7 @@ interface SubjectUpsertPayload {
         align-items: flex-start;
         gap: 1rem;
         border: 1px solid var(--gray-200);
+        padding: 1rem 1.2rem 1.05rem;
       }
 
       .eyebrow {
@@ -346,13 +399,23 @@ interface SubjectUpsertPayload {
         font-size: 0.82rem;
       }
 
-      .tab-actions {
-        display: flex;
-        justify-content: space-between;
-        align-items: center;
+      .detail-tabs {
+        border: 1px solid var(--gray-200);
+        border-radius: var(--radius);
+        box-shadow: var(--shadow);
+        background: var(--white);
+        overflow: hidden;
+      }
+
+      .tab-pane {
+        padding: 0.95rem 1rem 1rem;
+        display: grid;
         gap: 0.75rem;
-        padding: 1rem 0;
-        flex-wrap: wrap;
+      }
+
+      .tab-actions {
+        justify-content: flex-start;
+        align-items: center;
       }
 
       .filter-field {
@@ -374,9 +437,14 @@ interface SubjectUpsertPayload {
       }
 
       .actions-cell {
-        display: flex;
-        gap: 0.5rem;
-        flex-wrap: wrap;
+        white-space: nowrap;
+      }
+
+      .actions-wrap {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        flex-wrap: nowrap;
       }
 
       .badge {
@@ -401,6 +469,10 @@ interface SubjectUpsertPayload {
       @media (max-width: 768px) {
         .hero-card {
           flex-direction: column;
+        }
+
+        .tab-pane {
+          padding: 0.8rem;
         }
 
         .meta-grid {

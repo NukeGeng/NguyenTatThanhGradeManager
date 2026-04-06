@@ -10,6 +10,7 @@
 Chuyển đổi file HTML bên dưới thành Angular v21 standalone component cho trang chủ (landing page).
 
 **Tạo các file sau:**
+
 ```
 src/app/features/home/home.component.ts
 src/app/features/home/home.component.html
@@ -17,6 +18,7 @@ src/app/features/home/home.component.scss
 ```
 
 **Đồng thời cập nhật:**
+
 ```
 src/app/app.routes.ts   — thêm route path: ''
 src/index.html          — thêm Google Fonts nếu chưa có
@@ -27,27 +29,50 @@ src/index.html          — thêm Google Fonts nếu chưa có
 ## 🔧 Quy tắc chuyển đổi (làm ĐÚNG theo thứ tự)
 
 ### home.component.ts
+
 ```typescript
 // Standalone component, selector: app-home
 // Imports cần thiết:
-import { Component, OnInit, inject } from '@angular/core';
-import { Router, RouterLink } from '@angular/router';
-import { AuthService } from '../../core/services/auth.service';
+import { Component, OnInit, inject } from "@angular/core";
+import { Router, RouterLink } from "@angular/router";
+import { AuthService } from "../../core/services/auth.service";
 import {
   LucideAngularModule,
-  Zap, LogIn, LayoutDashboard, ArrowDown,
-  Users, User, Building2, Layers, ShieldCheck, Shield,
-  ClipboardList, FileSpreadsheet, Bell, BrainCircuit,
-  TrendingUp, Lightbulb, Database, CheckCircle,
-  AlertTriangle, AlertCircle, Cpu, Code2, Server,
-  Lock, Triangle, Sparkles, Workflow
-} from 'lucide-angular';
+  Zap,
+  LogIn,
+  LayoutDashboard,
+  ArrowDown,
+  Users,
+  User,
+  Building2,
+  Layers,
+  ShieldCheck,
+  Shield,
+  ClipboardList,
+  FileSpreadsheet,
+  Bell,
+  BrainCircuit,
+  TrendingUp,
+  Lightbulb,
+  Database,
+  CheckCircle,
+  AlertTriangle,
+  AlertCircle,
+  Cpu,
+  Code2,
+  Server,
+  Lock,
+  Triangle,
+  Sparkles,
+  Workflow,
+} from "lucide-angular";
 
 // Logic trong ngOnInit: nếu đã đăng nhập → navigate('/dashboard')
 // if (this.authService.isLoggedIn()) this.router.navigate(['/dashboard']);
 ```
 
 ### home.component.html
+
 - ❌ BỎ: `<!DOCTYPE>`, `<html>`, `<head>`, `<body>`, `<title>`
 - ❌ BỎ: `<link>` Google Fonts
 - ❌ BỎ: `<script src="lucide CDN">`
@@ -56,17 +81,19 @@ import {
 - ✅ THAY: `href="/login"` → `routerLink="/login"`
 - ✅ THAY: `href="/dashboard"` → `routerLink="/dashboard"`
 - ✅ GIỮ NGUYÊN: `href="#features"`, `href="#ai"` (anchor scroll)
-- ✅ THAY: `src="logo-nttu.png"` → `src="assets/images/logo-nttu.png"`
+- ✅ THAY: `src="LogoNTTU.svg"` → `src="assets/images/LogoNTTU.svg"`
 - ✅ THAY: email bị obfuscate `[email protected]` → `admin@nttu.edu.vn`
 - ✅ GIỮ NGUYÊN: 100% cấu trúc HTML, class CSS, text nội dung
 
 ### home.component.scss
+
 - ✅ CHUYỂN: toàn bộ nội dung trong `<style>...</style>` vào đây
 - ❌ BỎ: `:root { }` (đã có trong styles.scss global)
 - ❌ BỎ: reset (`*, html, body, img, a, ul, button`) (đã có global)
 - ✅ GIỮ: tất cả class CSS còn lại (`.navbar`, `.hero`, `.feat-card`...)
 
 ### app.routes.ts — thêm route trang chủ
+
 ```typescript
 {
   path: '',
@@ -992,7 +1019,7 @@ import {
 
       <a href="#" class="navbar__logo">
         <!-- Thay src bằng đường dẫn logo thật của bạn -->
-        <img src="logo-nttu.png" alt="Logo NTTU" />
+        <img src="LogoNTTU.svg" alt="Logo NTTU" />
         <div class="navbar__logo-text">
           <small>Trường ĐH Nguyễn Tất Thành</small>
           <strong>NttuGradeManager</strong>
@@ -1013,9 +1040,9 @@ import {
       </a>
 
     </nav>
+
   </div>
 </header>
-
 
 <!-- ═══════════════════════════════════════
      HERO
@@ -1102,9 +1129,9 @@ import {
       </div>
 
     </div>
+
   </div>
 </section>
-
 
 <!-- ═══════════════════════════════════════
      FEATURES
@@ -1174,9 +1201,9 @@ import {
       </div>
 
     </div>
+
   </div>
 </section>
-
 
 <!-- ═══════════════════════════════════════
      HOW IT WORKS
@@ -1219,9 +1246,9 @@ import {
       </div>
 
     </div>
+
   </div>
 </section>
-
 
 <!-- ═══════════════════════════════════════
      ROLES — PHÂN QUYỀN
@@ -1313,9 +1340,9 @@ import {
       </div>
 
     </div>
+
   </div>
 </section>
-
 
 <!-- ═══════════════════════════════════════
      AI PREDICTION
@@ -1431,9 +1458,9 @@ import {
       </div>
 
     </div>
+
   </div>
 </section>
-
 
 <!-- ═══════════════════════════════════════
      TECH STACK
@@ -1490,7 +1517,6 @@ import {
   </div>
 </section>
 
-
 <!-- ═══════════════════════════════════════
      CTA
 ═══════════════════════════════════════ -->
@@ -1515,7 +1541,6 @@ import {
   </div>
 </section>
 
-
 <!-- ═══════════════════════════════════════
      FOOTER
 ═══════════════════════════════════════ -->
@@ -1524,7 +1549,7 @@ import {
     <div class="footer__inner">
 
       <div class="footer__logo">
-        <img src="logo-nttu.png" alt="NTTU" />
+        <img src="LogoNTTU.svg" alt="NTTU" />
         <span>NttuGradeManager — Khoa CNTT, Trường ĐH Nguyễn Tất Thành</span>
       </div>
 
@@ -1532,6 +1557,7 @@ import {
         <a href="#">Giới thiệu</a>
         <a href="#">Hỗ trợ</a>
         <a href="/cdn-cgi/l/email-protection#d7b6b3babeb997b9a3a3a2f9b2
+
 ---
 
 ## ✅ Checklist sau khi tạo xong
@@ -1542,5 +1568,5 @@ import {
 □ home.component.scss — không có :root {} và reset, chỉ chứa class CSS của trang
 □ app.routes.ts — đã có route path: '' → HomeComponent
 □ index.html — đã có Google Fonts Be Vietnam Pro
-□ src/assets/images/logo-nttu.png — file logo đã được copy vào đúng chỗ
+□ src/assets/images/LogoNTTU.svg — file logo đã được copy vào đúng chỗ
 ```

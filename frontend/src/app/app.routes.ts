@@ -18,6 +18,10 @@ export const routes: Routes = [
       import('./features/dashboard/dashboard.routes').then((m) => m.DASHBOARD_ROUTES),
   },
   {
+    path: 'news',
+    loadComponent: () => import('./features/news/news.component').then((m) => m.NewsComponent),
+  },
+  {
     path: 'departments',
     canActivate: [authGuard, adminOnlyGuard],
     loadChildren: () =>

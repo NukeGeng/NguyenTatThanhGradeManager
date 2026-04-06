@@ -75,6 +75,14 @@ interface PredictClassResponse {
   ],
   template: `
     <section class="container page-wrap">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <span>Dashboard</span>
+        <span class="breadcrumb-sep">/</span>
+        <span>Nhập điểm</span>
+        <span class="breadcrumb-sep">/</span>
+        <span>Import Excel/CSV</span>
+      </nav>
+
       <header class="page-header">
         <div>
           <p class="eyebrow">Ngày 11 - Import điểm</p>

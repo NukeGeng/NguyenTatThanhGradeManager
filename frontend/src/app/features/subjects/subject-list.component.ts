@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -49,6 +49,7 @@ interface SubjectUpsertPayload {
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     ReactiveFormsModule,
     MatButtonModule,
     MatCardModule,
@@ -64,6 +65,12 @@ interface SubjectUpsertPayload {
   ],
   template: `
     <section class="container page-wrap">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <span>Dashboard</span>
+        <span class="breadcrumb-sep">/</span>
+        <span>Môn học</span>
+      </nav>
+
       <header class="page-header">
         <div>
           <p class="eyebrow">Quản trị Admin</p>
@@ -79,8 +86,8 @@ interface SubjectUpsertPayload {
         </button>
       </header>
 
-      <mat-card>
-        <div class="filters">
+      <mat-card class="content-card">
+        <div class="filter-bar">
           <mat-form-field appearance="outline">
             <mat-label>Khoa</mat-label>
             <mat-select
@@ -108,6 +115,18 @@ interface SubjectUpsertPayload {
             </mat-select>
           </mat-form-field>
 
+          <mat-form-field appearance="outline" class="search-field">
+            <mat-label>Tìm môn học</mat-label>
+            <input
+              matInput
+              [(ngModel)]="searchKeyword"
+              (ngModelChange)="applySearchFilter()"
+              placeholder="Nhập mã môn hoặc tên môn"
+            />
+          </mat-form-field>
+
+          <div class="spacer"></div>
+
           <mat-slide-toggle [checked]="activeOnly" (change)="onActiveOnlyChange($event.checked)">
             Chỉ active
           </mat-slide-toggle>
@@ -124,9 +143,15 @@ interface SubjectUpsertPayload {
             <p>{{ errorMessage }}</p>
             <button mat-stroked-button type="button" (click)="loadData()">Thử lại</button>
           </div>
+        } @else if (filteredSubjects.length === 0) {
+          <div class="empty-state">
+            <lucide-icon name="book-open" [size]="44"></lucide-icon>
+            <h3>Không có môn học phù hợp</h3>
+            <p>Thử đổi bộ lọc hoặc thêm môn học mới.</p>
+          </div>
         } @else {
           <div class="table-wrap">
-            <table mat-table [dataSource]="subjects" class="full-table">
+            <table mat-table [dataSource]="filteredSubjects" class="full-table nttu-table">
               <ng-container matColumnDef="code">
                 <th mat-header-cell *matHeaderCellDef>Mã môn</th>
                 <td mat-cell *matCellDef="let row">{{ row.code }}</td>
@@ -152,6 +177,13 @@ interface SubjectUpsertPayload {
                 <td mat-cell *matCellDef="let row">{{ row.coefficient ?? row.credits }}</td>
               </ng-container>
 
+              <ng-container matColumnDef="weights">
+                <th mat-header-cell *matHeaderCellDef>Trọng số</th>
+                <td mat-cell *matCellDef="let row">
+                  <span class="weight-display">{{ getWeightDisplay(row) }}</span>
+                </td>
+              </ng-container>
+
               <ng-container matColumnDef="status">
                 <th mat-header-cell *matHeaderCellDef>Trạng thái</th>
                 <td mat-cell *matCellDef="let row">
@@ -168,28 +200,41 @@ interface SubjectUpsertPayload {
               <ng-container matColumnDef="actions">
                 <th mat-header-cell *matHeaderCellDef>Thao tác</th>
                 <td mat-cell *matCellDef="let row" class="actions-cell">
-                  <button mat-stroked-button type="button" (click)="openEditDialog(row)">
-                    <lucide-icon name="pencil" [size]="16"></lucide-icon>
-                    Sửa
-                  </button>
+                  <div class="actions-wrap">
+                    <button
+                      type="button"
+                      class="action-btn"
+                      aria-label="Sửa môn"
+                      title="Sửa môn"
+                      (click)="openEditDialog(row)"
+                    >
+                      <lucide-icon name="pencil" [size]="15"></lucide-icon>
+                    </button>
 
-                  <button mat-stroked-button type="button" (click)="toggleSubject(row)">
-                    <lucide-icon
-                      [name]="row.isActive ? 'x-circle' : 'check-circle'"
-                      [size]="16"
-                    ></lucide-icon>
-                    {{ row.isActive ? 'Tắt' : 'Bật' }}
-                  </button>
+                    <button
+                      type="button"
+                      class="action-btn"
+                      [class.action-btn--danger]="row.isActive"
+                      [attr.aria-label]="row.isActive ? 'Tắt môn' : 'Bật môn'"
+                      [attr.title]="row.isActive ? 'Tắt môn' : 'Bật môn'"
+                      (click)="toggleSubject(row)"
+                    >
+                      <lucide-icon
+                        [name]="row.isActive ? 'x-circle' : 'check-circle'"
+                        [size]="15"
+                      ></lucide-icon>
+                    </button>
 
-                  <button
-                    mat-stroked-button
-                    type="button"
-                    class="danger"
-                    (click)="deleteSubject(row)"
-                  >
-                    <lucide-icon name="trash-2" [size]="16"></lucide-icon>
-                    Xóa
-                  </button>
+                    <button
+                      type="button"
+                      class="action-btn action-btn--danger"
+                      aria-label="Xóa môn"
+                      title="Xóa môn"
+                      (click)="deleteSubject(row)"
+                    >
+                      <lucide-icon name="trash-2" [size]="15"></lucide-icon>
+                    </button>
+                  </div>
                 </td>
               </ng-container>
 
@@ -241,13 +286,8 @@ interface SubjectUpsertPayload {
         color: #fff !important;
       }
 
-      .filters {
-        display: grid;
-        grid-template-columns: 220px 180px auto;
-        gap: 0.75rem;
-        align-items: center;
-        padding: 1rem;
-        border-bottom: 1px solid var(--gray-200);
+      .search-field {
+        width: min(320px, 100%);
       }
 
       .table-wrap {
@@ -259,10 +299,14 @@ interface SubjectUpsertPayload {
       }
 
       .actions-cell {
-        display: flex;
-        gap: 0.5rem;
-        flex-wrap: wrap;
-        padding-block: 0.75rem;
+        white-space: nowrap;
+      }
+
+      .actions-wrap {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        flex-wrap: nowrap;
       }
 
       .badge {
@@ -284,27 +328,9 @@ interface SubjectUpsertPayload {
         color: #dc2626;
       }
 
-      .danger {
-        border-color: #dc2626 !important;
-        color: #dc2626 !important;
-      }
-
-      .state-block {
-        min-height: 240px;
-        display: grid;
-        place-content: center;
-        justify-items: center;
-        gap: 0.75rem;
-        color: var(--text-sub);
-      }
-
-      .state-block.error {
-        color: #dc2626;
-      }
-
       @media (max-width: 768px) {
-        .filters {
-          grid-template-columns: 1fr;
+        .search-field {
+          width: 100%;
         }
       }
     `,
@@ -322,16 +348,19 @@ export class SubjectListComponent implements OnInit {
     'department',
     'semester',
     'coefficient',
+    'weights',
     'status',
     'actions',
   ];
 
   departments: Department[] = [];
   subjects: Subject[] = [];
+  filteredSubjects: Subject[] = [];
 
   selectedDepartmentId = 'all';
   selectedSemester: SemesterFilter = 'all';
   activeOnly = true;
+  searchKeyword = '';
 
   isLoading = true;
   errorMessage = '';
@@ -375,9 +404,11 @@ export class SubjectListComponent implements OnInit {
         next: ({ departments, subjects }) => {
           this.departments = departments;
           this.subjects = subjects;
+          this.applySearchFilter();
         },
         error: (error: unknown) => {
           this.errorMessage = this.resolveErrorMessage(error);
+          this.filteredSubjects = [];
         },
       });
   }
@@ -396,11 +427,26 @@ export class SubjectListComponent implements OnInit {
       .subscribe({
         next: (subjects) => {
           this.subjects = subjects;
+          this.applySearchFilter();
         },
         error: (error: unknown) => {
           this.errorMessage = this.resolveErrorMessage(error);
+          this.filteredSubjects = [];
         },
       });
+  }
+
+  applySearchFilter(): void {
+    const keyword = this.searchKeyword.trim().toLowerCase();
+
+    this.filteredSubjects = this.subjects.filter((item) => {
+      if (!keyword) {
+        return true;
+      }
+
+      const text = `${item.code} ${item.name}`.toLowerCase();
+      return text.includes(keyword);
+    });
   }
 
   openCreateDialog(): void {
@@ -524,6 +570,11 @@ export class SubjectListComponent implements OnInit {
     }
 
     return `HK${value}`;
+  }
+
+  getWeightDisplay(value: Subject): string {
+    const weights = value.defaultWeights;
+    return `TX:${weights.tx} GK:${weights.gk} TH:${weights.th} TKT:${weights.tkt}`;
   }
 
   private fetchSubjects() {

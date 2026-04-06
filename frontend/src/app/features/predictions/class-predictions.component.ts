@@ -57,9 +57,15 @@ interface PredictionRow {
   ],
   template: `
     <section class="container page-wrap">
-      <header class="page-header card">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <span>Dashboard</span>
+        <span class="breadcrumb-sep">/</span>
+        <span>Dự đoán AI</span>
+      </nav>
+
+      <header class="page-header">
         <div>
-          <p class="eyebrow">Ngày 12 - Dự đoán AI</p>
+          <p class="eyebrow">Phân tích rủi ro học tập</p>
           <h1>Dự đoán cả lớp</h1>
           <p class="subtitle">
             Theo dõi kết quả AI theo lớp học phần, lọc rủi ro cao và in báo cáo.
@@ -183,15 +189,16 @@ interface PredictionRow {
 
               <ng-container matColumnDef="actions">
                 <th mat-header-cell *matHeaderCellDef>Chi tiết</th>
-                <td mat-cell *matCellDef="let row">
+                <td mat-cell *matCellDef="let row" class="actions-cell">
                   <button
-                    mat-stroked-button
                     type="button"
+                    class="action-btn"
+                    aria-label="Xem báo cáo"
+                    title="Xem báo cáo"
                     (click)="openReport(row)"
                     [disabled]="!row.gradeId"
                   >
-                    <lucide-icon name="eye" [size]="16"></lucide-icon>
-                    Xem báo cáo
+                    <lucide-icon name="eye" [size]="15"></lucide-icon>
                   </button>
                 </td>
               </ng-container>
@@ -217,6 +224,19 @@ interface PredictionRow {
         border: 1px solid var(--gray-200);
         border-radius: var(--radius);
         box-shadow: var(--shadow);
+        padding: 1rem 1.1rem;
+      }
+
+      .page-wrap > mat-card.card {
+        overflow: visible;
+      }
+
+      .filter-card {
+        padding-top: 1.15rem;
+      }
+
+      .table-card {
+        padding-top: 0.75rem;
       }
 
       .page-header {
@@ -277,6 +297,10 @@ interface PredictionRow {
 
       .full-table {
         width: 100%;
+      }
+
+      .actions-cell {
+        white-space: nowrap;
       }
 
       .state-block {

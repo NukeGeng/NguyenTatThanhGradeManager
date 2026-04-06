@@ -87,9 +87,15 @@ interface WeightDialogData {
   ],
   template: `
     <section class="container page-wrap">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <span>Dashboard</span>
+        <span class="breadcrumb-sep">/</span>
+        <span>Nhập điểm</span>
+      </nav>
+
       <header class="page-header">
         <div>
-          <p class="eyebrow">Ngày 11 - Nhập điểm</p>
+          <p class="eyebrow">Quản lý điểm số</p>
           <h1>Grade Entry</h1>
           <p class="subtitle">
             Chọn lớp học phần, chọn sinh viên và nhập điểm theo hệ đại học NTTU.
@@ -105,10 +111,10 @@ interface WeightDialogData {
       <mat-card class="card-block">
         <div class="step-title">
           <span class="step-index">Bước 1</span>
-          <h2>Chọn lớp học phần</h2>
+          <h2 class="section-title">Chọn lớp học phần</h2>
         </div>
 
-        <form [formGroup]="selectionForm" class="filters-grid">
+        <form [formGroup]="selectionForm" class="filters-grid filter-bar">
           <mat-form-field appearance="outline">
             <mat-label>Năm học</mat-label>
             <mat-select formControlName="schoolYearId" (selectionChange)="onFilterChange()">
@@ -163,7 +169,7 @@ interface WeightDialogData {
       <mat-card class="card-block">
         <div class="step-title">
           <span class="step-index">Bước 2</span>
-          <h2>Chọn sinh viên</h2>
+          <h2 class="section-title">Chọn sinh viên</h2>
         </div>
 
         <ng-container *ngIf="!selectedClass">
@@ -186,7 +192,7 @@ interface WeightDialogData {
           </div>
 
           <div *ngIf="!isLoadingStudents && !loadErrorMessage" class="table-wrap">
-            <table mat-table [dataSource]="students" class="full-table">
+            <table mat-table [dataSource]="students" class="full-table nttu-table">
               <ng-container matColumnDef="studentCode">
                 <th mat-header-cell *matHeaderCellDef>Mã SV</th>
                 <td mat-cell *matCellDef="let row">{{ row.studentCode }}</td>
@@ -208,10 +214,15 @@ interface WeightDialogData {
 
               <ng-container matColumnDef="actions">
                 <th mat-header-cell *matHeaderCellDef>Thao tác</th>
-                <td mat-cell *matCellDef="let row">
-                  <button mat-stroked-button type="button" (click)="selectStudent(row)">
-                    <lucide-icon name="chevron-right" [size]="16"></lucide-icon>
-                    Nhập điểm
+                <td mat-cell *matCellDef="let row" class="actions-cell">
+                  <button
+                    type="button"
+                    class="action-btn"
+                    aria-label="Nhập điểm sinh viên"
+                    title="Nhập điểm sinh viên"
+                    (click)="selectStudent(row)"
+                  >
+                    <lucide-icon name="pencil" [size]="15"></lucide-icon>
                   </button>
                 </td>
               </ng-container>
@@ -223,6 +234,12 @@ interface WeightDialogData {
                 [class.row-active]="selectedStudent?._id === row._id"
               ></tr>
             </table>
+
+            <div class="table-summary" *ngIf="students.length > 0">
+              <span>Đã nhập điểm: {{ gradedStudentsCount }} / {{ students.length }}</span>
+              <span>Điểm TB lớp: {{ classAverageScore | number: '1.2-2' }}</span>
+              <span>Tỉ lệ đạt: {{ classPassRate | number: '1.0-1' }}%</span>
+            </div>
           </div>
         </ng-container>
       </mat-card>
@@ -230,7 +247,7 @@ interface WeightDialogData {
       <mat-card class="card-block">
         <div class="step-title">
           <span class="step-index">Bước 3</span>
-          <h2>Nhập điểm 1 sinh viên</h2>
+          <h2 class="section-title">Nhập điểm 1 sinh viên</h2>
         </div>
 
         <ng-container *ngIf="!selectedStudent">
@@ -392,6 +409,7 @@ interface WeightDialogData {
         border: 1px solid var(--gray-200);
         box-shadow: var(--shadow);
         border-radius: var(--radius);
+        padding: 1rem 1.1rem 1.1rem;
       }
 
       .step-title {
@@ -405,25 +423,33 @@ interface WeightDialogData {
         margin: 0;
         color: var(--navy-dark);
         font-size: 1.05rem;
+        border-left: 0;
+        padding-left: 0;
       }
 
       .step-index {
-        width: 26px;
-        height: 26px;
-        border-radius: 50%;
+        min-height: 26px;
+        padding: 0.1rem 0.6rem;
+        border-radius: 999px;
         background: var(--blue-pale);
         color: var(--blue);
         display: inline-flex;
         align-items: center;
         justify-content: center;
         font-weight: 700;
-        font-size: 0.78rem;
+        font-size: 0.72rem;
+        line-height: 1;
+        white-space: nowrap;
       }
 
       .filters-grid {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 0.75rem;
+      }
+
+      .filters-grid.filter-bar {
+        padding: 0.75rem;
       }
 
       .class-meta {
@@ -462,6 +488,10 @@ interface WeightDialogData {
         width: 100%;
       }
 
+      .actions-cell {
+        white-space: nowrap;
+      }
+
       .badge {
         display: inline-flex;
         align-items: center;
@@ -488,6 +518,17 @@ interface WeightDialogData {
 
       .row-active {
         background: var(--blue-pale);
+      }
+
+      .table-summary {
+        border-top: 1px dashed var(--gray-300);
+        margin-top: 0.5rem;
+        padding-top: 0.65rem;
+        display: flex;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+        color: var(--text-sub);
+        font-size: 0.82rem;
       }
 
       .student-head {
@@ -733,6 +774,32 @@ export class GradeEntryComponent implements OnInit {
       letterGrade: 'F',
       resultText: 'Không đạt',
     };
+  }
+
+  get gradedStudentsCount(): number {
+    return this.classGrades.filter((item) => this.isGradeCompleted(item)).length;
+  }
+
+  get classAverageScore(): number {
+    const values = this.classGrades
+      .map((item) => item.finalScore)
+      .filter((item): item is number => item !== null && item !== undefined);
+
+    if (!values.length) {
+      return 0;
+    }
+
+    const total = values.reduce((sum, item) => sum + Number(item), 0);
+    return total / values.length;
+  }
+
+  get classPassRate(): number {
+    if (!this.students.length) {
+      return 0;
+    }
+
+    const passCount = this.classGrades.filter((item) => this.isPassGrade(item)).length;
+    return (passCount / this.students.length) * 100;
   }
 
   onFilterChange(): void {
@@ -1093,6 +1160,27 @@ export class GradeEntryComponent implements OnInit {
 
   private normalizeNullableScoreArray(values: Array<number | null>): Array<number | null> {
     return values.map((item) => this.normalizeNullableScore(item));
+  }
+
+  private isGradeCompleted(grade: Grade): boolean {
+    return grade.tktScore !== null || grade.isVangThi === true;
+  }
+
+  private isPassGrade(grade: Grade): boolean {
+    if (grade.isVangThi) {
+      return false;
+    }
+
+    const tkt = grade.tktScore;
+    if (tkt === null || tkt === undefined || tkt < 4) {
+      return false;
+    }
+
+    if (tkt === 4) {
+      return true;
+    }
+
+    return grade.finalScore !== null && grade.finalScore >= 5;
   }
 
   private callPredictAfterSave(gradeId: string): void {

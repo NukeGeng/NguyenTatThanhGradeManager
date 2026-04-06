@@ -17,7 +17,6 @@ import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
-import { MatTableModule } from '@angular/material/table';
 import { LucideAngularModule } from 'lucide-angular';
 import { catchError, finalize, forkJoin, map, of, switchMap } from 'rxjs';
 
@@ -61,16 +60,21 @@ interface DepartmentUpsertPayload {
     MatDialogModule,
     MatProgressSpinnerModule,
     MatSnackBarModule,
-    MatTableModule,
     LucideAngularModule,
   ],
   template: `
     <section class="container page-wrap">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <span>Dashboard</span>
+        <span class="breadcrumb-sep">/</span>
+        <span>Khoa</span>
+      </nav>
+
       <header class="page-header">
         <div>
           <p class="eyebrow">Quản lý hệ thống</p>
           <h1>Danh sách khoa</h1>
-          <p class="subtitle">Quản lý thông tin khoa, giáo viên phụ trách và số liệu tổng quan.</p>
+          <p class="subtitle">Theo dõi nhanh quy mô môn học, lớp học phần và đội ngũ giáo viên.</p>
         </div>
 
         <button mat-flat-button type="button" class="btn-primary" (click)="openCreateDialog()">
@@ -79,7 +83,41 @@ interface DepartmentUpsertPayload {
         </button>
       </header>
 
-      <mat-card>
+      <section class="stats-grid" *ngIf="!isLoading && !errorMessage">
+        <article class="stat-card">
+          <div class="stat-card__icon">
+            <lucide-icon name="building-2" [size]="18"></lucide-icon>
+          </div>
+          <p class="stat-card__val">{{ rows.length }}</p>
+          <p class="stat-card__label">Tổng khoa</p>
+        </article>
+
+        <article class="stat-card">
+          <div class="stat-card__icon">
+            <lucide-icon name="book-open" [size]="18"></lucide-icon>
+          </div>
+          <p class="stat-card__val">{{ totalSubjects }}</p>
+          <p class="stat-card__label">Tổng môn học</p>
+        </article>
+
+        <article class="stat-card">
+          <div class="stat-card__icon">
+            <lucide-icon name="school" [size]="18"></lucide-icon>
+          </div>
+          <p class="stat-card__val">{{ totalClasses }}</p>
+          <p class="stat-card__label">Tổng lớp học phần</p>
+        </article>
+
+        <article class="stat-card">
+          <div class="stat-card__icon">
+            <lucide-icon name="users" [size]="18"></lucide-icon>
+          </div>
+          <p class="stat-card__val">{{ totalTeachers }}</p>
+          <p class="stat-card__label">Tổng giáo viên</p>
+        </article>
+      </section>
+
+      <mat-card class="content-card">
         @if (isLoading) {
           <div class="state-block">
             <mat-spinner [diameter]="36"></mat-spinner>
@@ -91,62 +129,83 @@ interface DepartmentUpsertPayload {
             <p>{{ errorMessage }}</p>
             <button mat-stroked-button type="button" (click)="loadDepartments()">Thử lại</button>
           </div>
+        } @else if (rows.length === 0) {
+          <div class="empty-state">
+            <lucide-icon name="building-2" [size]="44"></lucide-icon>
+            <h3>Chưa có khoa nào</h3>
+            <p>Tạo khoa đầu tiên để bắt đầu cấu hình môn học và phân quyền giảng dạy.</p>
+            <button mat-flat-button type="button" class="btn-primary" (click)="openCreateDialog()">
+              <lucide-icon name="plus" [size]="16"></lucide-icon>
+              Thêm khoa
+            </button>
+          </div>
         } @else {
-          <div class="table-wrap">
-            <table mat-table [dataSource]="rows" class="full-table">
-              <ng-container matColumnDef="code">
-                <th mat-header-cell *matHeaderCellDef>Mã khoa</th>
-                <td mat-cell *matCellDef="let row">{{ row.code }}</td>
-              </ng-container>
+          <div class="dept-grid">
+            @for (row of rows; track row._id) {
+              <article class="dept-card">
+                <div class="dept-card__head">
+                  <div>
+                    <p class="dept-code">{{ row.code }}</p>
+                    <h3>{{ row.name }}</h3>
+                  </div>
+                  <span
+                    class="grade-badge"
+                    [class.grade-badge--a]="row.isActive !== false"
+                    [class.grade-badge--f]="row.isActive === false"
+                  >
+                    {{ row.isActive === false ? 'Đã tắt' : 'Đang bật' }}
+                  </span>
+                </div>
 
-              <ng-container matColumnDef="name">
-                <th mat-header-cell *matHeaderCellDef>Tên khoa</th>
-                <td mat-cell *matCellDef="let row">{{ row.name }}</td>
-              </ng-container>
+                <p class="dept-head">
+                  <strong>Trưởng khoa:</strong>
+                  {{ getHeadName(row.headId) }}
+                </p>
 
-              <ng-container matColumnDef="subjectCount">
-                <th mat-header-cell *matHeaderCellDef>Số môn</th>
-                <td mat-cell *matCellDef="let row">{{ row.subjectCount }}</td>
-              </ng-container>
+                <div class="dept-metrics">
+                  <div>
+                    <strong>{{ row.subjectCount }}</strong>
+                    <span>Môn học</span>
+                  </div>
+                  <div>
+                    <strong>{{ row.classCount }}</strong>
+                    <span>Lớp HP</span>
+                  </div>
+                  <div>
+                    <strong>{{ row.teacherCount }}</strong>
+                    <span>Giáo viên</span>
+                  </div>
+                </div>
 
-              <ng-container matColumnDef="classCount">
-                <th mat-header-cell *matHeaderCellDef>Số lớp</th>
-                <td mat-cell *matCellDef="let row">{{ row.classCount }}</td>
-              </ng-container>
-
-              <ng-container matColumnDef="teacherCount">
-                <th mat-header-cell *matHeaderCellDef>Số GV</th>
-                <td mat-cell *matCellDef="let row">{{ row.teacherCount }}</td>
-              </ng-container>
-
-              <ng-container matColumnDef="actions">
-                <th mat-header-cell *matHeaderCellDef>Thao tác</th>
-                <td mat-cell *matCellDef="let row" class="actions-cell">
-                  <a mat-stroked-button [routerLink]="['/departments', row._id]">
-                    <lucide-icon name="chevron-right" [size]="16"></lucide-icon>
-                    Chi tiết
+                <div class="actions-cell">
+                  <a
+                    class="action-btn"
+                    [routerLink]="['/departments', row._id]"
+                    aria-label="Chi tiết khoa"
+                  >
+                    <lucide-icon name="eye" [size]="15"></lucide-icon>
                   </a>
 
-                  <button mat-stroked-button type="button" (click)="openEditDialog(row)">
-                    <lucide-icon name="pencil" [size]="16"></lucide-icon>
-                    Sửa
+                  <button
+                    type="button"
+                    class="action-btn"
+                    aria-label="Sửa khoa"
+                    (click)="openEditDialog(row)"
+                  >
+                    <lucide-icon name="pencil" [size]="15"></lucide-icon>
                   </button>
 
                   <button
-                    mat-stroked-button
                     type="button"
-                    class="danger"
+                    class="action-btn action-btn--danger"
+                    aria-label="Xóa khoa"
                     (click)="deleteDepartment(row)"
                   >
-                    <lucide-icon name="trash-2" [size]="16"></lucide-icon>
-                    Xóa
+                    <lucide-icon name="trash-2" [size]="15"></lucide-icon>
                   </button>
-                </td>
-              </ng-container>
-
-              <tr mat-header-row *matHeaderRowDef="displayedColumns"></tr>
-              <tr mat-row *matRowDef="let row; columns: displayedColumns"></tr>
-            </table>
+                </div>
+              </article>
+            }
           </div>
         }
       </mat-card>
@@ -192,51 +251,95 @@ interface DepartmentUpsertPayload {
         color: #fff !important;
       }
 
-      mat-card {
-        border-radius: var(--radius);
+      .stats-grid {
+        margin-top: -0.1rem;
+      }
+
+      .dept-grid {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 1rem;
+      }
+
+      .dept-card {
         border: 1px solid var(--gray-200);
-        box-shadow: var(--shadow);
-        overflow: hidden;
+        border-radius: var(--radius);
+        padding: 1rem;
+        display: grid;
+        gap: 0.85rem;
       }
 
-      .table-wrap {
-        overflow-x: auto;
+      .dept-card__head {
+        display: flex;
+        justify-content: space-between;
+        align-items: flex-start;
+        gap: 0.75rem;
       }
 
-      .full-table {
-        width: 100%;
+      .dept-code {
+        margin: 0;
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: var(--blue);
+        letter-spacing: 0.03em;
+      }
+
+      h3 {
+        margin: 0.2rem 0 0;
+        font-size: 1rem;
+        color: var(--navy);
+      }
+
+      .dept-head {
+        margin: 0;
+        color: var(--text-sub);
+        font-size: 0.84rem;
+      }
+
+      .dept-metrics {
+        display: grid;
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+        gap: 0.6rem;
+      }
+
+      .dept-metrics div {
+        background: var(--gray-50);
+        border: 1px solid var(--gray-200);
+        border-radius: var(--radius-sm);
+        padding: 0.55rem;
+        text-align: center;
+      }
+
+      .dept-metrics strong {
+        display: block;
+        color: var(--navy);
+        font-size: 1rem;
+      }
+
+      .dept-metrics span {
+        color: var(--text-sub);
+        font-size: 0.75rem;
       }
 
       .actions-cell {
         display: flex;
-        gap: 0.5rem;
+        gap: 0.35rem;
         flex-wrap: wrap;
-        padding-block: 0.75rem;
-      }
-
-      .danger {
-        border-color: #dc2626 !important;
-        color: #dc2626 !important;
-      }
-
-      .state-block {
-        min-height: 240px;
-        display: grid;
-        place-content: center;
-        justify-items: center;
-        gap: 0.75rem;
-        color: var(--text-sub);
-        text-align: center;
-        padding: 1rem;
-      }
-
-      .state-block.error {
-        color: #dc2626;
       }
 
       @media (max-width: 768px) {
-        .actions-cell {
-          min-width: 280px;
+        .dept-grid {
+          grid-template-columns: repeat(2, minmax(0, 1fr));
+        }
+      }
+
+      @media (max-width: 560px) {
+        .dept-grid {
+          grid-template-columns: 1fr;
+        }
+
+        .dept-metrics {
+          grid-template-columns: 1fr 1fr 1fr;
         }
       }
     `,
@@ -248,12 +351,23 @@ export class DepartmentListComponent implements OnInit {
   private readonly snackBar = inject(MatSnackBar);
   private readonly destroyRef = inject(DestroyRef);
 
-  displayedColumns = ['code', 'name', 'subjectCount', 'classCount', 'teacherCount', 'actions'];
   rows: DepartmentRow[] = [];
   teachers: User[] = [];
 
   isLoading = true;
   errorMessage = '';
+
+  get totalSubjects(): number {
+    return this.rows.reduce((sum, item) => sum + item.subjectCount, 0);
+  }
+
+  get totalClasses(): number {
+    return this.rows.reduce((sum, item) => sum + item.classCount, 0);
+  }
+
+  get totalTeachers(): number {
+    return this.rows.reduce((sum, item) => sum + item.teacherCount, 0);
+  }
 
   ngOnInit(): void {
     this.loadDepartments();
@@ -323,6 +437,19 @@ export class DepartmentListComponent implements OnInit {
           this.errorMessage = this.resolveErrorMessage(error);
         },
       });
+  }
+
+  getHeadName(value: Department['headId']): string {
+    if (!value) {
+      return 'Chưa gán';
+    }
+
+    if (typeof value !== 'string') {
+      return value.name;
+    }
+
+    const found = this.teachers.find((item) => item._id === value);
+    return found?.name ?? 'Chưa gán';
   }
 
   openCreateDialog(): void {

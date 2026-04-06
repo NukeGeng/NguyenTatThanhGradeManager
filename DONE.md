@@ -179,7 +179,7 @@
 ## [DONE-027] Landing Page Home từ TEMPLATEHTML + route mặc định
 
 - Ngày: 05/04/2026
-- File đã tạo/sửa: frontend/src/app/features/home/home.component.ts, frontend/src/app/features/home/home.component.html, frontend/src/app/features/home/home.component.scss, frontend/src/app/app.routes.ts, frontend/src/app/app.config.ts, frontend/angular.json, frontend/src/assets/images/logo-nttu.png, BUGS.md, DONE.md
+- File đã tạo/sửa: frontend/src/app/features/home/home.component.ts, frontend/src/app/features/home/home.component.html, frontend/src/app/features/home/home.component.scss, frontend/src/app/app.routes.ts, frontend/src/app/app.config.ts, frontend/angular.json, frontend/src/assets/images/LogoNTTU.svg, BUGS.md, DONE.md
 - Ghi chú: Đã chuyển HTML template sang Angular standalone HomeComponent (lucide-icon + routerLink + anchor section), thêm route `path: ''` về homepage, bổ sung đăng ký icon Lucide dùng cho trang chủ, thêm `src/assets` vào build assets, và build frontend thành công.
 
 ## [DONE-028] Fix Scrollbar Layout Shift + Smooth Scroll navbar trang chủ
@@ -200,6 +200,18 @@
 - File đã tạo/sửa: frontend/src/app/features/home/home.component.ts, BUGS.md, DONE.md
 - Ghi chú: Đã thay cuộn native smooth sang animation `requestAnimationFrame` (easing) để tránh bị nhảy tức thì do phụ thuộc setting/browser; đồng thời giữ offset navbar sticky để section dừng đúng vị trí.
 
+## [DONE-031] Rework LayoutComponent theo cổng sinh viên + thêm trang Tin tức
+
+- Ngày: 06/04/2026
+- File đã tạo/sửa: frontend/src/app/shared/components/layout/layout.component.ts, frontend/src/app/app.routes.ts, frontend/src/app/features/news/news.component.ts, DONE.md
+- Ghi chú: Đã thay toàn bộ template/styles của LayoutComponent theo layout topbar + sidebar mới, thêm menu Tin tức và route /news, tạo NewsComponent standalone dùng mock data để chờ API thật.
+
+## [DONE-032] Đổi wordmark topbar sang LogoNTTU.svg + kéo search sát logo
+
+- Ngày: 06/04/2026
+- File đã tạo/sửa: frontend/src/app/shared/components/layout/layout.component.ts, DONE.md
+- Ghi chú: Đã thay block chữ tên trường trong topbar bằng ảnh LogoNTTU.svg và chuyển search bar sang cụm bên trái để nằm sát logo theo mẫu.
+
 ---
 
 ## FRONTEND
@@ -217,6 +229,30 @@
 ---
 
 ## TEMPLATE THÊM TASK MỚI
+
+## [DONE-033] Chuẩn hóa vùng nội dung layout + bộ class page dùng chung
+
+- Ngày: 06/04/2026
+- File đã tạo/sửa: frontend/src/app/shared/components/layout/layout.component.ts, frontend/src/app/shared/styles/\_page.scss, frontend/src/styles.scss, DONE.md
+- Ghi chú: Đã sửa CSS `main-content` trong LayoutComponent theo chuẩn padding/background/scroll, tạo shared page styles (\_page.scss) cho breadcrumb/page-header/stats/content-card và import global vào styles.scss để tái sử dụng toàn bộ trang con.
+
+## [DONE-034] Gia cố vùng main-content tránh dính mép tại router-outlet
+
+- Ngày: 06/04/2026
+- File đã tạo/sửa: frontend/src/app/shared/components/layout/layout.component.ts, frontend/src/styles.scss, DONE.md
+- Ghi chú: Đã bọc `router-outlet` bằng `main-content__inner` để đảm bảo có khung đệm ổn định cho mọi trang con, đồng thời bổ sung biến màu còn thiếu trong styles.scss để các class page dùng chung hiển thị đúng.
+
+## [DONE-035] Chuẩn hóa main content các trang quản lý + thêm breadcrumb + giảm bo góc
+
+- Ngày: 06/04/2026
+- File đã tạo/sửa: frontend/src/styles.scss, frontend/src/app/shared/styles/\_page.scss, frontend/src/app/shared/components/layout/layout.component.ts, frontend/src/app/features/predictions/class-predictions.component.ts, frontend/src/app/features/classes/class-list.component.ts, frontend/src/app/features/grades/grade-entry/grade-entry.component.ts, frontend/src/app/features/grades/grade-import/grade-import.component.ts, frontend/src/app/features/users/user-list.component.ts, frontend/src/app/features/departments/department-list.component.ts, frontend/src/app/features/subjects/subject-list.component.ts, DONE.md
+- Ghi chú: Đã chuẩn hóa lại giao diện vùng main content theo style hiện đại (spacing/card shell/border/shadow), thêm breadcrumb cho các route /predictions, /classes, /grades, /users, /departments, /subjects và giảm radius toàn cục để đồng bộ giao diện mà không phát sinh lỗi compile.
+
+## [DONE-036] Làm lại UI theo TEMPLATE_FIX_CSS cho classes/grades/users/departments/subjects
+
+- Ngày: 06/04/2026
+- File đã tạo/sửa: frontend/src/app/shared/styles/\_page.scss, frontend/src/app/features/classes/class-list.component.ts, frontend/src/app/features/grades/grade-entry/grade-entry.component.ts, frontend/src/app/features/users/user-list.component.ts, frontend/src/app/features/departments/department-list.component.ts, frontend/src/app/features/departments/department-detail.component.ts, frontend/src/app/features/subjects/subject-list.component.ts, DONE.md
+- Ghi chú: Đã áp bộ CSS chung từ TEMPLATE_FIX_CSS (nttu-table/filter-bar/section-title/grade-badge/empty-state/action-btn), làm lại layout các trang theo cấu trúc portal hiện đại, thêm filter/search/stats/card-grid nơi phù hợp, giữ nguyên logic API hiện tại và build frontend thành công.
 
 ```
 ## [DONE-001]

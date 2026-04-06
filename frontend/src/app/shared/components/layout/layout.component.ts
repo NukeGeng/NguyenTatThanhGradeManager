@@ -33,139 +33,368 @@ interface LayoutNavItem {
     LucideAngularModule,
   ],
   template: `
-    <mat-sidenav-container class="shell">
-      <mat-sidenav
-        class="sidebar"
-        [mode]="isMobile ? 'over' : 'side'"
-        [opened]="isMobile ? mobileSidebarOpened : true"
-        (closedStart)="mobileSidebarOpened = false"
-      >
-        <div class="brand">
-          <div class="brand-logo">
-            <lucide-icon name="graduation-cap" [size]="18"></lucide-icon>
-          </div>
-          <div>
-            <strong>NTTU Manager</strong>
-            <p>Hệ thống học tập</p>
-          </div>
-        </div>
-
-        <nav class="menu-list">
-          <a
-            *ngFor="let item of visibleNavItems"
-            [routerLink]="item.path"
-            routerLinkActive="active"
-            class="menu-link"
-            (click)="onMenuClick()"
-          >
-            <span class="menu-left">
-              <lucide-icon [name]="item.icon" [size]="17"></lucide-icon>
-              <span>{{ item.label }}</span>
-            </span>
-
-            @if (item.showAlertBadge && highRiskCount > 0) {
-              <span class="alert-badge">{{ highRiskCount }}</span>
-            }
-          </a>
-        </nav>
-      </mat-sidenav>
-
-      <mat-sidenav-content class="content-wrap">
-        <header class="topbar">
-          <button
-            mat-icon-button
-            type="button"
-            class="menu-toggle"
-            (click)="toggleSidebar()"
-            aria-label="Mở menu"
-          >
+    <section class="shell">
+      <header class="topbar">
+        <div class="topbar-left">
+          <button type="button" class="menu-toggle" (click)="toggleSidebar()" aria-label="Mở menu">
             <lucide-icon name="menu" [size]="18"></lucide-icon>
           </button>
 
-          <div class="topbar-right">
-            <div class="user-box">
-              <div class="avatar">{{ userInitials }}</div>
-              <div>
-                <p class="name">{{ currentUserName }}</p>
-                <p class="role">{{ currentUserRoleLabel }}</p>
-              </div>
-            </div>
+          <a routerLink="/dashboard" class="school-brand">
+            <img class="school-shield" src="assets/images/logo-nttu.png" alt="Logo NTTU" />
+            <img class="school-wordmark" src="assets/images/LogoNTTU.svg" alt="Logo NTTU" />
+          </a>
 
-            <button mat-flat-button class="logout-btn" type="button" (click)="logout()">
-              <lucide-icon name="log-out" [size]="16"></lucide-icon>
-              Đăng xuất
-            </button>
-          </div>
-        </header>
+          <label class="search-wrap" aria-label="Tìm kiếm">
+            <lucide-icon name="search" [size]="15"></lucide-icon>
+            <input type="text" placeholder="Tìm kiếm..." />
+          </label>
+        </div>
+
+        <div class="topbar-right">
+          <nav class="top-links">
+            <a routerLink="/" class="top-link">Trang chủ</a>
+            <a routerLink="/news" class="top-link">Tin tức</a>
+          </nav>
+
+          <details class="user-menu">
+            <summary class="user-trigger">
+              <span class="avatar">{{ userInitials }}</span>
+              <span class="user-meta">
+                <span class="name">{{ currentUserName }}</span>
+                <span class="role">{{ currentUserRoleLabel }}</span>
+              </span>
+              <lucide-icon name="chevron-down" [size]="14"></lucide-icon>
+            </summary>
+
+            <div class="dropdown-menu">
+              <button type="button" class="dropdown-item" (click)="logout()">
+                <lucide-icon name="log-out" [size]="15"></lucide-icon>
+                Đăng xuất
+              </button>
+            </div>
+          </details>
+        </div>
+      </header>
+
+      <div class="shell-body">
+        <aside class="sidebar" [class.mobile-open]="!isMobile || mobileSidebarOpened">
+          <nav class="menu-list">
+            <p class="section-label">TỔNG QUAN</p>
+            @for (item of visibleNavItems; track item.path) {
+              @if (item.path === '/dashboard' || item.path === '/news') {
+                <a
+                  [routerLink]="item.path"
+                  routerLinkActive="active"
+                  class="menu-link"
+                  (click)="onMenuClick()"
+                >
+                  <span class="menu-left">
+                    <lucide-icon [name]="item.icon" [size]="16"></lucide-icon>
+                    <span>{{ item.label }}</span>
+                  </span>
+                </a>
+              }
+            }
+
+            <p class="section-label">QUẢN LÝ</p>
+            @for (item of visibleNavItems; track item.path) {
+              @if (
+                item.path === '/classes' ||
+                item.path === '/students' ||
+                item.path === '/grades' ||
+                item.path === '/predictions'
+              ) {
+                <a
+                  [routerLink]="item.path"
+                  routerLinkActive="active"
+                  class="menu-link"
+                  (click)="onMenuClick()"
+                >
+                  <span class="menu-left">
+                    <lucide-icon [name]="item.icon" [size]="16"></lucide-icon>
+                    <span>{{ item.label }}</span>
+                  </span>
+
+                  @if (item.showAlertBadge && highRiskCount > 0) {
+                    <span class="alert-badge">{{ highRiskCount }}</span>
+                  }
+                </a>
+              }
+            }
+
+            @if (currentUserRoleLabel === 'Quản trị viên') {
+              <p class="section-label">QUẢN TRỊ</p>
+              @for (item of visibleNavItems; track item.path) {
+                @if (
+                  item.path === '/departments' ||
+                  item.path === '/users' ||
+                  item.path === '/subjects'
+                ) {
+                  <a
+                    [routerLink]="item.path"
+                    routerLinkActive="active"
+                    class="menu-link"
+                    (click)="onMenuClick()"
+                  >
+                    <span class="menu-left">
+                      <lucide-icon [name]="item.icon" [size]="16"></lucide-icon>
+                      <span>{{ item.label }}</span>
+                    </span>
+                  </a>
+                }
+              }
+            }
+          </nav>
+        </aside>
+
+        @if (isMobile && mobileSidebarOpened) {
+          <button
+            type="button"
+            class="sidebar-backdrop"
+            (click)="onMenuClick()"
+            aria-label="Đóng menu"
+          ></button>
+        }
 
         <main class="main-content">
-          <router-outlet></router-outlet>
+          <div class="main-content__inner page-container">
+            <router-outlet></router-outlet>
+          </div>
         </main>
-      </mat-sidenav-content>
-    </mat-sidenav-container>
+      </div>
+    </section>
   `,
   styles: [
     `
       .shell {
-        min-height: 100vh;
-        background: var(--gray-50);
+        height: 100vh;
+        display: grid;
+        grid-template-rows: 64px 1fr;
+        overflow: hidden;
+        background: rgb(255, 255, 255);
       }
 
-      .sidebar {
-        width: 270px;
-        border-right: 1px solid rgba(15, 33, 68, 0.1);
-        background: #1565c0;
-        color: #fff;
-        padding: 1rem 0.9rem;
-      }
-
-      .brand {
+      .topbar {
+        height: 64px;
+        background: var(--white);
+        border-bottom: 1px solid var(--gray-200);
         display: flex;
         align-items: center;
-        gap: 0.7rem;
-        padding: 0.6rem 0.45rem 0.9rem;
-        border-bottom: 1px solid rgba(255, 255, 255, 0.18);
-        margin-bottom: 0.75rem;
+        gap: 1rem;
+        padding-inline: 1rem;
       }
 
-      .brand-logo {
+      .topbar-left {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        min-width: 0;
+      }
+
+      .menu-toggle {
         width: 34px;
         height: 34px;
-        border-radius: 10px;
+        border: 1px solid var(--gray-200);
+        border-radius: var(--radius-sm);
+        background: #fff;
+        color: var(--navy);
+        display: none;
+        align-items: center;
+        justify-content: center;
+        cursor: pointer;
+      }
+
+      .school-brand {
+        display: flex;
+        align-items: center;
+        gap: 0.65rem;
+        text-decoration: none;
+        flex-shrink: 0;
+      }
+
+      .school-shield {
+        height: 44px;
+        width: auto;
+      }
+
+      .school-wordmark {
+        height: 44px;
+        width: auto;
+      }
+
+      .search-wrap {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        border: 1px solid var(--gray-200);
+        border-radius: 999px;
+        padding: 0.4rem 1rem;
+        width: 320px;
+        margin-left: 0.15rem;
+        color: var(--gray-400);
+        flex-shrink: 0;
+      }
+
+      .search-wrap input {
+        width: 100%;
+        border: none;
+        outline: none;
+        font-size: 0.875rem;
+        color: var(--text);
+        background: transparent;
+      }
+
+      .topbar-right {
+        margin-left: auto;
+        display: flex;
+        align-items: center;
+        gap: 0.95rem;
+      }
+
+      .top-links {
+        display: inline-flex;
+        gap: 0.75rem;
+      }
+
+      .top-link {
+        color: var(--gray-600);
+        text-decoration: none;
+        font-size: 0.84rem;
+        font-weight: 500;
+      }
+
+      .top-link:hover {
+        color: var(--navy);
+      }
+
+      .user-menu {
+        position: relative;
+      }
+
+      .user-trigger {
+        list-style: none;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        cursor: pointer;
+      }
+
+      .user-trigger::-webkit-details-marker {
+        display: none;
+      }
+
+      .user-meta {
+        display: grid;
+        line-height: 1.2;
+      }
+
+      .name {
+        margin: 0;
+        color: var(--text);
+        font-size: 0.84rem;
+        font-weight: 700;
+      }
+
+      .role {
+        margin: 0;
+        color: var(--text-sub);
+        font-size: 0.77rem;
+      }
+
+      .avatar {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
         display: inline-flex;
         align-items: center;
         justify-content: center;
-        background: rgba(255, 255, 255, 0.18);
+        font-size: 0.74rem;
+        font-weight: 700;
+        color: #fff;
+        background: linear-gradient(135deg, var(--navy), var(--blue));
       }
 
-      .brand strong {
-        font-size: 0.95rem;
-        letter-spacing: 0.01em;
+      .dropdown-menu {
+        position: absolute;
+        top: calc(100% + 0.5rem);
+        right: 0;
+        min-width: 140px;
+        background: #fff;
+        border: 1px solid var(--gray-200);
+        border-radius: var(--radius);
+        box-shadow: 0 10px 24px rgba(15, 33, 68, 0.14);
+        padding: 0.35rem;
+        display: none;
       }
 
-      .brand p {
-        margin: 0.1rem 0 0;
-        font-size: 0.77rem;
-        opacity: 0.84;
+      .user-menu[open] .dropdown-menu {
+        display: block;
+      }
+
+      .dropdown-item {
+        width: 100%;
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        border-radius: var(--radius-sm);
+        display: inline-flex;
+        align-items: center;
+        gap: 0.45rem;
+        padding: 0.45rem 0.55rem;
+        color: var(--gray-600);
+        font-size: 0.84rem;
+        font-weight: 600;
+      }
+
+      .dropdown-item:hover {
+        background: var(--blue-pale);
+        color: var(--navy);
+      }
+
+      .shell-body {
+        min-height: 0;
+        display: grid;
+        grid-template-columns: 220px 1fr;
+        position: relative;
+      }
+
+      .sidebar {
+        background: #fff;
+        border-right: 1px solid var(--gray-200);
+        box-shadow: 2px 0 14px rgba(15, 33, 68, 0.05);
+        padding: 0.7rem 0.6rem 1rem;
+        overflow-y: auto;
       }
 
       .menu-list {
         display: grid;
-        gap: 0.45rem;
+        gap: 0.2rem;
+      }
+
+      .section-label {
+        margin: 0.5rem 0 0.2rem;
+        padding: 0.75rem 0.75rem 0.3rem;
+        font-size: 0.68rem;
+        font-weight: 700;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        color: var(--text-muted);
       }
 
       .menu-link {
         display: flex;
         align-items: center;
         justify-content: space-between;
-        gap: 0.55rem;
-        color: #fff;
+        gap: 0.5rem;
+        color: var(--gray-600);
         text-decoration: none;
-        padding: 0.62rem 0.72rem;
+        padding: 0.5rem 0.75rem;
         border-radius: var(--radius-sm);
         transition: var(--transition);
-        font-size: 0.86rem;
-        font-weight: 600;
+        font-size: 0.84rem;
+        font-weight: 500;
+        border-left: 3px solid transparent;
       }
 
       .menu-left {
@@ -174,13 +403,28 @@ interface LayoutNavItem {
         gap: 0.5rem;
       }
 
+      .menu-left lucide-icon {
+        color: var(--gray-400);
+      }
+
       .menu-link:hover {
-        background: rgba(255, 255, 255, 0.14);
+        background: var(--blue-pale);
+        color: var(--navy);
+      }
+
+      .menu-link:hover .menu-left lucide-icon {
+        color: var(--blue);
       }
 
       .menu-link.active {
-        background: rgba(255, 255, 255, 0.2);
-        border: 1px solid rgba(255, 255, 255, 0.42);
+        background: var(--blue-pale);
+        color: var(--navy);
+        font-weight: 700;
+        border-left-color: var(--blue);
+      }
+
+      .menu-link.active .menu-left lucide-icon {
+        color: var(--blue);
       }
 
       .alert-badge {
@@ -197,75 +441,22 @@ interface LayoutNavItem {
         color: #fff;
       }
 
-      .content-wrap {
-        display: grid;
-        grid-template-rows: auto 1fr;
-        min-height: 100vh;
-      }
-
-      .topbar {
-        min-height: 64px;
-        padding: 0.55rem 1rem;
-        border-bottom: 1px solid var(--gray-200);
-        background: var(--white);
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.75rem;
-      }
-
-      .menu-toggle {
-        display: none;
-      }
-
-      .topbar-right {
-        margin-left: auto;
-        display: flex;
-        align-items: center;
-        gap: 0.8rem;
-      }
-
-      .user-box {
-        display: flex;
-        align-items: center;
-        gap: 0.55rem;
-      }
-
-      .avatar {
-        width: 32px;
-        height: 32px;
-        border-radius: 50%;
-        display: inline-flex;
-        align-items: center;
-        justify-content: center;
-        font-size: 0.74rem;
-        font-weight: 700;
-        color: #fff;
-        background: linear-gradient(135deg, var(--navy), var(--blue));
-      }
-
-      .name {
-        margin: 0;
-        color: var(--text);
-        font-size: 0.84rem;
-        font-weight: 700;
-        line-height: 1.2;
-      }
-
-      .role {
-        margin: 0.05rem 0 0;
-        color: var(--text-sub);
-        font-size: 0.74rem;
-        line-height: 1.2;
-      }
-
-      .logout-btn {
-        background: var(--navy) !important;
-        color: #fff !important;
-      }
-
       .main-content {
-        min-height: 0;
+        overflow-y: auto;
+        background: rgb(255, 255, 255);
+      }
+
+      .main-content__inner {
+        width: 100%;
+        min-height: 100%;
+        max-width: 1200px;
+        margin: 0 auto;
+        padding: clamp(0.95rem, 2.2vw, 1.35rem) clamp(0.9rem, 2.6vw, 1.35rem)
+          clamp(1.15rem, 2.8vw, 1.6rem);
+      }
+
+      .sidebar-backdrop {
+        display: none;
       }
 
       @media (max-width: 1024px) {
@@ -275,8 +466,65 @@ interface LayoutNavItem {
           justify-content: center;
         }
 
-        .user-box {
+        .shell-body {
+          grid-template-columns: 1fr;
+        }
+
+        .sidebar {
+          position: fixed;
+          top: 64px;
+          left: 0;
+          bottom: 0;
+          width: 220px;
+          z-index: 50;
+          transform: translateX(-100%);
+          transition: transform 0.2s ease;
+        }
+
+        .sidebar.mobile-open {
+          transform: translateX(0);
+        }
+
+        .sidebar-backdrop {
+          display: block;
+          position: fixed;
+          top: 64px;
+          left: 0;
+          right: 0;
+          bottom: 0;
+          border: none;
+          background: rgba(15, 33, 68, 0.3);
+          z-index: 45;
+        }
+
+        .search-wrap {
           display: none;
+        }
+
+        .top-links {
+          display: none;
+        }
+
+        .user-meta {
+          display: none;
+        }
+      }
+
+      @media (max-width: 640px) {
+        .school-wordmark {
+          display: none;
+        }
+
+        .topbar {
+          padding-inline: 0.7rem;
+        }
+
+        .main-content {
+          padding: 0;
+        }
+
+        .main-content__inner {
+          padding: 0.85rem;
         }
       }
     `,
@@ -291,6 +539,7 @@ export class LayoutComponent implements OnInit {
 
   readonly navItems: LayoutNavItem[] = [
     { label: 'Dashboard', path: '/dashboard', icon: 'trending-up' },
+    { label: 'Tin tức', path: '/news', icon: 'newspaper' },
     { label: 'Lớp học', path: '/classes', icon: 'school' },
     { label: 'Học sinh', path: '/students', icon: 'users' },
     { label: 'Nhập điểm', path: '/grades', icon: 'book-open-check' },

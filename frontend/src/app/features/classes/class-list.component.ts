@@ -2,7 +2,7 @@ import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
-import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
+import { FormBuilder, FormsModule, ReactiveFormsModule, Validators } from '@angular/forms';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
@@ -55,21 +55,31 @@ interface ClassUpsertPayload {
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     MatButtonModule,
     MatCardModule,
     MatDialogModule,
+    MatFormFieldModule,
+    MatInputModule,
     MatProgressSpinnerModule,
+    MatSelectModule,
     MatSnackBarModule,
     MatTableModule,
     LucideAngularModule,
   ],
   template: `
     <section class="container page-wrap">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <span>Trang chủ</span>
+        <span class="breadcrumb-sep">/</span>
+        <span>Lớp học</span>
+      </nav>
+
       <header class="page-header">
         <div>
-          <p class="eyebrow">Quản lý đào tạo</p>
-          <h1>Danh sách lớp học phần</h1>
-          <p class="subtitle">Theo dõi lớp theo năm học, sĩ số và giáo viên phụ trách.</p>
+          <p class="eyebrow">Quản lý học vụ</p>
+          <h1>Lớp học phần</h1>
+          <p class="subtitle">Theo dõi theo năm học, học kỳ, khoa và trạng thái mở lớp.</p>
         </div>
 
         <button mat-flat-button type="button" class="btn-primary" (click)="openCreateDialog()">
@@ -78,7 +88,54 @@ interface ClassUpsertPayload {
         </button>
       </header>
 
-      <mat-card>
+      <mat-card class="content-card">
+        <div class="filter-bar">
+          <mat-form-field appearance="outline">
+            <mat-label>Năm học</mat-label>
+            <mat-select [(ngModel)]="selectedSchoolYearId" (ngModelChange)="applyFilters()">
+              <mat-option value="all">Tất cả năm học</mat-option>
+              @for (year of schoolYears; track year._id) {
+                <mat-option [value]="year._id">{{ year.name }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Học kỳ</mat-label>
+            <mat-select [(ngModel)]="selectedSemester" (ngModelChange)="applyFilters()">
+              <mat-option value="all">Tất cả học kỳ</mat-option>
+              <mat-option value="1">Học kỳ 1</mat-option>
+              <mat-option value="2">Học kỳ 2</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Khoa</mat-label>
+            <mat-select [(ngModel)]="selectedDepartmentId" (ngModelChange)="applyFilters()">
+              <mat-option value="all">Tất cả khoa</mat-option>
+              @for (department of departments; track department._id) {
+                <mat-option [value]="department._id"
+                  >{{ department.code }} - {{ department.name }}</mat-option
+                >
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <div class="spacer"></div>
+
+          <mat-form-field appearance="outline" class="search-field">
+            <mat-label>Tìm lớp học phần</mat-label>
+            <input
+              matInput
+              [(ngModel)]="searchKeyword"
+              (ngModelChange)="applyFilters()"
+              placeholder="Nhập mã lớp hoặc tên lớp"
+            />
+          </mat-form-field>
+        </div>
+      </mat-card>
+
+      <mat-card class="content-card">
         @if (isLoading) {
           <div class="state-block">
             <mat-spinner [diameter]="36"></mat-spinner>
@@ -90,21 +147,37 @@ interface ClassUpsertPayload {
             <p>{{ errorMessage }}</p>
             <button mat-stroked-button type="button" (click)="loadData()">Thử lại</button>
           </div>
+        } @else if (filteredClasses.length === 0) {
+          <div class="empty-state">
+            <lucide-icon name="book-open" [size]="44"></lucide-icon>
+            <h3>Không có lớp học phần phù hợp</h3>
+            <p>Thử thay đổi bộ lọc hoặc thêm lớp mới để bắt đầu.</p>
+          </div>
         } @else {
           <div class="table-wrap">
-            <table mat-table [dataSource]="classes" class="full-table">
-              <ng-container matColumnDef="name">
-                <th mat-header-cell *matHeaderCellDef>Tên lớp</th>
+            <table mat-table [dataSource]="filteredClasses" class="full-table nttu-table">
+              <ng-container matColumnDef="index">
+                <th mat-header-cell *matHeaderCellDef>STT</th>
+                <td mat-cell *matCellDef="let row; index as i">{{ i + 1 }}</td>
+              </ng-container>
+
+              <ng-container matColumnDef="code">
+                <th mat-header-cell *matHeaderCellDef>Mã lớp</th>
                 <td mat-cell *matCellDef="let row">
                   <button type="button" class="link-btn" (click)="openDetail(row)">
-                    {{ row.name || row.code }}
+                    {{ row.code }}
                   </button>
                 </td>
               </ng-container>
 
-              <ng-container matColumnDef="gradeLevel">
-                <th mat-header-cell *matHeaderCellDef>Khối</th>
-                <td mat-cell *matCellDef="let row">{{ getGradeLevelLabel(row.subjectId) }}</td>
+              <ng-container matColumnDef="name">
+                <th mat-header-cell *matHeaderCellDef>Tên lớp</th>
+                <td mat-cell *matCellDef="let row">{{ row.name || row.code }}</td>
+              </ng-container>
+
+              <ng-container matColumnDef="department">
+                <th mat-header-cell *matHeaderCellDef>Khoa</th>
+                <td mat-cell *matCellDef="let row">{{ getDepartmentCode(row.departmentId) }}</td>
               </ng-container>
 
               <ng-container matColumnDef="schoolYear">
@@ -112,9 +185,26 @@ interface ClassUpsertPayload {
                 <td mat-cell *matCellDef="let row">{{ getSchoolYearName(row.schoolYearId) }}</td>
               </ng-container>
 
+              <ng-container matColumnDef="semester">
+                <th mat-header-cell *matHeaderCellDef>Học kỳ</th>
+                <td mat-cell *matCellDef="let row">HK{{ row.semester }}</td>
+              </ng-container>
+
+              <ng-container matColumnDef="credits">
+                <th mat-header-cell *matHeaderCellDef>Tín chỉ</th>
+                <td mat-cell *matCellDef="let row">{{ getSubjectCredits(row.subjectId) }}</td>
+              </ng-container>
+
               <ng-container matColumnDef="studentCount">
                 <th mat-header-cell *matHeaderCellDef>Sĩ số</th>
                 <td mat-cell *matCellDef="let row">{{ row.studentCount }}</td>
+              </ng-container>
+
+              <ng-container matColumnDef="weights">
+                <th mat-header-cell *matHeaderCellDef>Trọng số</th>
+                <td mat-cell *matCellDef="let row">
+                  <span class="weight-display">{{ getWeightDisplay(row) }}</span>
+                </td>
               </ng-container>
 
               <ng-container matColumnDef="teacher">
@@ -122,22 +212,53 @@ interface ClassUpsertPayload {
                 <td mat-cell *matCellDef="let row">{{ getTeacherName(row.teacherId) }}</td>
               </ng-container>
 
+              <ng-container matColumnDef="status">
+                <th mat-header-cell *matHeaderCellDef>Trạng thái</th>
+                <td mat-cell *matCellDef="let row">
+                  <span
+                    class="grade-badge"
+                    [class.grade-badge--a]="row.isActive"
+                    [class.grade-badge--f]="!row.isActive"
+                  >
+                    {{ row.isActive ? 'Mở lớp' : 'Đã khóa' }}
+                  </span>
+                </td>
+              </ng-container>
+
               <ng-container matColumnDef="actions">
                 <th mat-header-cell *matHeaderCellDef>Thao tác</th>
                 <td mat-cell *matCellDef="let row" class="actions-cell">
-                  <button mat-stroked-button type="button" (click)="openEditDialog(row)">
-                    <lucide-icon name="pencil" [size]="16"></lucide-icon>
-                    Sửa
-                  </button>
-                  <button
-                    mat-stroked-button
-                    type="button"
-                    class="danger"
-                    (click)="deleteClass(row)"
-                  >
-                    <lucide-icon name="trash-2" [size]="16"></lucide-icon>
-                    Xóa
-                  </button>
+                  <div class="actions-wrap">
+                    <button
+                      type="button"
+                      class="action-btn"
+                      aria-label="Chi tiết lớp"
+                      title="Chi tiết lớp"
+                      (click)="openDetail(row)"
+                    >
+                      <lucide-icon name="eye" [size]="15"></lucide-icon>
+                    </button>
+
+                    <button
+                      type="button"
+                      class="action-btn"
+                      aria-label="Sửa lớp"
+                      title="Sửa lớp"
+                      (click)="openEditDialog(row)"
+                    >
+                      <lucide-icon name="pencil" [size]="15"></lucide-icon>
+                    </button>
+
+                    <button
+                      type="button"
+                      class="action-btn action-btn--danger"
+                      aria-label="Xóa lớp"
+                      title="Xóa lớp"
+                      (click)="deleteClass(row)"
+                    >
+                      <lucide-icon name="trash-2" [size]="15"></lucide-icon>
+                    </button>
+                  </div>
                 </td>
               </ng-container>
 
@@ -189,6 +310,10 @@ interface ClassUpsertPayload {
         color: #fff !important;
       }
 
+      .search-field {
+        width: min(320px, 100%);
+      }
+
       .table-wrap {
         overflow-x: auto;
       }
@@ -208,28 +333,20 @@ interface ClassUpsertPayload {
       }
 
       .actions-cell {
-        display: flex;
-        gap: 0.5rem;
-        flex-wrap: wrap;
-        padding-block: 0.75rem;
+        white-space: nowrap;
       }
 
-      .danger {
-        border-color: #dc2626 !important;
-        color: #dc2626 !important;
+      .actions-wrap {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        flex-wrap: nowrap;
       }
 
-      .state-block {
-        min-height: 240px;
-        display: grid;
-        place-content: center;
-        justify-items: center;
-        gap: 0.75rem;
-        color: var(--text-sub);
-      }
-
-      .state-block.error {
-        color: #dc2626;
+      @media (max-width: 768px) {
+        .search-field {
+          width: 100%;
+        }
       }
     `,
   ],
@@ -242,19 +359,31 @@ export class ClassListComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
   readonly displayedColumns = [
+    'index',
+    'code',
     'name',
-    'gradeLevel',
+    'department',
     'schoolYear',
+    'semester',
+    'credits',
     'studentCount',
+    'weights',
     'teacher',
+    'status',
     'actions',
   ];
 
   classes: Class[] = [];
+  filteredClasses: Class[] = [];
   departments: Department[] = [];
   schoolYears: SchoolYear[] = [];
   subjects: Subject[] = [];
   teachers: User[] = [];
+
+  selectedSchoolYearId = 'all';
+  selectedSemester: 'all' | '1' | '2' = 'all';
+  selectedDepartmentId = 'all';
+  searchKeyword = '';
 
   isLoading = true;
   errorMessage = '';
@@ -297,11 +426,45 @@ export class ClassListComponent implements OnInit {
           this.schoolYears = schoolYears;
           this.subjects = subjects;
           this.teachers = users.filter((item) => item.role === 'teacher');
+          this.applyFilters();
         },
         error: (error: unknown) => {
           this.errorMessage = this.resolveErrorMessage(error);
+          this.filteredClasses = [];
         },
       });
+  }
+
+  applyFilters(): void {
+    const keyword = this.searchKeyword.trim().toLowerCase();
+
+    this.filteredClasses = this.classes.filter((item) => {
+      const schoolYearId = this.resolveRefId(item.schoolYearId);
+      const departmentId = this.resolveRefId(item.departmentId);
+      const semesterText = String(item.semester);
+
+      const byYear =
+        this.selectedSchoolYearId === 'all' ? true : schoolYearId === this.selectedSchoolYearId;
+      const bySemester =
+        this.selectedSemester === 'all' ? true : semesterText === this.selectedSemester;
+      const byDepartment =
+        this.selectedDepartmentId === 'all' ? true : departmentId === this.selectedDepartmentId;
+
+      if (!keyword) {
+        return byYear && bySemester && byDepartment;
+      }
+
+      const text = [
+        item.code,
+        item.name,
+        this.getTeacherName(item.teacherId),
+        this.getDepartmentCode(item.departmentId),
+      ]
+        .join(' ')
+        .toLowerCase();
+
+      return byYear && bySemester && byDepartment && text.includes(keyword);
+    });
   }
 
   openCreateDialog(): void {
@@ -435,12 +598,39 @@ export class ClassListComponent implements OnInit {
     return found?.name ?? 'Chưa gán';
   }
 
+  getDepartmentCode(value: Class['departmentId']): string {
+    if (typeof value !== 'string') {
+      return value.code;
+    }
+
+    const found = this.departments.find((item) => item._id === value);
+    return found?.code ?? '-';
+  }
+
+  getSubjectCredits(value: Class['subjectId']): number {
+    const subject = this.resolveSubject(value);
+    return Number(subject?.credits ?? 0);
+  }
+
+  getWeightDisplay(row: Class): string {
+    const weights = row.weights;
+    return `TX:${weights.tx} GK:${weights.gk} TH:${weights.th} TKT:${weights.tkt}`;
+  }
+
   private resolveSubject(value: Class['subjectId']): Subject | null {
     if (typeof value !== 'string') {
       return value;
     }
 
     return this.subjects.find((subject) => subject._id === value) ?? null;
+  }
+
+  private resolveRefId(value: string | { _id: string } | null | undefined): string | null {
+    if (!value) {
+      return null;
+    }
+
+    return typeof value === 'string' ? value : value._id;
   }
 
   private resolveErrorMessage(error: unknown): string {

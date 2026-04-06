@@ -1,4 +1,5 @@
 @import '@angular/material/prebuilt-themes/azure-blue.css';
+@import './app/shared/styles/page';
 
 :root {
   --navy: #1a3464;
@@ -13,18 +14,26 @@
   --gray-50: #f8fafc;
   --gray-100: #f1f5f9;
   --gray-200: #e2e8f0;
+  --gray-300: #cbd5e1;
   --gray-400: #94a3b8;
   --gray-600: #475569;
+  --red: #dc2626;
+  --red-pale: #fef2f2;
+  --green: #16a34a;
   --text: #1e293b;
   --text-sub: #475569;
   --text-muted: #94a3b8;
 
   --container-max: 1200px;
   --pad: clamp(1rem, 4vw, 2rem);
-  --radius: 12px;
-  --radius-sm: 8px;
+  --radius: 9px;
+  --radius-sm: 6px;
   --shadow: 0 1px 3px rgba(0, 0, 0, 0.08), 0 4px 16px rgba(0, 0, 0, 0.06);
   --shadow-md: 0 4px 24px rgba(26, 52, 100, 0.12);
+  --transition: 0.2s ease;
+  --green-pale: #ecfdf3;
+  --yellow: #d97706;
+  --yellow-pale: #fff7ed;
 
   font-family: 'Be Vietnam Pro', sans-serif;
 }
@@ -112,4 +121,9 @@ body {
 
 .mat-mdc-form-field {
   font-family: 'Be Vietnam Pro', sans-serif !important;
+}
+
+.mat-mdc-card,
+.mat-mdc-outlined-card {
+  border-radius: var(--radius) !important;
 }

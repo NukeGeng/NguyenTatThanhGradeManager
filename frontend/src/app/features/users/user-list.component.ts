@@ -5,6 +5,7 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import {
   AbstractControl,
   FormBuilder,
+  FormsModule,
   ReactiveFormsModule,
   ValidationErrors,
   ValidatorFn,
@@ -23,6 +24,7 @@ import {
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { LucideAngularModule } from 'lucide-angular';
@@ -63,23 +65,33 @@ interface DepartmentDialogData {
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     MatButtonModule,
     MatCardModule,
     MatChipsModule,
     MatDialogModule,
+    MatFormFieldModule,
+    MatInputModule,
     MatProgressSpinnerModule,
+    MatSelectModule,
     MatSnackBarModule,
     MatTableModule,
     LucideAngularModule,
   ],
   template: `
     <section class="container page-wrap">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <span>Dashboard</span>
+        <span class="breadcrumb-sep">/</span>
+        <span>Giáo viên</span>
+      </nav>
+
       <header class="page-header">
         <div>
           <p class="eyebrow">Quản trị Admin</p>
-          <h1>Quản lý giáo viên</h1>
+          <h1>Tài khoản giáo viên</h1>
           <p class="subtitle">
-            Tạo tài khoản, phân khoa giảng dạy và bật tắt trạng thái hoạt động.
+            Quản lý tài khoản, phân khoa giảng dạy và trạng thái hoạt động theo khoa.
           </p>
         </div>
 
@@ -89,7 +101,78 @@ interface DepartmentDialogData {
         </button>
       </header>
 
-      <mat-card>
+      <section class="stats-grid">
+        <article class="stat-card">
+          <div class="stat-card__icon">
+            <lucide-icon name="users" [size]="18"></lucide-icon>
+          </div>
+          <p class="stat-card__val">{{ totalTeachers }}</p>
+          <p class="stat-card__label">Tổng giáo viên</p>
+        </article>
+
+        <article class="stat-card stat-card--success">
+          <div class="stat-card__icon">
+            <lucide-icon name="check-circle" [size]="18"></lucide-icon>
+          </div>
+          <p class="stat-card__val">{{ activeTeachers }}</p>
+          <p class="stat-card__label">Đang hoạt động</p>
+        </article>
+
+        <article class="stat-card stat-card--danger">
+          <div class="stat-card__icon">
+            <lucide-icon name="x-circle" [size]="18"></lucide-icon>
+          </div>
+          <p class="stat-card__val">{{ lockedTeachers }}</p>
+          <p class="stat-card__label">Đã khóa</p>
+        </article>
+
+        <article class="stat-card">
+          <div class="stat-card__icon">
+            <lucide-icon name="layers" [size]="18"></lucide-icon>
+          </div>
+          <p class="stat-card__val">{{ multiDepartmentTeachers }}</p>
+          <p class="stat-card__label">Dạy nhiều khoa</p>
+        </article>
+      </section>
+
+      <mat-card class="content-card">
+        <div class="filter-bar">
+          <mat-form-field appearance="outline">
+            <mat-label>Khoa</mat-label>
+            <mat-select [(ngModel)]="selectedDepartmentId" (ngModelChange)="applyFilters()">
+              <mat-option value="all">Tất cả khoa</mat-option>
+              @for (department of departments; track department._id) {
+                <mat-option [value]="department._id"
+                  >{{ department.code }} - {{ department.name }}</mat-option
+                >
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
+            <mat-label>Trạng thái</mat-label>
+            <mat-select [(ngModel)]="selectedStatus" (ngModelChange)="applyFilters()">
+              <mat-option value="all">Tất cả</mat-option>
+              <mat-option value="active">Đang hoạt động</mat-option>
+              <mat-option value="inactive">Đã khóa</mat-option>
+            </mat-select>
+          </mat-form-field>
+
+          <div class="spacer"></div>
+
+          <mat-form-field appearance="outline" class="search-field">
+            <mat-label>Tìm giáo viên</mat-label>
+            <input
+              matInput
+              [(ngModel)]="searchKeyword"
+              (ngModelChange)="applyFilters()"
+              placeholder="Nhập tên hoặc email"
+            />
+          </mat-form-field>
+        </div>
+      </mat-card>
+
+      <mat-card class="content-card">
         @if (isLoading) {
           <div class="state-block">
             <mat-spinner [diameter]="36"></mat-spinner>
@@ -101,25 +184,44 @@ interface DepartmentDialogData {
             <p>{{ errorMessage }}</p>
             <button mat-stroked-button type="button" (click)="loadData()">Thử lại</button>
           </div>
+        } @else if (filteredUsers.length === 0) {
+          <div class="empty-state">
+            <lucide-icon name="user-x" [size]="44"></lucide-icon>
+            <h3>Không có giáo viên phù hợp</h3>
+            <p>Điều chỉnh bộ lọc hoặc tạo tài khoản giáo viên mới.</p>
+            <button mat-flat-button type="button" class="btn-primary" (click)="openCreateDialog()">
+              <lucide-icon name="user-plus" [size]="16"></lucide-icon>
+              Tạo tài khoản GV
+            </button>
+          </div>
         } @else {
           <div class="table-wrap">
-            <table mat-table [dataSource]="users" class="full-table">
-              <ng-container matColumnDef="name">
-                <th mat-header-cell *matHeaderCellDef>Họ tên</th>
-                <td mat-cell *matCellDef="let row">{{ row.name }}</td>
-              </ng-container>
-
-              <ng-container matColumnDef="email">
-                <th mat-header-cell *matHeaderCellDef>Email</th>
-                <td mat-cell *matCellDef="let row">{{ row.email }}</td>
+            <table mat-table [dataSource]="filteredUsers" class="full-table nttu-table">
+              <ng-container matColumnDef="teacher">
+                <th mat-header-cell *matHeaderCellDef>Giáo viên</th>
+                <td mat-cell *matCellDef="let row">
+                  <div class="teacher-cell">
+                    <span class="user-avatar">{{ getInitials(row.name) }}</span>
+                    <div>
+                      <p class="teacher-name">{{ row.name }}</p>
+                      <p class="teacher-email">{{ row.email }}</p>
+                    </div>
+                  </div>
+                </td>
               </ng-container>
 
               <ng-container matColumnDef="departments">
                 <th mat-header-cell *matHeaderCellDef>Khoa đang dạy</th>
                 <td mat-cell *matCellDef="let row">
                   <mat-chip-set>
-                    @for (deptCode of getDepartmentCodes(row.departmentIds); track deptCode) {
+                    @for (
+                      deptCode of getDepartmentCodes(row.departmentIds).slice(0, 3);
+                      track deptCode
+                    ) {
                       <mat-chip>{{ deptCode }}</mat-chip>
+                    }
+                    @if (getDepartmentCodes(row.departmentIds).length > 3) {
+                      <mat-chip>+{{ getDepartmentCodes(row.departmentIds).length - 3 }}</mat-chip>
                     }
                   </mat-chip-set>
                 </td>
@@ -129,9 +231,9 @@ interface DepartmentDialogData {
                 <th mat-header-cell *matHeaderCellDef>Trạng thái</th>
                 <td mat-cell *matCellDef="let row">
                   <span
-                    class="badge"
-                    [class.badge-active]="row.isActive !== false"
-                    [class.badge-off]="row.isActive === false"
+                    class="grade-badge"
+                    [class.grade-badge--a]="row.isActive !== false"
+                    [class.grade-badge--f]="row.isActive === false"
                   >
                     {{ row.isActive === false ? 'Đã khóa' : 'Hoạt động' }}
                   </span>
@@ -141,23 +243,38 @@ interface DepartmentDialogData {
               <ng-container matColumnDef="actions">
                 <th mat-header-cell *matHeaderCellDef>Thao tác</th>
                 <td mat-cell *matCellDef="let row" class="actions-cell">
-                  <button mat-stroked-button type="button" (click)="openEditDialog(row)">
-                    <lucide-icon name="pencil" [size]="16"></lucide-icon>
-                    Sửa thông tin
-                  </button>
+                  <div class="actions-wrap">
+                    <button
+                      type="button"
+                      class="action-btn"
+                      aria-label="Sửa thông tin"
+                      (click)="openEditDialog(row)"
+                    >
+                      <lucide-icon name="pencil" [size]="15"></lucide-icon>
+                    </button>
 
-                  <button mat-stroked-button type="button" (click)="openAssignDialog(row)">
-                    <lucide-icon name="layers" [size]="16"></lucide-icon>
-                    Phân khoa
-                  </button>
+                    <button
+                      type="button"
+                      class="action-btn"
+                      aria-label="Phân khoa"
+                      (click)="openAssignDialog(row)"
+                    >
+                      <lucide-icon name="layers" [size]="15"></lucide-icon>
+                    </button>
 
-                  <button mat-stroked-button type="button" (click)="toggleUser(row)">
-                    <lucide-icon
-                      [name]="row.isActive === false ? 'check-circle' : 'x-circle'"
-                      [size]="16"
-                    ></lucide-icon>
-                    {{ row.isActive === false ? 'Mở khóa' : 'Khóa tài khoản' }}
-                  </button>
+                    <button
+                      type="button"
+                      class="action-btn"
+                      [class.action-btn--danger]="row.isActive !== false"
+                      aria-label="Cập nhật trạng thái"
+                      (click)="toggleUser(row)"
+                    >
+                      <lucide-icon
+                        [name]="row.isActive === false ? 'check-circle' : 'x-circle'"
+                        [size]="15"
+                      ></lucide-icon>
+                    </button>
+                  </div>
                 </td>
               </ng-container>
 
@@ -209,6 +326,14 @@ interface DepartmentDialogData {
         color: #fff !important;
       }
 
+      .stats-grid {
+        margin-top: -0.1rem;
+      }
+
+      .search-field {
+        width: min(320px, 100%);
+      }
+
       .table-wrap {
         overflow-x: auto;
       }
@@ -218,43 +343,38 @@ interface DepartmentDialogData {
       }
 
       .actions-cell {
-        display: flex;
-        gap: 0.5rem;
-        flex-wrap: wrap;
-        padding-block: 0.75rem;
+        white-space: nowrap;
       }
 
-      .badge {
+      .actions-wrap {
         display: inline-flex;
         align-items: center;
-        border-radius: 999px;
-        padding: 0.2rem 0.55rem;
-        font-size: 0.73rem;
-        font-weight: 700;
+        gap: 0.35rem;
+        flex-wrap: nowrap;
       }
 
-      .badge-active {
-        background: #f0fdf4;
-        color: #16a34a;
+      .teacher-cell {
+        display: flex;
+        align-items: center;
+        gap: 0.7rem;
       }
 
-      .badge-off {
-        background: #fef2f2;
-        color: #dc2626;
+      .teacher-name {
+        margin: 0;
+        font-weight: 600;
+        color: var(--text);
       }
 
-      .state-block {
-        min-height: 240px;
-        display: grid;
-        place-content: center;
-        justify-items: center;
-        gap: 0.75rem;
+      .teacher-email {
+        margin: 0.1rem 0 0;
         color: var(--text-sub);
-        text-align: center;
+        font-size: 0.8rem;
       }
 
-      .state-block.error {
-        color: #dc2626;
+      @media (max-width: 768px) {
+        .search-field {
+          width: 100%;
+        }
       }
     `,
   ],
@@ -265,13 +385,34 @@ export class UserListComponent implements OnInit {
   private readonly snackBar = inject(MatSnackBar);
   private readonly destroyRef = inject(DestroyRef);
 
-  readonly displayedColumns = ['name', 'email', 'departments', 'status', 'actions'];
+  readonly displayedColumns = ['teacher', 'departments', 'status', 'actions'];
 
   users: User[] = [];
+  filteredUsers: User[] = [];
   departments: Department[] = [];
+
+  selectedDepartmentId = 'all';
+  selectedStatus: 'all' | 'active' | 'inactive' = 'all';
+  searchKeyword = '';
 
   isLoading = true;
   errorMessage = '';
+
+  get totalTeachers(): number {
+    return this.users.length;
+  }
+
+  get activeTeachers(): number {
+    return this.users.filter((item) => item.isActive !== false).length;
+  }
+
+  get lockedTeachers(): number {
+    return this.users.filter((item) => item.isActive === false).length;
+  }
+
+  get multiDepartmentTeachers(): number {
+    return this.users.filter((item) => this.getDepartmentIds(item.departmentIds).length > 1).length;
+  }
 
   ngOnInit(): void {
     this.loadData();
@@ -299,11 +440,48 @@ export class UserListComponent implements OnInit {
         next: ({ users, departments }) => {
           this.users = users.filter((item) => item.role === 'teacher');
           this.departments = departments;
+          this.applyFilters();
         },
         error: (error: unknown) => {
           this.errorMessage = this.resolveErrorMessage(error);
+          this.filteredUsers = [];
         },
       });
+  }
+
+  applyFilters(): void {
+    const keyword = this.searchKeyword.trim().toLowerCase();
+
+    this.filteredUsers = this.users.filter((item) => {
+      const departmentIds = this.getDepartmentIds(item.departmentIds);
+      const byDepartment =
+        this.selectedDepartmentId === 'all'
+          ? true
+          : departmentIds.includes(this.selectedDepartmentId);
+      const byStatus =
+        this.selectedStatus === 'all'
+          ? true
+          : this.selectedStatus === 'active'
+            ? item.isActive !== false
+            : item.isActive === false;
+
+      if (!keyword) {
+        return byDepartment && byStatus;
+      }
+
+      const text = `${item.name} ${item.email}`.toLowerCase();
+      return byDepartment && byStatus && text.includes(keyword);
+    });
+  }
+
+  getInitials(name: string): string {
+    const tokens = name
+      .trim()
+      .split(/\s+/)
+      .filter((token) => token.length > 0)
+      .slice(0, 2);
+
+    return tokens.map((token) => token[0]?.toUpperCase() ?? '').join('') || 'GV';
   }
 
   getDepartmentCodes(values: Array<string | Department>): string[] {
@@ -317,6 +495,10 @@ export class UserListComponent implements OnInit {
         return item.code;
       })
       .filter((code, index, list) => list.indexOf(code) === index);
+  }
+
+  private getDepartmentIds(values: Array<string | Department>): string[] {
+    return values.map((item) => (typeof item === 'string' ? item : item._id));
   }
 
   openCreateDialog(): void {
