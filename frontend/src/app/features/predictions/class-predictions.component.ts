@@ -83,8 +83,8 @@ interface PredictionRow {
         </button>
       </header>
 
-      <mat-card class="card filter-card">
-        <div class="filter-grid">
+      <mat-card class="content-card filter-card">
+        <div class="filter-bar filter-grid">
           <mat-form-field appearance="outline">
             <mat-label>Lớp học phần</mat-label>
             <mat-select
@@ -110,7 +110,7 @@ interface PredictionRow {
         </div>
       </mat-card>
 
-      <mat-card class="card table-card">
+      <mat-card class="content-card table-card">
         @if (isLoadingClasses || isLoadingPredictions) {
           <div class="state-block">
             <mat-spinner [diameter]="36"></mat-spinner>
@@ -141,12 +141,12 @@ interface PredictionRow {
             >
             <span>
               Rủi ro cao:
-              <strong class="risk-high">{{ highRiskCount }}</strong>
+              <strong class="risk-high-text">{{ highRiskCount }}</strong>
             </span>
           </div>
 
           <div class="table-wrap">
-            <table mat-table [dataSource]="dataSource" matSort class="full-table">
+            <table mat-table [dataSource]="dataSource" matSort class="full-table nttu-table">
               <ng-container matColumnDef="studentCode">
                 <th mat-header-cell *matHeaderCellDef mat-sort-header>Mã SV</th>
                 <td mat-cell *matCellDef="let row">{{ row.studentCode }}</td>
@@ -214,29 +214,18 @@ interface PredictionRow {
   styles: [
     `
       .page-wrap {
-        padding-block: 1.5rem;
         display: grid;
         gap: 1rem;
       }
 
-      .card {
-        background: var(--white);
-        border: 1px solid var(--gray-200);
-        border-radius: var(--radius);
-        box-shadow: var(--shadow);
-        padding: 1rem 1.1rem;
-      }
-
-      .page-wrap > mat-card.card {
+      .filter-card {
+        padding: 0.95rem 1rem 1rem;
         overflow: visible;
       }
 
-      .filter-card {
-        padding-top: 1.15rem;
-      }
-
       .table-card {
-        padding-top: 0.75rem;
+        padding: 0.95rem 1rem 1rem;
+        overflow: hidden;
       }
 
       .page-header {
@@ -271,6 +260,7 @@ interface PredictionRow {
         grid-template-columns: minmax(260px, 420px) auto;
         gap: 0.75rem;
         align-items: center;
+        justify-content: space-between;
       }
 
       .risk-toggle {
@@ -287,7 +277,7 @@ interface PredictionRow {
         color: var(--text-sub);
       }
 
-      .risk-high {
+      .risk-high-text {
         color: #dc2626;
       }
 

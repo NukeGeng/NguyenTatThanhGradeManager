@@ -273,9 +273,12 @@ interface ClassUpsertPayload {
   styles: [
     `
       .page-wrap {
-        padding-block: 1.5rem;
         display: grid;
         gap: 1rem;
+      }
+
+      .content-card {
+        padding: 0.95rem 1rem 1rem;
       }
 
       .page-header {
@@ -469,7 +472,8 @@ export class ClassListComponent implements OnInit {
 
   openCreateDialog(): void {
     const dialogRef = this.dialog.open(ClassFormDialogComponent, {
-      width: '680px',
+      width: '860px',
+      maxWidth: '95vw',
       data: {
         mode: 'create',
         classData: null,
@@ -505,7 +509,8 @@ export class ClassListComponent implements OnInit {
 
   openEditDialog(row: Class): void {
     const dialogRef = this.dialog.open(ClassFormDialogComponent, {
-      width: '680px',
+      width: '860px',
+      maxWidth: '95vw',
       data: {
         mode: 'edit',
         classData: row,
@@ -749,7 +754,8 @@ export class ClassListComponent implements OnInit {
   styles: [
     `
       .dialog-form {
-        min-width: min(640px, 92vw);
+        width: 100%;
+        min-width: 0;
         display: grid;
         gap: 0.75rem;
       }

@@ -2,14 +2,23 @@
 .page-container {
   display: flex;
   flex-direction: column;
-  gap: 1.1rem;
-  max-width: 1200px;
+  gap: 1rem;
+  max-width: 100%;
+  width: 100%;
+  margin-inline: 0;
+  padding-inline: 0;
+}
+
+.page-container > .container {
+  max-width: 100%;
+  padding-inline: 0;
 }
 
 .page-wrap {
   display: grid;
   gap: 1rem;
   margin: 0;
+  padding-block: 1.5rem;
 }
 
 .page-wrap .state-block {
@@ -50,6 +59,39 @@
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 1rem 1.2rem;
+}
+
+.page-header h1,
+.page-title {
+  font-size: 1.1rem;
+  font-weight: 800;
+  color: var(--navy);
+  letter-spacing: -0.02em;
+  margin: 0;
+}
+
+.page-header .subtitle,
+.page-subtitle,
+.page-sub {
+  margin: 0.2rem 0 0;
+  color: var(--text-sub);
+  font-size: 0.82rem;
+}
+
+.page-header .eyebrow {
+  margin: 0;
+  color: var(--blue);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  font-size: 0.74rem;
+  font-weight: 700;
+}
+
+.btn-row {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
 }
 
 .page-title {
@@ -218,6 +260,158 @@
   font-size: 0.875rem !important;
 }
 
+/* Score sheet table (nhap diem / xem diem ca lop) */
+.score-sheet-wrap {
+  overflow-x: auto;
+  border: 1px solid var(--gray-200);
+  border-radius: var(--radius-sm);
+}
+
+.score-sheet {
+  width: 100%;
+  min-width: 1000px;
+  border-collapse: collapse;
+  background: var(--white);
+}
+
+.score-sheet--compact {
+  width: max-content;
+  min-width: 100%;
+  table-layout: auto;
+}
+
+.score-sheet--wide {
+  min-width: 1320px;
+}
+
+.score-sheet--entry {
+  min-width: 760px;
+}
+
+.score-sheet th,
+.score-sheet td {
+  border: 1px solid var(--gray-200);
+  padding: 0.45rem 0.5rem;
+  text-align: center;
+  vertical-align: middle;
+  font-size: 0.78rem;
+  line-height: 1.25;
+}
+
+.score-sheet thead th {
+  background: var(--gray-50);
+  color: var(--blue);
+  font-weight: 700;
+}
+
+.score-sheet .left-col {
+  min-width: 58px;
+}
+
+.score-sheet .name-col {
+  text-align: left;
+  min-width: 200px;
+  font-weight: 600;
+  color: var(--text);
+}
+
+.score-sheet .num-col {
+  min-width: 70px;
+}
+
+.score-sheet .group-col {
+  min-width: 88px;
+}
+
+.score-sheet .status-dot {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: var(--gray-300);
+}
+
+.score-sheet .status-dot.ok {
+  background: #43ce45;
+}
+
+.score-sheet .score-danger {
+  color: var(--red);
+  font-weight: 700;
+}
+
+.score-sheet .rank-col {
+  color: var(--text-sub);
+}
+
+.score-sheet tr.row-active {
+  background: #eff6ff;
+}
+
+.score-sheet--compact th,
+.score-sheet--compact td {
+  padding: 0.4rem 0.45rem;
+  font-size: 0.76rem;
+  word-break: normal;
+  overflow-wrap: normal;
+}
+
+.score-sheet--compact thead th {
+  white-space: normal;
+  line-height: 1.35;
+}
+
+.score-sheet--compact tbody td {
+  white-space: nowrap;
+}
+
+.score-sheet--compact .left-col {
+  min-width: unset;
+  width: auto;
+}
+
+.score-sheet--compact .name-col {
+  min-width: unset;
+  width: auto;
+}
+
+.score-sheet--compact .num-col {
+  min-width: unset;
+  width: auto;
+}
+
+.score-sheet--compact .tx-col {
+  min-width: unset;
+  width: auto;
+}
+
+.score-sheet--compact .group-col {
+  min-width: unset;
+  width: auto;
+}
+
+.score-edit-input {
+  width: 100%;
+  min-width: 58px;
+  border: 1px solid var(--gray-300);
+  border-radius: var(--radius-sm);
+  background: #fff;
+  color: var(--text);
+  font-family: 'Be Vietnam Pro', sans-serif;
+  font-size: 0.82rem;
+  text-align: center;
+  padding: 0.32rem 0.4rem;
+}
+
+.score-edit-input:focus {
+  outline: none;
+  border-color: var(--blue);
+  box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+}
+
 /* Filter bar */
 .filter-bar {
   background: var(--white);
@@ -230,9 +424,31 @@
   flex-wrap: wrap;
 }
 
-.filter-bar mat-form-field {
+.filter-bar > * {
+  margin: 0 !important;
+}
+
+.filter-bar mat-form-field,
+.filter-bar .mat-mdc-form-field {
   min-width: 160px;
   flex-shrink: 0;
+  margin: 0 !important;
+  --mat-form-field-container-height: 44px;
+  --mat-form-field-container-vertical-padding: 10px;
+}
+
+.filter-bar .mat-mdc-form-field-subscript-wrapper,
+.filter-bar .mat-mdc-form-field-bottom-align::before {
+  display: none;
+}
+
+.filter-bar .mat-mdc-checkbox,
+.filter-bar .mat-mdc-slide-toggle,
+.filter-bar .mat-mdc-button-base,
+.filter-bar button,
+.filter-bar a {
+  align-self: center;
+  margin: 0 !important;
 }
 
 .filter-bar .spacer {

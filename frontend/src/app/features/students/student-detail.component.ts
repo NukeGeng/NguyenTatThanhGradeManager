@@ -29,19 +29,39 @@ import { ApiResponse, Grade, Prediction, Student } from '../../shared/models/int
   ],
   template: `
     <section class="container page-wrap">
-      <div class="top-actions">
-        <button mat-stroked-button type="button" (click)="goBack()">
-          <lucide-icon name="arrow-left" [size]="16"></lucide-icon>
-          Quay lại danh sách
-        </button>
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <span>Dashboard</span>
+        <span class="breadcrumb-sep">/</span>
+        <span>Học sinh</span>
+        <span class="breadcrumb-sep">/</span>
+        <span>Chi tiết</span>
+      </nav>
 
-        @if (student) {
-          <a mat-flat-button class="btn-primary" [routerLink]="['/students', student._id, 'edit']">
-            <lucide-icon name="pencil" [size]="16"></lucide-icon>
-            Chỉnh sửa
-          </a>
-        }
-      </div>
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">Hồ sơ học sinh</p>
+          <h1 class="page-title">Chi tiết học sinh</h1>
+          <p class="subtitle">Theo dõi thông tin cá nhân, kết quả điểm và lịch sử dự đoán AI.</p>
+        </div>
+
+        <div class="btn-row">
+          <button mat-stroked-button type="button" (click)="goBack()">
+            <lucide-icon name="arrow-left" [size]="16"></lucide-icon>
+            Quay lại danh sách
+          </button>
+
+          @if (student) {
+            <a
+              mat-flat-button
+              class="btn-primary"
+              [routerLink]="['/students', student._id, 'edit']"
+            >
+              <lucide-icon name="pencil" [size]="16"></lucide-icon>
+              Chỉnh sửa
+            </a>
+          }
+        </div>
+      </header>
 
       @if (isLoading) {
         <mat-card class="state-card">
@@ -55,7 +75,7 @@ import { ApiResponse, Grade, Prediction, Student } from '../../shared/models/int
           <button mat-stroked-button type="button" (click)="loadData()">Thử lại</button>
         </mat-card>
       } @else if (student) {
-        <mat-card class="hero-card">
+        <mat-card class="content-card hero-card">
           <div>
             <p class="eyebrow">Hồ sơ học sinh</p>
             <h1>{{ student.fullName }}</h1>
@@ -74,10 +94,10 @@ import { ApiResponse, Grade, Prediction, Student } from '../../shared/models/int
         </mat-card>
 
         <div class="grid-2">
-          <mat-card>
-            <h2>Lịch sử điểm</h2>
+          <mat-card class="content-card">
+            <h2 class="section-title">Lịch sử điểm</h2>
             <div class="table-wrap">
-              <table mat-table [dataSource]="grades" class="full-table">
+              <table mat-table [dataSource]="grades" class="full-table nttu-table">
                 <ng-container matColumnDef="subject">
                   <th mat-header-cell *matHeaderCellDef>Môn học</th>
                   <td mat-cell *matCellDef="let row">{{ getSubjectName(row.subjectId) }}</td>
@@ -108,8 +128,8 @@ import { ApiResponse, Grade, Prediction, Student } from '../../shared/models/int
             </div>
           </mat-card>
 
-          <mat-card>
-            <h2>Timeline dự đoán AI</h2>
+          <mat-card class="content-card">
+            <h2 class="section-title">Timeline dự đoán AI</h2>
             @if (predictions.length === 0) {
               <div class="empty-state">
                 <lucide-icon name="info" [size]="18"></lucide-icon>
@@ -148,9 +168,12 @@ import { ApiResponse, Grade, Prediction, Student } from '../../shared/models/int
   styles: [
     `
       .page-wrap {
-        padding-block: 1.5rem;
         display: grid;
         gap: 1rem;
+      }
+
+      .content-card {
+        padding: 1rem 1.1rem 1.1rem;
       }
 
       .top-actions {

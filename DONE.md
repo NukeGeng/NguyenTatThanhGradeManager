@@ -254,6 +254,84 @@
 - File đã tạo/sửa: frontend/src/app/shared/styles/\_page.scss, frontend/src/app/features/classes/class-list.component.ts, frontend/src/app/features/grades/grade-entry/grade-entry.component.ts, frontend/src/app/features/users/user-list.component.ts, frontend/src/app/features/departments/department-list.component.ts, frontend/src/app/features/departments/department-detail.component.ts, frontend/src/app/features/subjects/subject-list.component.ts, DONE.md
 - Ghi chú: Đã áp bộ CSS chung từ TEMPLATE_FIX_CSS (nttu-table/filter-bar/section-title/grade-badge/empty-state/action-btn), làm lại layout các trang theo cấu trúc portal hiện đại, thêm filter/search/stats/card-grid nơi phù hợp, giữ nguyên logic API hiện tại và build frontend thành công.
 
+## [DONE-037] Đồng bộ giao diện toàn feature theo style UserList (trừ Home/Auth)
+
+- Ngày: 07/04/2026
+- File đã tạo/sửa: frontend/src/app/shared/styles/\_page.scss, frontend/src/app/features/students/student-list.component.ts, frontend/src/app/features/students/student-form.component.ts, frontend/src/app/features/students/student-detail.component.ts, frontend/src/app/features/classes/class-list.component.ts, frontend/src/app/features/classes/class-detail.component.ts, frontend/src/app/features/departments/department-list.component.ts, frontend/src/app/features/subjects/subject-list.component.ts, frontend/src/app/features/grades/grade-entry/grade-entry.component.ts, frontend/src/app/features/grades/grade-import/grade-import.component.ts, frontend/src/app/features/predictions/class-predictions.component.ts, frontend/src/app/features/predictions/prediction-report.component.ts, frontend/src/app/features/news/news.component.ts, frontend/src/app/features/notifications/notification-list.component.ts, DONE.md
+- Ghi chú: Đã chuẩn hóa căn giữa `page-container`, tăng margin/padding cho card và state blocks để nội dung không dính lề, đồng bộ spacing/justify theo pattern của UserList, và đổi toàn bộ action buttons ở Student List sang icon buttons giống Users (xem/sửa/xóa). Build frontend pass.
+
+## [DONE-038] Căn giữa toàn bộ control trong filter-bar (dropdown/input/button)
+
+- Ngày: 07/04/2026
+- File đã tạo/sửa: frontend/src/app/shared/styles/\_page.scss, DONE.md
+- Ghi chú: Đã fix lệch trục dọc trong filter-bar cho toàn bộ trang bằng cách chuẩn hóa margin control, bỏ vùng subscript chiếm chỗ của Material form-field trong filter bar, và ép checkbox/slide-toggle/button/input/select cùng align center. Build frontend pass.
+
+## [DONE-039] CSS lại form nhập điểm + tạo trang xem điểm cả lớp dạng bảng tổng hợp
+
+- Ngày: 07/04/2026
+- File đã tạo/sửa: frontend/src/app/shared/styles/\_page.scss, frontend/src/app/features/grades/grade-entry/grade-entry.component.ts, frontend/src/app/features/grades/class-grade-sheet/class-grade-sheet.component.ts, frontend/src/app/features/grades/grades.routes.ts, DONE.md
+- Ghi chú: Đã chuyển phần danh sách sinh viên ở Grade Entry sang bảng score-sheet dạng nhiều cột giống mẫu (TX/TH/TKT/điểm tổng kết/thang 4/điểm chữ/xếp loại/đạt), thêm nút điều hướng tới trang mới xem điểm toàn bộ sinh viên của một lớp theo cùng định dạng bảng, và build frontend thành công.
+
+## [DONE-040] Fix lỗi thiếu provider Lucide icon `table`
+
+- Ngày: 07/04/2026
+- File đã tạo/sửa: frontend/src/app/app.config.ts, BUGS.md, DONE.md
+- Ghi chú: Đã đăng ký icon `Table` trong `LucideAngularModule.pick(...)` để hết lỗi runtime từ GlobalErrorHandler khi render nút "Xem điểm cả lớp" ở Grade Entry; build frontend pass.
+
+## [DONE-041] Tối ưu lại layout bước 2 và bước 3 trang nhập điểm
+
+- Ngày: 07/04/2026
+- File đã tạo/sửa: frontend/src/app/shared/styles/\_page.scss, frontend/src/app/features/grades/grade-entry/grade-entry.component.ts, frontend/src/app/features/grades/class-grade-sheet/class-grade-sheet.component.ts, DONE.md
+- Ghi chú: Đã tách biến thể bảng điểm `score-sheet--compact|--wide|--entry`, giảm độ rộng và kích thước ô ở bước 2 để hạn chế vỡ form (không cần zoom 80% mới thấy), đồng thời chuyển bước 3 sang nhập điểm dạng bảng (TX/GK/TH/TKT + trạng thái dự thi/vắng thi) để căn chỉnh gọn, thẳng hàng như bảng bước 2.
+
+## [DONE-042] Fix tràn ngang trang nhập điểm ở mức zoom 100%
+
+- Ngày: 07/04/2026
+- File đã tạo/sửa: frontend/src/app/shared/styles/\_page.scss, frontend/src/app/features/grades/grade-entry/grade-entry.component.ts, DONE.md
+- Ghi chú: Đã tối ưu thêm biến thể `score-sheet--compact` (table-layout fixed, giảm width/min-width từng nhóm cột, cho phép wrap header) và giảm padding card bước 2 để tăng vùng hiển thị bảng; mục tiêu là tránh overflow toàn trang và giảm phụ thuộc kéo ngang/zoom thấp. Build frontend pass.
+
+## [DONE-043] Chuyển sidebar sang chế độ drawer ẩn/mở bằng nút
+
+- Ngày: 07/04/2026
+- File đã tạo/sửa: frontend/src/app/shared/components/layout/layout.component.ts, DONE.md
+- Ghi chú: Sidebar được chuyển sang dạng overlay drawer cho mọi kích thước màn hình, mặc định ẩn và mở bằng nút menu trên topbar; đóng khi bấm nền mờ hoặc chọn menu. Mục tiêu là mở rộng không gian nội dung (đặc biệt trang bảng điểm) và giữ trải nghiệm giống responsive mobile. Build frontend pass.
+
+## [DONE-044] Căn giữa và mở rộng khung main-content/page-container toàn bộ component
+
+- Ngày: 07/04/2026
+- File đã tạo/sửa: frontend/src/styles.scss, frontend/src/app/shared/styles/\_page.scss, frontend/src/app/shared/components/layout/layout.component.ts, DONE.md
+- Ghi chú: Đồng bộ lại khung hiển thị trung tâm: tăng `container/content max width` lên 1640px, cập nhật `main-content__inner` và `page-container` để luôn căn giữa màn hình và tận dụng tối đa chiều ngang khả dụng. Kết quả là các page (đặc biệt bảng điểm) hiển thị đầy đủ hơn, bớt bó hẹp cột/chữ. Build frontend pass.
+
+## [DONE-045] Giãn cột bảng điểm TX/TH và sửa ép chữ theo ký tự
+
+- Ngày: 07/04/2026
+- File đã tạo/sửa: frontend/src/app/shared/styles/\_page.scss, frontend/src/app/features/grades/grade-entry/grade-entry.component.ts, DONE.md
+- Ghi chú: Nới kích thước cột trong `score-sheet--compact` (đặc biệt `num-col`/`group-col`), tăng spacing cell, bỏ `word-break: break-word` gây bẻ chữ từng ký tự, và chuyển class `card-block--table` sang đúng card của Bước 2 để phần bảng điểm có thêm không gian ngang. Build frontend pass.
+
+## [DONE-046] Nới thêm không gian ngang để nhìn bảng điểm như mức zoom thấp hơn
+
+- Ngày: 07/04/2026
+- File đã tạo/sửa: frontend/src/app/shared/styles/\_page.scss, frontend/src/app/shared/components/layout/layout.component.ts, DONE.md
+- Ghi chú: Giảm thêm lớp padding lồng nhau ở `main-content` + `page-container` + `.container` trong shell để tăng chiều ngang thực tế cho bảng; đồng thời tăng nhẹ độ rộng cột số/nhóm của `score-sheet--compact` nhằm tránh cảm giác dính cột. Build frontend pass.
+
+## [DONE-047] Nới riêng 3 cột Điểm TX 1/2/3 thêm 5px
+
+- Ngày: 07/04/2026
+- File đã tạo/sửa: frontend/src/app/features/grades/grade-entry/grade-entry.component.ts, frontend/src/app/shared/styles/\_page.scss, DONE.md
+- Ghi chú: Tạo class riêng `tx-col` cho các ô header/data của 3 cột TX ở Bước 2 và tăng width từ 78px lên 83px (đúng +5px) để tách cột rõ hơn, không ảnh hưởng các cột điểm khác. Build frontend pass.
+
+## [DONE-048] Cân đều lại width cột TX với các cột điểm còn lại
+
+- Ngày: 07/04/2026
+- File đã tạo/sửa: frontend/src/app/shared/styles/\_page.scss, DONE.md
+- Ghi chú: Đồng bộ `tx-col` về cùng width `78px` như `num-col` trong `score-sheet--compact`, giúp 3 cột Điểm TX 1/2/3 có độ rộng đều và cùng nhịp với các ô điểm khác. Build frontend pass.
+
+## [DONE-049] Đổi bảng Step 2 sang auto-fit cột theo nội dung
+
+- Ngày: 07/04/2026
+- File đã tạo/sửa: frontend/src/app/shared/styles/\_page.scss, DONE.md
+- Ghi chú: Bỏ cơ chế width cứng ở `score-sheet--compact` (left/name/num/tx/group), chuyển sang `table-layout: auto` + `width: max-content` + `min-width: 100%` để độ rộng cột tự co giãn theo nội dung từng cột như mẫu tham chiếu. Build frontend pass.
+
 ```
 ## [DONE-001]
 - Ngày:

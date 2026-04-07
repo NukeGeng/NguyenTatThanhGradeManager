@@ -29,10 +29,26 @@ import { ApiResponse, Class, Student } from '../../shared/models/interfaces';
   ],
   template: `
     <section class="container page-wrap">
-      <button mat-stroked-button type="button" (click)="goBack()">
-        <lucide-icon name="arrow-left" [size]="16"></lucide-icon>
-        Quay lại danh sách lớp
-      </button>
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <span>Dashboard</span>
+        <span class="breadcrumb-sep">/</span>
+        <span>Lớp học</span>
+        <span class="breadcrumb-sep">/</span>
+        <span>Chi tiết</span>
+      </nav>
+
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">Quản lý lớp học</p>
+          <h1 class="page-title">Chi tiết lớp học phần</h1>
+          <p class="subtitle">Theo dõi thông tin lớp và danh sách học sinh trong lớp học phần.</p>
+        </div>
+
+        <button mat-stroked-button type="button" (click)="goBack()">
+          <lucide-icon name="arrow-left" [size]="16"></lucide-icon>
+          Quay lại danh sách lớp
+        </button>
+      </header>
 
       @if (isLoading) {
         <mat-card class="state-card">
@@ -46,7 +62,7 @@ import { ApiResponse, Class, Student } from '../../shared/models/interfaces';
           <button mat-stroked-button type="button" (click)="loadData()">Thử lại</button>
         </mat-card>
       } @else if (classData) {
-        <mat-card class="hero-card">
+        <mat-card class="content-card hero-card">
           <div>
             <p class="eyebrow">Lớp học phần</p>
             <h1>{{ classData.name || classData.code }}</h1>
@@ -65,11 +81,11 @@ import { ApiResponse, Class, Student } from '../../shared/models/interfaces';
           </div>
         </mat-card>
 
-        <mat-card>
-          <h2>Danh sách học sinh</h2>
+        <mat-card class="content-card">
+          <h2 class="section-title">Danh sách học sinh</h2>
 
           <div class="table-wrap">
-            <table mat-table [dataSource]="students" class="full-table">
+            <table mat-table [dataSource]="students" class="full-table nttu-table">
               <ng-container matColumnDef="studentCode">
                 <th mat-header-cell *matHeaderCellDef>Mã HS</th>
                 <td mat-cell *matCellDef="let row">{{ row.studentCode }}</td>
@@ -123,9 +139,12 @@ import { ApiResponse, Class, Student } from '../../shared/models/interfaces';
   styles: [
     `
       .page-wrap {
-        padding-block: 1.5rem;
         display: grid;
         gap: 1rem;
+      }
+
+      .content-card {
+        padding: 1rem 1.1rem 1.1rem;
       }
 
       .state-card {

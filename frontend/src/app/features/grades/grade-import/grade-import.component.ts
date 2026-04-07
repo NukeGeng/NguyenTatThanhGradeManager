@@ -86,7 +86,7 @@ interface PredictClassResponse {
       <header class="page-header">
         <div>
           <p class="eyebrow">Ngày 11 - Import điểm</p>
-          <h1>Import Excel/CSV</h1>
+          <h1 class="page-title">Import Excel/CSV</h1>
           <p class="subtitle">Quy trình 4 bước: chọn lớp, upload file, preview, xác nhận import.</p>
         </div>
 
@@ -96,7 +96,7 @@ interface PredictClassResponse {
         </a>
       </header>
 
-      <mat-card class="card-block">
+      <mat-card class="content-card card-block">
         <mat-stepper #stepper [linear]="false">
           <mat-step [completed]="setupForm.valid">
             <ng-template matStepLabel>Bước 1: Chọn lớp & học kỳ</ng-template>
@@ -429,10 +429,13 @@ interface PredictClassResponse {
       }
 
       .state-block {
-        display: inline-flex;
-        align-items: center;
+        min-height: 170px;
+        display: grid;
+        place-content: center;
+        justify-items: center;
         gap: 0.65rem;
         color: var(--text-sub);
+        text-align: center;
       }
 
       .summary-text {

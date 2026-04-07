@@ -1,74 +1,77 @@
-<section class="dashboard container">
-  <header class="dashboard-header">
+<section class="container page-wrap">
+  <nav class="breadcrumb" aria-label="Breadcrumb">
+    <span>Trang chủ</span>
+    <span class="breadcrumb-sep">/</span>
+    <span>Dashboard</span>
+  </nav>
+
+  <header class="page-header">
     <div>
-      <h1>Tổng quan hệ thống</h1>
-      <p>Theo dõi dữ liệu học sinh và cảnh báo rủi ro học tập theo thời gian thực.</p>
+      <p class="eyebrow">Tổng quan hệ thống</p>
+      <h1 class="page-title">Dashboard học vụ</h1>
+      <p class="subtitle">
+        Theo dõi dữ liệu học sinh và cảnh báo rủi ro học tập theo thời gian thực.
+      </p>
     </div>
   </header>
 
-  <div *ngIf="isLoading" class="loading-state card">
+  <mat-card *ngIf="isLoading" class="content-card state-card">
     <mat-progress-spinner mode="indeterminate" diameter="34"></mat-progress-spinner>
     <span>Đang tải dữ liệu dashboard...</span>
-  </div>
+  </mat-card>
 
-  <div *ngIf="!isLoading && errorMessage" class="error-state card">
+  <mat-card *ngIf="!isLoading && errorMessage" class="content-card state-card error">
     <strong>Không thể tải dashboard</strong>
     <p>{{ errorMessage }}</p>
-  </div>
+  </mat-card>
 
   <ng-container *ngIf="!isLoading && !errorMessage">
     <section class="stats-grid">
-      <mat-card class="card card--accent stat-card">
-        <div class="stat-icon stat-icon-blue">
-          <lucide-icon name="users" [size]="18"></lucide-icon>
+      <article class="stat-card">
+        <div class="stat-card__icon si-blue">
+          <lucide-icon name="users" [size]="16"></lucide-icon>
         </div>
-        <div>
-          <p class="stat-label">Tổng học sinh</p>
-          <p class="stat-value">{{ stats.totalStudents }}</p>
-        </div>
-      </mat-card>
+        <div class="stat-card__val">{{ stats.totalStudents }}</div>
+        <div class="stat-card__label">Tổng học sinh</div>
+      </article>
 
-      <mat-card class="card card--accent stat-card">
-        <div class="stat-icon stat-icon-navy">
-          <lucide-icon name="school" [size]="18"></lucide-icon>
+      <article class="stat-card">
+        <div class="stat-card__icon si-blue">
+          <lucide-icon name="school" [size]="16"></lucide-icon>
         </div>
-        <div>
-          <p class="stat-label">Tổng lớp</p>
-          <p class="stat-value">{{ stats.totalClasses }}</p>
-        </div>
-      </mat-card>
+        <div class="stat-card__val">{{ stats.totalClasses }}</div>
+        <div class="stat-card__label">Tổng lớp học phần</div>
+      </article>
 
-      <mat-card class="card card--accent stat-card">
-        <div class="stat-icon stat-icon-red">
-          <lucide-icon name="bell-ring" [size]="18"></lucide-icon>
+      <article class="stat-card stat-card--danger">
+        <div class="stat-card__icon si-red">
+          <lucide-icon name="bell-ring" [size]="16"></lucide-icon>
         </div>
-        <div>
-          <p class="stat-label">Cảnh báo cao</p>
-          <p class="stat-value">{{ stats.totalAlerts }}</p>
-        </div>
-      </mat-card>
+        <div class="stat-card__val">{{ stats.totalAlerts }}</div>
+        <div class="stat-card__label">Cảnh báo rủi ro cao</div>
+      </article>
 
-      <mat-card class="card card--accent stat-card">
-        <div class="stat-icon stat-icon-green">
-          <lucide-icon name="trending-up" [size]="18"></lucide-icon>
+      <article class="stat-card stat-card--success">
+        <div class="stat-card__icon si-green">
+          <lucide-icon name="trending-up" [size]="16"></lucide-icon>
         </div>
-        <div>
-          <p class="stat-label">Tỷ lệ giỏi</p>
-          <p class="stat-value">{{ stats.excellentRate }}%</p>
-        </div>
-      </mat-card>
+        <div class="stat-card__val">{{ stats.excellentRate }}%</div>
+        <div class="stat-card__label">Tỷ lệ xếp loại A</div>
+      </article>
     </section>
 
     <section class="content-grid">
-      <mat-card class="card alerts-card">
-        <div class="section-header">
-          <h2>Danh sách học sinh rủi ro cao</h2>
-          <span class="badge risk-high">{{ alertRows.length }} cảnh báo</span>
+      <mat-card class="content-card">
+        <div class="content-card__header">
+          <h2 class="content-card__title">Danh sách học sinh rủi ro cao</h2>
+          <span class="chip chip-red">{{ alertRows.length }} cảnh báo</span>
         </div>
 
-        <div *ngIf="!alertRows.length" class="empty-state">Chưa có học sinh rủi ro cao.</div>
+        <div class="content-card__body" *ngIf="!alertRows.length">
+          <div class="empty-state">Chưa có học sinh rủi ro cao.</div>
+        </div>
 
-        <div *ngIf="alertRows.length" class="alerts-table-wrap">
+        <div class="content-card__body alerts-table-wrap" *ngIf="alertRows.length">
           <table class="alerts-table">
             <thead>
               <tr>
@@ -85,11 +88,11 @@
                 <td>{{ alert.predictedRank }}</td>
                 <td>
                   <span
-                    class="badge"
+                    class="chip"
                     [ngClass]="{
-                      'risk-high': alert.riskLevel === 'high',
-                      'risk-med': alert.riskLevel === 'medium',
-                      'risk-low': alert.riskLevel === 'low',
+                      'chip-red': alert.riskLevel === 'high',
+                      'chip-amber': alert.riskLevel === 'medium',
+                      'chip-green': alert.riskLevel === 'low',
                     }"
                   >
                     {{
@@ -107,20 +110,22 @@
         </div>
       </mat-card>
 
-      <mat-card class="card chart-card">
-        <div class="section-header">
-          <h2>Phân bố xếp loại</h2>
+      <mat-card class="content-card">
+        <div class="content-card__header">
+          <h2 class="content-card__title">Phân bố xếp loại</h2>
         </div>
 
-        <div class="chart-wrap">
-          <canvas #gradeChartCanvas></canvas>
-        </div>
+        <div class="content-card__body">
+          <div class="chart-wrap">
+            <canvas #gradeChartCanvas></canvas>
+          </div>
 
-        <div class="grade-legend">
-          <span class="badge grade-a">A: {{ gradeCounts.A }}</span>
-          <span class="badge grade-b">B: {{ gradeCounts.B }}</span>
-          <span class="badge grade-c">C: {{ gradeCounts.C }}</span>
-          <span class="badge grade-f">F: {{ gradeCounts.F }}</span>
+          <div class="grade-legend">
+            <span class="chip grade-a">A: {{ gradeCounts.A }}</span>
+            <span class="chip grade-b">B: {{ gradeCounts.B }}</span>
+            <span class="chip grade-c">C: {{ gradeCounts.C }}</span>
+            <span class="chip grade-f">F: {{ gradeCounts.F }}</span>
+          </div>
         </div>
       </mat-card>
     </section>

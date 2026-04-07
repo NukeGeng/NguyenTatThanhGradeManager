@@ -249,9 +249,12 @@ interface SubjectUpsertPayload {
   styles: [
     `
       .page-wrap {
-        padding-block: 1.5rem;
         display: grid;
         gap: 1rem;
+      }
+
+      .content-card {
+        padding: 0.95rem 1rem 1rem;
       }
 
       .page-header {

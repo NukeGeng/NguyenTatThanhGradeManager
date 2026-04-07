@@ -503,7 +503,8 @@ export class UserListComponent implements OnInit {
 
   openCreateDialog(): void {
     const dialogRef = this.dialog.open(UserCreateDialogComponent, {
-      width: '620px',
+      width: '760px',
+      maxWidth: '95vw',
       data: this.departments,
     });
 
@@ -532,7 +533,8 @@ export class UserListComponent implements OnInit {
 
   openEditDialog(user: User): void {
     const dialogRef = this.dialog.open(UserEditDialogComponent, {
-      width: '560px',
+      width: '700px',
+      maxWidth: '95vw',
       data: { user } satisfies UserDialogData,
     });
 
@@ -561,7 +563,8 @@ export class UserListComponent implements OnInit {
 
   openAssignDialog(user: User): void {
     const dialogRef = this.dialog.open(UserAssignDepartmentDialogComponent, {
-      width: '620px',
+      width: '760px',
+      maxWidth: '95vw',
       data: {
         user,
         departments: this.departments,
@@ -689,7 +692,8 @@ export class UserListComponent implements OnInit {
   styles: [
     `
       .dialog-form {
-        min-width: min(580px, 92vw);
+        width: 100%;
+        min-width: 0;
         display: grid;
         gap: 0.75rem;
       }
@@ -818,7 +822,8 @@ export class UserCreateDialogComponent {
   styles: [
     `
       .dialog-form {
-        min-width: min(520px, 92vw);
+        width: 100%;
+        min-width: 0;
         display: grid;
         gap: 0.75rem;
       }
@@ -906,7 +911,8 @@ export class UserEditDialogComponent {
   styles: [
     `
       .dialog-form {
-        min-width: min(560px, 92vw);
+        width: 100%;
+        min-width: 0;
         display: grid;
         gap: 0.75rem;
       }

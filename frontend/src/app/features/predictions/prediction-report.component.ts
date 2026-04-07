@@ -34,39 +34,57 @@ import {
   ],
   template: `
     <section class="container page-wrap">
-      <div class="top-actions">
-        <a mat-stroked-button [routerLink]="['/predictions']">
-          <lucide-icon name="arrow-left" [size]="16"></lucide-icon>
-          Về danh sách dự đoán lớp
-        </a>
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <span>Dashboard</span>
+        <span class="breadcrumb-sep">/</span>
+        <span>Dự đoán AI</span>
+        <span class="breadcrumb-sep">/</span>
+        <span>Báo cáo</span>
+      </nav>
 
-        @if (gradeId) {
-          <button
-            mat-flat-button
-            type="button"
-            class="btn-primary"
-            [disabled]="isPredicting || !grade"
-            (click)="runPrediction()"
-          >
-            <lucide-icon name="chart-column-increasing" [size]="16"></lucide-icon>
-            {{ isPredicting ? 'Đang chạy AI...' : 'Chạy lại dự đoán' }}
-          </button>
-        }
-      </div>
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">Phân tích học tập</p>
+          <h1 class="page-title">Báo cáo dự đoán AI</h1>
+          <p class="subtitle">
+            Xem chi tiết xếp loại dự đoán, độ tin cậy và khuyến nghị cải thiện.
+          </p>
+        </div>
+
+        <div class="btn-row">
+          <a mat-stroked-button [routerLink]="['/predictions']">
+            <lucide-icon name="arrow-left" [size]="16"></lucide-icon>
+            Về danh sách dự đoán lớp
+          </a>
+
+          @if (gradeId) {
+            <button
+              mat-flat-button
+              type="button"
+              class="btn-primary"
+              [disabled]="isPredicting || !grade"
+              (click)="runPrediction()"
+            >
+              <lucide-icon name="chart-column-increasing" [size]="16"></lucide-icon>
+              {{ isPredicting ? 'Đang chạy AI...' : 'Chạy lại dự đoán' }}
+            </button>
+          }
+        </div>
+      </header>
 
       @if (isLoading) {
-        <mat-card class="state-card">
+        <mat-card class="content-card state-card">
           <mat-spinner [diameter]="36"></mat-spinner>
           <p>Đang tải báo cáo dự đoán...</p>
         </mat-card>
       } @else if (errorMessage) {
-        <mat-card class="state-card error">
+        <mat-card class="content-card state-card error">
           <lucide-icon name="x-circle" [size]="20"></lucide-icon>
           <p>{{ errorMessage }}</p>
           <button mat-stroked-button type="button" (click)="loadData()">Thử lại</button>
         </mat-card>
       } @else if (grade) {
-        <mat-card class="hero-card card--accent">
+        <mat-card class="content-card hero-card card--accent">
           <div>
             <p class="eyebrow">Báo cáo AI theo bảng điểm</p>
             <h1>{{ getStudentName(grade.studentId) }}</h1>
@@ -83,13 +101,13 @@ import {
         </mat-card>
 
         @if (!prediction) {
-          <mat-card class="state-card">
+          <mat-card class="content-card state-card">
             <lucide-icon name="info" [size]="20"></lucide-icon>
             <p>Chưa có dữ liệu dự đoán cho bảng điểm này. Vui lòng chạy dự đoán AI.</p>
           </mat-card>
         } @else {
           <div class="grid-2">
-            <mat-card class="card-block">
+            <mat-card class="content-card card-block">
               <h2>Kết quả chính</h2>
 
               <div class="result-row">
@@ -121,7 +139,7 @@ import {
               </div>
             </mat-card>
 
-            <mat-card class="card-block">
+            <mat-card class="content-card card-block">
               <h2>Chi tiết phân tích</h2>
 
               <div class="section-item">
@@ -171,7 +189,6 @@ import {
   styles: [
     `
       .page-wrap {
-        padding-block: 1.5rem;
         display: grid;
         gap: 1rem;
       }
@@ -211,6 +228,7 @@ import {
         border: 1px solid var(--gray-200);
         border-radius: var(--radius);
         box-shadow: var(--shadow);
+        padding: 1rem 1.2rem 1.1rem;
       }
 
       .card--accent::before {
@@ -254,6 +272,7 @@ import {
 
       .card-block {
         border: 1px solid var(--gray-200);
+        padding: 1rem 1.1rem 1.1rem;
       }
 
       h2 {

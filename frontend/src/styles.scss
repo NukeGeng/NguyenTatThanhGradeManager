@@ -24,7 +24,8 @@
   --text-sub: #475569;
   --text-muted: #94a3b8;
 
-  --container-max: 1200px;
+  --container-max: 1640px;
+  --content-max: 1640px;
   --pad: clamp(1rem, 4vw, 2rem);
   --radius: 9px;
   --radius-sm: 6px;
@@ -43,15 +44,7 @@
 }
 
 html {
-  /* Giữ chỗ scrollbar để tránh layout shift khi trang dài/ngắn thay đổi. */
-  scrollbar-gutter: stable;
   scroll-behavior: smooth;
-}
-
-@supports not (scrollbar-gutter: stable) {
-  html {
-    overflow-y: scroll;
-  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -64,6 +57,7 @@ html,
 body {
   margin: 0;
   min-height: 100%;
+  overflow-x: hidden;
   font-family: 'Be Vietnam Pro', sans-serif;
   color: var(--text);
   background: var(--white);
@@ -126,4 +120,25 @@ body {
 .mat-mdc-card,
 .mat-mdc-outlined-card {
   border-radius: var(--radius) !important;
+}
+
+.mat-mdc-dialog-container .mat-mdc-dialog-surface {
+  border-radius: 12px !important;
+  overflow: hidden;
+}
+
+.mat-mdc-dialog-container .mat-mdc-dialog-title {
+  padding: 1rem 1.2rem 0.4rem !important;
+}
+
+.mat-mdc-dialog-container .mat-mdc-dialog-content {
+  padding: 0 1.2rem 0.85rem !important;
+  max-height: min(74vh, 760px) !important;
+  scrollbar-gutter: stable;
+}
+
+.mat-mdc-dialog-container .mat-mdc-dialog-actions {
+  padding: 0.6rem 1.2rem 1rem !important;
+  min-height: auto !important;
+  margin: 0 !important;
 }

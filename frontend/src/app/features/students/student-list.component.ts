@@ -40,10 +40,16 @@ import { ApiResponse, Class, Student, StudentStatus } from '../../shared/models/
   ],
   template: `
     <section class="container page-wrap">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <span>Dashboard</span>
+        <span class="breadcrumb-sep">/</span>
+        <span>Học sinh</span>
+      </nav>
+
       <header class="page-header">
         <div>
           <p class="eyebrow">Quản lý học sinh</p>
-          <h1>Danh sách học sinh</h1>
+          <h1 class="page-title">Danh sách học sinh</h1>
           <p class="subtitle">Tìm kiếm nhanh theo tên, lọc theo lớp và trạng thái.</p>
         </div>
 
@@ -53,8 +59,8 @@ import { ApiResponse, Class, Student, StudentStatus } from '../../shared/models/
         </button>
       </header>
 
-      <mat-card>
-        <div class="filters">
+      <mat-card class="content-card">
+        <div class="filter-bar filters">
           <mat-form-field appearance="outline">
             <mat-label>Tìm theo tên</mat-label>
             <input
@@ -101,7 +107,7 @@ import { ApiResponse, Class, Student, StudentStatus } from '../../shared/models/
           </div>
         } @else {
           <div class="table-wrap">
-            <table mat-table [dataSource]="dataSource" matSort class="full-table">
+            <table mat-table [dataSource]="dataSource" matSort class="full-table nttu-table">
               <ng-container matColumnDef="studentCode">
                 <th mat-header-cell *matHeaderCellDef mat-sort-header>Mã HS</th>
                 <td mat-cell *matCellDef="let row">{{ row.studentCode }}</td>
@@ -138,25 +144,37 @@ import { ApiResponse, Class, Student, StudentStatus } from '../../shared/models/
               <ng-container matColumnDef="actions">
                 <th mat-header-cell *matHeaderCellDef>Thao tác</th>
                 <td mat-cell *matCellDef="let row" class="actions-cell">
-                  <button mat-stroked-button type="button" (click)="viewStudent(row)">
-                    <lucide-icon name="chevron-right" [size]="16"></lucide-icon>
-                    Chi tiết
-                  </button>
+                  <div class="actions-wrap">
+                    <button
+                      type="button"
+                      class="action-btn"
+                      aria-label="Xem chi tiết học sinh"
+                      title="Xem chi tiết"
+                      (click)="viewStudent(row)"
+                    >
+                      <lucide-icon name="eye" [size]="15"></lucide-icon>
+                    </button>
 
-                  <button mat-stroked-button type="button" (click)="editStudent(row)">
-                    <lucide-icon name="pencil" [size]="16"></lucide-icon>
-                    Sửa
-                  </button>
+                    <button
+                      type="button"
+                      class="action-btn"
+                      aria-label="Sửa học sinh"
+                      title="Sửa"
+                      (click)="editStudent(row)"
+                    >
+                      <lucide-icon name="pencil" [size]="15"></lucide-icon>
+                    </button>
 
-                  <button
-                    mat-stroked-button
-                    type="button"
-                    class="danger"
-                    (click)="deleteStudent(row)"
-                  >
-                    <lucide-icon name="trash-2" [size]="16"></lucide-icon>
-                    Xóa
-                  </button>
+                    <button
+                      type="button"
+                      class="action-btn action-btn--danger"
+                      aria-label="Xóa học sinh"
+                      title="Xóa"
+                      (click)="deleteStudent(row)"
+                    >
+                      <lucide-icon name="trash-2" [size]="15"></lucide-icon>
+                    </button>
+                  </div>
                 </td>
               </ng-container>
 
@@ -177,9 +195,12 @@ import { ApiResponse, Class, Student, StudentStatus } from '../../shared/models/
   styles: [
     `
       .page-wrap {
-        padding-block: 1.5rem;
         display: grid;
         gap: 1rem;
+      }
+
+      .content-card {
+        padding: 0.95rem 1rem 1rem;
       }
 
       .page-header {
@@ -218,8 +239,8 @@ import { ApiResponse, Class, Student, StudentStatus } from '../../shared/models/
         display: grid;
         grid-template-columns: 1.5fr 1fr 1fr;
         gap: 0.75rem;
-        padding: 1rem;
-        border-bottom: 1px solid var(--gray-200);
+        padding: 0.3rem;
+        margin-bottom: 0.4rem;
       }
 
       .table-wrap {
@@ -231,15 +252,14 @@ import { ApiResponse, Class, Student, StudentStatus } from '../../shared/models/
       }
 
       .actions-cell {
-        display: flex;
-        gap: 0.5rem;
-        flex-wrap: wrap;
-        padding-block: 0.75rem;
+        white-space: nowrap;
       }
 
-      .danger {
-        border-color: #dc2626 !important;
-        color: #dc2626 !important;
+      .actions-wrap {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.35rem;
+        flex-wrap: nowrap;
       }
 
       .badge {
@@ -272,6 +292,10 @@ import { ApiResponse, Class, Student, StudentStatus } from '../../shared/models/
 
       .state-block.error {
         color: #dc2626;
+      }
+
+      mat-paginator {
+        margin-top: 0.45rem;
       }
 
       @media (max-width: 768px) {

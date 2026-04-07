@@ -51,26 +51,34 @@ interface StudentUpsertPayload {
   ],
   template: `
     <section class="container page-wrap">
-      <button mat-stroked-button type="button" (click)="goBack()">
-        <lucide-icon name="arrow-left" [size]="16"></lucide-icon>
-        Quay lại danh sách học sinh
-      </button>
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <span>Dashboard</span>
+        <span class="breadcrumb-sep">/</span>
+        <span>Học sinh</span>
+        <span class="breadcrumb-sep">/</span>
+        <span>{{ isEditMode ? 'Cập nhật' : 'Thêm mới' }}</span>
+      </nav>
 
-      <mat-card>
-        <header class="card-header">
-          <div>
-            <p class="eyebrow">Quản lý học sinh</p>
-            <h1>{{ isEditMode ? 'Cập nhật học sinh' : 'Thêm học sinh mới' }}</h1>
-            <p>
-              {{
-                isEditMode
-                  ? 'Chỉnh sửa thông tin học sinh hiện có.'
-                  : 'Mã học sinh sẽ được tự động sinh khi lưu.'
-              }}
-            </p>
-          </div>
-        </header>
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">Quản lý học sinh</p>
+          <h1 class="page-title">{{ isEditMode ? 'Cập nhật học sinh' : 'Thêm học sinh mới' }}</h1>
+          <p class="subtitle">
+            {{
+              isEditMode
+                ? 'Chỉnh sửa thông tin học sinh hiện có.'
+                : 'Mã học sinh sẽ được tự động sinh khi lưu.'
+            }}
+          </p>
+        </div>
 
+        <button mat-stroked-button type="button" (click)="goBack()">
+          <lucide-icon name="arrow-left" [size]="16"></lucide-icon>
+          Quay lại danh sách học sinh
+        </button>
+      </header>
+
+      <mat-card class="content-card">
         @if (isLoading) {
           <div class="state-block">
             <mat-spinner [diameter]="36"></mat-spinner>
@@ -193,9 +201,12 @@ interface StudentUpsertPayload {
   styles: [
     `
       .page-wrap {
-        padding-block: 1.5rem;
         display: grid;
         gap: 1rem;
+      }
+
+      .content-card {
+        padding: 1rem 1.1rem 1.1rem;
       }
 
       .card-header {

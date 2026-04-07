@@ -14,30 +14,40 @@ interface NewsItem {
   standalone: true,
   imports: [CommonModule],
   template: `
-    <section class="news-page">
-      <header class="news-header">
-        <p class="eyebrow">Cổng thông tin</p>
-        <h1>Tin tức NTTU</h1>
-        <p class="subtitle">
-          Danh sách tin tức nội bộ đang dùng dữ liệu mock cho giai đoạn frontend.
-        </p>
+    <section class="container page-wrap news-page">
+      <nav class="breadcrumb" aria-label="Breadcrumb">
+        <span>Dashboard</span>
+        <span class="breadcrumb-sep">/</span>
+        <span>Tin tức</span>
+      </nav>
+
+      <header class="page-header">
+        <div>
+          <p class="eyebrow">Cổng thông tin</p>
+          <h1 class="page-title">Tin tức NTTU</h1>
+          <p class="subtitle">
+            Danh sách tin tức nội bộ đang dùng dữ liệu mock cho giai đoạn frontend.
+          </p>
+        </div>
       </header>
 
-      <div class="news-grid">
-        @for (item of newsItems; track item.id) {
-          <article class="news-card">
-            <div class="card-head">
-              <span class="date">{{ item.publishedAt }}</span>
-              @if (item.isNew) {
-                <span class="badge-new">Mới</span>
-              }
-            </div>
+      <section class="content-card news-card-shell">
+        <div class="news-grid">
+          @for (item of newsItems; track item.id) {
+            <article class="news-card">
+              <div class="card-head">
+                <span class="date">{{ item.publishedAt }}</span>
+                @if (item.isNew) {
+                  <span class="chip chip-blue">Mới</span>
+                }
+              </div>
 
-            <h2>{{ item.title }}</h2>
-            <p>{{ item.summary }}</p>
-          </article>
-        }
-      </div>
+              <h2>{{ item.title }}</h2>
+              <p>{{ item.summary }}</p>
+            </article>
+          }
+        </div>
+      </section>
     </section>
   `,
   styles: [
@@ -47,23 +57,8 @@ interface NewsItem {
         gap: 1rem;
       }
 
-      .news-header h1 {
-        margin: 0;
-        color: var(--navy);
-      }
-
-      .eyebrow {
-        margin: 0;
-        color: var(--blue);
-        text-transform: uppercase;
-        font-size: 0.75rem;
-        letter-spacing: 0.08em;
-        font-weight: 700;
-      }
-
-      .subtitle {
-        margin: 0.35rem 0 0;
-        color: var(--text-sub);
+      .news-card-shell {
+        padding: 1rem 1.1rem 1.1rem;
       }
 
       .news-grid {
@@ -98,17 +93,6 @@ interface NewsItem {
       .date {
         font-size: 0.8rem;
         color: var(--text-muted);
-      }
-
-      .badge-new {
-        display: inline-flex;
-        align-items: center;
-        border-radius: 999px;
-        padding: 0.18rem 0.6rem;
-        background: var(--blue-pale);
-        color: var(--blue);
-        font-size: 0.72rem;
-        font-weight: 700;
       }
 
       .news-card h2 {

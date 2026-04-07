@@ -1,5 +1,4 @@
 import { CommonModule } from '@angular/common';
-import { BreakpointObserver } from '@angular/cdk/layout';
 import { Component, DestroyRef, OnInit, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { NavigationEnd, Router, RouterLink, RouterLinkActive, RouterOutlet } from '@angular/router';
@@ -36,7 +35,12 @@ interface LayoutNavItem {
     <section class="shell">
       <header class="topbar">
         <div class="topbar-left">
-          <button type="button" class="menu-toggle" (click)="toggleSidebar()" aria-label="Mở menu">
+          <button
+            type="button"
+            class="menu-toggle"
+            (click)="toggleSidebar()"
+            [attr.aria-label]="sidebarOpened ? 'Đóng menu' : 'Mở menu'"
+          >
             <lucide-icon name="menu" [size]="18"></lucide-icon>
           </button>
 
@@ -78,7 +82,7 @@ interface LayoutNavItem {
       </header>
 
       <div class="shell-body">
-        <aside class="sidebar" [class.mobile-open]="!isMobile || mobileSidebarOpened">
+        <aside class="sidebar" [class.mobile-open]="sidebarOpened">
           <nav class="menu-list">
             <p class="section-label">TỔNG QUAN</p>
             @for (item of visibleNavItems; track item.path) {
@@ -148,7 +152,7 @@ interface LayoutNavItem {
           </nav>
         </aside>
 
-        @if (isMobile && mobileSidebarOpened) {
+        @if (sidebarOpened) {
           <button
             type="button"
             class="sidebar-backdrop"
@@ -170,15 +174,17 @@ interface LayoutNavItem {
       .shell {
         height: 100vh;
         display: grid;
-        grid-template-rows: 64px 1fr;
+        grid-template-rows: 56px 1fr;
         overflow: hidden;
-        background: rgb(255, 255, 255);
+        background: var(--gray-100);
       }
 
       .topbar {
-        height: 64px;
+        height: 56px;
         background: var(--white);
         border-bottom: 1px solid var(--gray-200);
+        position: relative;
+        z-index: 60;
         display: flex;
         align-items: center;
         gap: 1rem;
@@ -199,7 +205,7 @@ interface LayoutNavItem {
         border-radius: var(--radius-sm);
         background: #fff;
         color: var(--navy);
-        display: none;
+        display: inline-flex;
         align-items: center;
         justify-content: center;
         cursor: pointer;
@@ -214,12 +220,12 @@ interface LayoutNavItem {
       }
 
       .school-shield {
-        height: 44px;
+        height: 38px;
         width: auto;
       }
 
       .school-wordmark {
-        height: 44px;
+        height: 38px;
         width: auto;
       }
 
@@ -319,6 +325,7 @@ interface LayoutNavItem {
         position: absolute;
         top: calc(100% + 0.5rem);
         right: 0;
+        z-index: 80;
         min-width: 140px;
         background: #fff;
         border: 1px solid var(--gray-200);
@@ -355,16 +362,28 @@ interface LayoutNavItem {
       .shell-body {
         min-height: 0;
         display: grid;
-        grid-template-columns: 220px 1fr;
+        grid-template-columns: 1fr;
         position: relative;
       }
 
       .sidebar {
+        position: fixed;
+        top: 56px;
+        left: 0;
+        bottom: 0;
+        width: 236px;
+        z-index: 50;
+        transform: translateX(-100%);
+        transition: transform 0.22s ease;
         background: #fff;
         border-right: 1px solid var(--gray-200);
-        box-shadow: 2px 0 14px rgba(15, 33, 68, 0.05);
-        padding: 0.7rem 0.6rem 1rem;
+        box-shadow: 0 14px 32px rgba(15, 33, 68, 0.16);
+        padding: 0.75rem 0.5rem;
         overflow-y: auto;
+      }
+
+      .sidebar.mobile-open {
+        transform: translateX(0);
       }
 
       .menu-list {
@@ -443,58 +462,49 @@ interface LayoutNavItem {
 
       .main-content {
         overflow-y: auto;
-        background: rgb(255, 255, 255);
+        overflow-x: hidden;
+        scrollbar-gutter: auto;
+        background: var(--gray-100);
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+        padding: clamp(0.65rem, 1vw, 0.95rem);
       }
 
       .main-content__inner {
         width: 100%;
+        max-width: none;
+        min-width: 0;
         min-height: 100%;
-        max-width: 1200px;
-        margin: 0 auto;
-        padding: clamp(0.95rem, 2.2vw, 1.35rem) clamp(0.9rem, 2.6vw, 1.35rem)
-          clamp(1.15rem, 2.8vw, 1.6rem);
+        margin-inline: 0;
+        padding: 0;
+      }
+
+      .main-content__inner.page-container {
+        max-width: none;
+        padding-inline: 0;
+      }
+
+      .main-content__inner > .container {
+        max-width: 100%;
+        padding-inline: 0;
       }
 
       .sidebar-backdrop {
-        display: none;
+        display: block;
+        position: fixed;
+        top: 56px;
+        left: 0;
+        right: 0;
+        bottom: 0;
+        border: none;
+        background: rgba(15, 33, 68, 0.3);
+        z-index: 45;
       }
 
       @media (max-width: 1024px) {
-        .menu-toggle {
-          display: inline-flex;
-          align-items: center;
-          justify-content: center;
-        }
-
-        .shell-body {
-          grid-template-columns: 1fr;
-        }
-
         .sidebar {
-          position: fixed;
-          top: 64px;
-          left: 0;
-          bottom: 0;
-          width: 220px;
-          z-index: 50;
-          transform: translateX(-100%);
-          transition: transform 0.2s ease;
-        }
-
-        .sidebar.mobile-open {
-          transform: translateX(0);
-        }
-
-        .sidebar-backdrop {
-          display: block;
-          position: fixed;
-          top: 64px;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          border: none;
-          background: rgba(15, 33, 68, 0.3);
-          z-index: 45;
+          width: 210px;
         }
 
         .search-wrap {
@@ -519,12 +529,12 @@ interface LayoutNavItem {
           padding-inline: 0.7rem;
         }
 
-        .main-content {
+        .main-content__inner {
           padding: 0;
         }
 
-        .main-content__inner {
-          padding: 0.85rem;
+        .main-content {
+          padding: 0.55rem;
         }
       }
     `,
@@ -534,7 +544,6 @@ export class LayoutComponent implements OnInit {
   private readonly authService = inject(AuthService);
   private readonly apiService = inject(ApiService);
   private readonly router = inject(Router);
-  private readonly breakpointObserver = inject(BreakpointObserver);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly navItems: LayoutNavItem[] = [
@@ -554,8 +563,7 @@ export class LayoutComponent implements OnInit {
     { label: 'Môn học', path: '/subjects', icon: 'layers', adminOnly: true },
   ];
 
-  isMobile = false;
-  mobileSidebarOpened = false;
+  sidebarOpened = false;
 
   currentUserName = 'Người dùng';
   currentUserRoleLabel = 'Giáo viên';
@@ -584,7 +592,6 @@ export class LayoutComponent implements OnInit {
   }
 
   ngOnInit(): void {
-    this.observeLayoutMode();
     this.loadCurrentUser();
     this.loadHighRiskCount();
 
@@ -594,39 +601,22 @@ export class LayoutComponent implements OnInit {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe(() => {
+        this.onMenuClick();
         this.loadHighRiskCount();
       });
   }
 
   toggleSidebar(): void {
-    if (!this.isMobile) {
-      return;
-    }
-
-    this.mobileSidebarOpened = !this.mobileSidebarOpened;
+    this.sidebarOpened = !this.sidebarOpened;
   }
 
   onMenuClick(): void {
-    if (this.isMobile) {
-      this.mobileSidebarOpened = false;
-    }
+    this.sidebarOpened = false;
   }
 
   logout(): void {
     this.authService.logout();
     this.router.navigate(['/login']);
-  }
-
-  private observeLayoutMode(): void {
-    this.breakpointObserver
-      .observe('(max-width: 1024px)')
-      .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((state) => {
-        this.isMobile = state.matches;
-        if (!state.matches) {
-          this.mobileSidebarOpened = false;
-        }
-      });
   }
 
   private loadCurrentUser(): void {

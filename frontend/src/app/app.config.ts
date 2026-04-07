@@ -50,6 +50,7 @@ import {
   Search,
   Server,
   Shield,
+  Table,
   Trash2,
   Triangle,
   User,
@@ -62,7 +63,9 @@ import {
   XCircle,
   Zap,
   CheckCircle,
+  Check,
   Users,
+  X,
 } from 'lucide-angular';
 
 import { routes } from './app.routes';
@@ -102,6 +105,7 @@ export const appConfig: ApplicationConfig = {
         ChevronRight,
         ChartColumnIncreasing,
         CheckCircle,
+        Check,
         Eye,
         EyeOff,
         FileDown,
@@ -125,6 +129,7 @@ export const appConfig: ApplicationConfig = {
         Shield,
         ShieldCheck,
         Sparkles,
+        Table,
         TrendingUp,
         Trash2,
         Triangle,
@@ -134,6 +139,7 @@ export const appConfig: ApplicationConfig = {
         Users,
         Workflow,
         XCircle,
+        X,
         Zap,
       }),
     ),

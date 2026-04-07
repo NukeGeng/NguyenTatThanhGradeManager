@@ -96,19 +96,26 @@ interface WeightDialogData {
       <header class="page-header">
         <div>
           <p class="eyebrow">Quản lý điểm số</p>
-          <h1>Grade Entry</h1>
+          <h1 class="page-title">Grade Entry</h1>
           <p class="subtitle">
             Chọn lớp học phần, chọn sinh viên và nhập điểm theo hệ đại học NTTU.
           </p>
         </div>
 
-        <a mat-flat-button class="btn-primary" [routerLink]="['/grades/import']">
-          <lucide-icon name="arrow-right" [size]="16"></lucide-icon>
-          Đi đến Import Excel/CSV
-        </a>
+        <div class="btn-row">
+          <a mat-stroked-button [routerLink]="['/grades/class-sheet']">
+            <lucide-icon name="table" [size]="16"></lucide-icon>
+            Xem điểm cả lớp
+          </a>
+
+          <a mat-flat-button class="btn-primary" [routerLink]="['/grades/import']">
+            <lucide-icon name="arrow-right" [size]="16"></lucide-icon>
+            Đi đến Import Excel/CSV
+          </a>
+        </div>
       </header>
 
-      <mat-card class="card-block">
+      <mat-card class="content-card card-block">
         <div class="step-title">
           <span class="step-index">Bước 1</span>
           <h2 class="section-title">Chọn lớp học phần</h2>
@@ -166,7 +173,7 @@ interface WeightDialogData {
         </ng-container>
       </mat-card>
 
-      <mat-card class="card-block">
+      <mat-card class="content-card card-block card-block--table">
         <div class="step-title">
           <span class="step-index">Bước 2</span>
           <h2 class="section-title">Chọn sinh viên</h2>
@@ -191,48 +198,144 @@ interface WeightDialogData {
             <button mat-stroked-button type="button" (click)="loadClassContext()">Thử lại</button>
           </div>
 
-          <div *ngIf="!isLoadingStudents && !loadErrorMessage" class="table-wrap">
-            <table mat-table [dataSource]="students" class="full-table nttu-table">
-              <ng-container matColumnDef="studentCode">
-                <th mat-header-cell *matHeaderCellDef>Mã SV</th>
-                <td mat-cell *matCellDef="let row">{{ row.studentCode }}</td>
-              </ng-container>
+          <div *ngIf="!isLoadingStudents && !loadErrorMessage" class="score-sheet-wrap">
+            <table class="score-sheet score-sheet--compact">
+              <thead>
+                <tr>
+                  <th rowspan="3" class="left-col">STT</th>
+                  <th rowspan="3" class="name-col">Họ tên sinh viên</th>
+                  <th [attr.colspan]="txHeaderIndexes.length" class="group-col">
+                    Đánh giá thường xuyên
+                  </th>
+                  <th rowspan="3" class="group-col">TL/BTL</th>
+                  <th [attr.colspan]="showThColumns ? thHeaderIndexes.length : 1" class="group-col">
+                    Điểm thực hành
+                  </th>
+                  <th rowspan="3" class="group-col">Được dự thi kết thúc HP</th>
+                  <th rowspan="3" class="group-col">Điểm thi kết thúc HP</th>
+                  <th rowspan="3" class="group-col">Vắng thi</th>
+                  <th rowspan="3" class="group-col">Điểm tổng kết</th>
+                  <th rowspan="3" class="group-col">Thang điểm 4</th>
+                  <th rowspan="3" class="group-col">Điểm chữ</th>
+                  <th rowspan="3" class="group-col">Xếp loại</th>
+                  <th rowspan="3" class="group-col">Đạt</th>
+                  <th rowspan="3" class="group-col">Nhập điểm</th>
+                </tr>
 
-              <ng-container matColumnDef="fullName">
-                <th mat-header-cell *matHeaderCellDef>Họ tên</th>
-                <td mat-cell *matCellDef="let row">{{ row.fullName }}</td>
-              </ng-container>
+                <tr>
+                  <th [attr.colspan]="txHeaderIndexes.length" class="group-col">LT Hệ số 1</th>
+                  <th [attr.colspan]="showThColumns ? thHeaderIndexes.length : 1" class="group-col">
+                    {{ showThColumns ? 'TH' : 'Không áp dụng' }}
+                  </th>
+                </tr>
 
-              <ng-container matColumnDef="status">
-                <th mat-header-cell *matHeaderCellDef>Trạng thái điểm</th>
-                <td mat-cell *matCellDef="let row">
-                  <span class="badge" [ngClass]="getStudentGradeStatus(row)._className">
-                    {{ getStudentGradeStatus(row)._label }}
-                  </span>
-                </td>
-              </ng-container>
+                <tr>
+                  @for (index of txHeaderIndexes; track index) {
+                    <th class="num-col tx-col">Điểm TX {{ index }}</th>
+                  }
 
-              <ng-container matColumnDef="actions">
-                <th mat-header-cell *matHeaderCellDef>Thao tác</th>
-                <td mat-cell *matCellDef="let row" class="actions-cell">
-                  <button
-                    type="button"
-                    class="action-btn"
-                    aria-label="Nhập điểm sinh viên"
-                    title="Nhập điểm sinh viên"
-                    (click)="selectStudent(row)"
-                  >
-                    <lucide-icon name="pencil" [size]="15"></lucide-icon>
-                  </button>
-                </td>
-              </ng-container>
+                  @if (showThColumns) {
+                    @for (index of thHeaderIndexes; track index) {
+                      <th class="num-col">Điểm TH {{ index }}</th>
+                    }
+                  } @else {
+                    <th class="num-col">-</th>
+                  }
+                </tr>
+              </thead>
 
-              <tr mat-header-row *matHeaderRowDef="studentColumns"></tr>
-              <tr
-                mat-row
-                *matRowDef="let row; columns: studentColumns"
-                [class.row-active]="selectedStudent?._id === row._id"
-              ></tr>
+              <tbody>
+                @for (student of students; track student._id; let i = $index) {
+                  <tr [class.row-active]="selectedStudent?._id === student._id">
+                    <td>{{ i + 1 }}</td>
+                    <td class="name-col">{{ student.fullName }}</td>
+
+                    @for (index of txHeaderIndexes; track index) {
+                      <td class="tx-col">
+                        {{
+                          formatScore(scoreAt(getStudentGrade(student._id)?.txScores, index - 1))
+                        }}
+                      </td>
+                    }
+
+                    <td>-</td>
+
+                    @if (showThColumns) {
+                      @for (index of thHeaderIndexes; track index) {
+                        <td>
+                          {{
+                            formatScore(scoreAt(getStudentGrade(student._id)?.thScores, index - 1))
+                          }}
+                        </td>
+                      }
+                    } @else {
+                      <td>-</td>
+                    }
+
+                    <td>
+                      <span
+                        class="status-dot"
+                        [class.ok]="getStudentGrade(student._id)?.isDuThi !== false"
+                      >
+                        <lucide-icon
+                          [name]="getStudentGrade(student._id)?.isDuThi === false ? 'x' : 'check'"
+                          [size]="11"
+                        ></lucide-icon>
+                      </span>
+                    </td>
+
+                    <td>
+                      <span
+                        [class.score-danger]="
+                          scoreAt([getStudentGrade(student._id)?.tktScore ?? null], 0) === 4
+                        "
+                      >
+                        {{ formatScore(getStudentGrade(student._id)?.tktScore) }}
+                      </span>
+                    </td>
+
+                    <td>
+                      <span
+                        class="status-dot"
+                        [class.ok]="getStudentGrade(student._id)?.isVangThi === true"
+                      >
+                        <lucide-icon
+                          [name]="getStudentGrade(student._id)?.isVangThi ? 'check' : 'x'"
+                          [size]="11"
+                        ></lucide-icon>
+                      </span>
+                    </td>
+
+                    <td>{{ formatScore(getStudentGrade(student._id)?.finalScore) }}</td>
+                    <td>{{ formatScore(getStudentGrade(student._id)?.gpa4) }}</td>
+                    <td>{{ getStudentGrade(student._id)?.letterGrade || '-' }}</td>
+                    <td class="rank-col">
+                      {{ rankByLetter(getStudentGrade(student._id)?.letterGrade) }}
+                    </td>
+
+                    <td>
+                      <span class="status-dot" [class.ok]="isPassForStudent(student._id)">
+                        <lucide-icon
+                          [name]="isPassForStudent(student._id) ? 'check' : 'x'"
+                          [size]="11"
+                        ></lucide-icon>
+                      </span>
+                    </td>
+
+                    <td>
+                      <button
+                        type="button"
+                        class="action-btn"
+                        aria-label="Nhập điểm sinh viên"
+                        title="Nhập điểm sinh viên"
+                        (click)="selectStudent(student)"
+                      >
+                        <lucide-icon name="pencil" [size]="14"></lucide-icon>
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
             </table>
 
             <div class="table-summary" *ngIf="students.length > 0">
@@ -244,7 +347,7 @@ interface WeightDialogData {
         </ng-container>
       </mat-card>
 
-      <mat-card class="card-block">
+      <mat-card class="content-card card-block">
         <div class="step-title">
           <span class="step-index">Bước 3</span>
           <h2 class="section-title">Nhập điểm 1 sinh viên</h2>
@@ -267,60 +370,100 @@ interface WeightDialogData {
           </div>
 
           <form [formGroup]="gradeForm" class="entry-grid">
-            <section>
-              <h3>a. Điểm thường xuyên (TX)</h3>
-              <div formArrayName="txScores" class="score-grid">
-                <div *ngFor="let ctrl of txScoresArray.controls; index as i">
-                  <mat-form-field appearance="outline">
-                    <mat-label>TX{{ i + 1 }}</mat-label>
-                    <input matInput type="number" [formControlName]="i" min="0" max="10" />
-                  </mat-form-field>
-                </div>
-              </div>
+            <div class="score-sheet-wrap">
+              <table class="score-sheet score-sheet--entry">
+                <thead>
+                  <tr>
+                    @for (index of txHeaderIndexes; track index) {
+                      <th class="num-col">TX{{ index }}</th>
+                    }
+                    <th class="num-col">GK</th>
+                    @if (showThColumns) {
+                      @for (index of thHeaderIndexes; track index) {
+                        <th class="num-col">TH{{ index }}</th>
+                      }
+                    }
+                    <th class="num-col">TKT</th>
+                    <th class="group-col">Được dự thi HP</th>
+                    <th class="group-col">Vắng thi</th>
+                  </tr>
+                </thead>
+
+                <tbody>
+                  <tr>
+                    <ng-container formArrayName="txScores">
+                      @for (ctrl of txScoresArray.controls; track $index; let i = $index) {
+                        <td>
+                          <input
+                            class="score-edit-input"
+                            type="number"
+                            [formControlName]="i"
+                            min="0"
+                            max="10"
+                          />
+                        </td>
+                      }
+                    </ng-container>
+
+                    <td>
+                      <input
+                        class="score-edit-input"
+                        type="number"
+                        formControlName="gkScore"
+                        min="0"
+                        max="10"
+                      />
+                    </td>
+
+                    @if (showThColumns) {
+                      <ng-container formArrayName="thScores">
+                        @for (ctrl of thScoresArray.controls; track $index; let i = $index) {
+                          <td>
+                            <input
+                              class="score-edit-input"
+                              type="number"
+                              [formControlName]="i"
+                              min="0"
+                              max="10"
+                            />
+                          </td>
+                        }
+                      </ng-container>
+                    }
+
+                    <td>
+                      <input
+                        class="score-edit-input"
+                        type="number"
+                        formControlName="tktScore"
+                        min="0"
+                        max="10"
+                      />
+                    </td>
+
+                    <td>
+                      <mat-checkbox formControlName="isDuThi"></mat-checkbox>
+                    </td>
+
+                    <td>
+                      <mat-checkbox formControlName="isVangThi" (change)="onVangThiChanged()">
+                      </mat-checkbox>
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
+            </div>
+
+            <div class="entry-hints">
               <p class="avg-text">Trung bình TX: {{ txAverage | number: '1.2-2' }}</p>
-            </section>
+              @if (showThColumns) {
+                <p class="avg-text">Trung bình TH: {{ thAverage | number: '1.2-2' }}</p>
+              }
 
-            <section>
-              <h3>b. Điểm giữa kỳ (GK)</h3>
-              <mat-form-field appearance="outline" class="single-field">
-                <mat-label>GK</mat-label>
-                <input matInput type="number" formControlName="gkScore" min="0" max="10" />
-              </mat-form-field>
-            </section>
-
-            <section *ngIf="currentWeights.th > 0">
-              <h3>c. Điểm thực hành (TH)</h3>
-              <div formArrayName="thScores" class="score-grid">
-                <div *ngFor="let ctrl of thScoresArray.controls; index as i">
-                  <mat-form-field appearance="outline">
-                    <mat-label>TH{{ i + 1 }}</mat-label>
-                    <input matInput type="number" [formControlName]="i" min="0" max="10" />
-                  </mat-form-field>
-                </div>
-              </div>
-              <p class="avg-text">Trung bình TH: {{ thAverage | number: '1.2-2' }}</p>
-            </section>
-
-            <section>
-              <h3>d. Điểm thi kết thúc học phần (TKT)</h3>
-              <mat-form-field appearance="outline" class="single-field">
-                <mat-label>TKT</mat-label>
-                <input matInput type="number" formControlName="tktScore" min="0" max="10" />
-              </mat-form-field>
               <p class="hint" *ngIf="gradeForm.controls.isVangThi.value">
                 Sinh viên đang ở trạng thái vắng thi, ô TKT đã khóa.
               </p>
-            </section>
-
-            <section>
-              <h3>e. Trạng thái dự thi</h3>
-              <div class="check-row">
-                <mat-checkbox formControlName="isDuThi">Được dự thi HP</mat-checkbox>
-                <mat-checkbox formControlName="isVangThi" (change)="onVangThiChanged()">
-                  Vắng thi
-                </mat-checkbox>
-              </div>
-            </section>
+            </div>
           </form>
 
           <div class="preview-box">
@@ -412,6 +555,10 @@ interface WeightDialogData {
         padding: 1rem 1.1rem 1.1rem;
       }
 
+      .card-block--table {
+        padding-inline: 0.6rem;
+      }
+
       .step-title {
         display: flex;
         align-items: center;
@@ -470,10 +617,13 @@ interface WeightDialogData {
       }
 
       .state-block {
-        display: inline-flex;
-        align-items: center;
+        min-height: 180px;
+        display: grid;
+        place-content: center;
+        justify-items: center;
         gap: 0.65rem;
         color: var(--text-sub);
+        text-align: center;
       }
 
       .state-block.error {
@@ -645,8 +795,6 @@ export class GradeEntryComponent implements OnInit {
   private readonly dialog = inject(MatDialog);
   private readonly destroyRef = inject(DestroyRef);
 
-  readonly studentColumns: string[] = ['studentCode', 'fullName', 'status', 'actions'];
-
   readonly selectionForm = this.fb.group({
     schoolYearId: this.fb.control<string>('', {
       nonNullable: true,
@@ -705,6 +853,19 @@ export class GradeEntryComponent implements OnInit {
 
   get thAverage(): number {
     return this.meanScore(this.thScoresArray.getRawValue());
+  }
+
+  get txHeaderIndexes(): number[] {
+    const txCount = Math.max(1, this.selectedClass?.txCount || 3);
+    return Array.from({ length: txCount }, (_, index) => index + 1);
+  }
+
+  get thHeaderIndexes(): number[] {
+    return [1, 2, 3];
+  }
+
+  get showThColumns(): boolean {
+    return this.currentWeights.th > 0;
   }
 
   get preview(): GradePreview {
@@ -849,7 +1010,8 @@ export class GradeEntryComponent implements OnInit {
 
   openWeightDialog(): void {
     const dialogRef = this.dialog.open(GradeWeightDialogComponent, {
-      width: '420px',
+      width: '640px',
+      maxWidth: '94vw',
       data: {
         weights: this.currentWeights,
       } satisfies WeightDialogData,
@@ -1053,6 +1215,66 @@ export class GradeEntryComponent implements OnInit {
     }
 
     return Number(subject.credits || 0);
+  }
+
+  getStudentGrade(studentId: string): Grade | null {
+    return this.findStudentGrade(studentId);
+  }
+
+  scoreAt(values: Array<number | null> | undefined, index: number): number | null {
+    if (!Array.isArray(values) || index < 0 || index >= values.length) {
+      return null;
+    }
+
+    const value = values[index];
+    if (value === null || value === undefined) {
+      return null;
+    }
+
+    const numeric = Number(value);
+    return Number.isNaN(numeric) ? null : numeric;
+  }
+
+  formatScore(value: number | null | undefined): string {
+    if (value === null || value === undefined) {
+      return '';
+    }
+
+    const numeric = Number(value);
+    if (Number.isNaN(numeric)) {
+      return '';
+    }
+
+    return numeric.toFixed(2).replace('.', ',');
+  }
+
+  rankByLetter(letter: GradeLetter | null | undefined): string {
+    if (letter === 'A') {
+      return 'Giỏi';
+    }
+
+    if (letter === 'B') {
+      return 'Khá';
+    }
+
+    if (letter === 'C') {
+      return 'Trung bình';
+    }
+
+    if (letter === 'F') {
+      return 'Yếu';
+    }
+
+    return '-';
+  }
+
+  isPassForStudent(studentId: string): boolean {
+    const grade = this.findStudentGrade(studentId);
+    if (!grade) {
+      return false;
+    }
+
+    return this.isPassGrade(grade);
   }
 
   private loadMasterData(): void {

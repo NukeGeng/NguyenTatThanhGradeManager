@@ -182,6 +182,15 @@
 - Fix: Thay sang animation cuộn thủ công bằng `requestAnimationFrame` + easing (`easeInOutCubic`), tự tính vị trí trừ offset navbar sticky để luôn mượt và đúng điểm dừng.
 - Trạng thái: ✅ Đã fix
 
+## [BUG-019] Lỗi Lucide icon `table` chưa được cung cấp
+
+- Ngày: 07/04/2026
+- File/Vị trí: frontend/src/app/features/grades/grade-entry/grade-entry.component.ts, frontend/src/app/app.config.ts
+- Mô tả: Runtime ném lỗi ở GlobalErrorHandler: `The "table" icon has not been provided by any available icon providers` khi mở trang nhập điểm.
+- Nguyên nhân: Template dùng `<lucide-icon name="table">` nhưng icon `Table` chưa được đăng ký trong `LucideAngularModule.pick(...)` tại app config.
+- Fix: Import và thêm `Table` vào danh sách icon provider trong `frontend/src/app/app.config.ts`.
+- Trạng thái: ✅ Đã fix
+
 ---
 
 ## TEMPLATE THÊM BUG MỚI
