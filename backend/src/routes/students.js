@@ -6,18 +6,36 @@ const Class = require("../models/Class");
 
 const router = express.Router();
 
+const getAdvisingStudentIds = (user) =>
+  (user.advisingStudentIds || []).map((item) =>
+    item?._id ? String(item._id) : String(item),
+  );
+
 router.use(auth);
 
 const generateStudentCode = async () => {
-  const lastStudent = await Student.findOne({ studentCode: /^HS\d{4,}$/ })
-    .sort({ studentCode: -1 })
+  const latestStudents = await Student.find({
+    studentCode: { $exists: true, $ne: null },
+  })
+    .sort({ createdAt: -1 })
+    .limit(500)
     .select("studentCode");
 
-  const lastNumber = lastStudent
-    ? Number(lastStudent.studentCode.replace(/^HS/, ""))
-    : 0;
+  let maxNumber = 0;
 
-  return `HS${String(lastNumber + 1).padStart(4, "0")}`;
+  latestStudents.forEach((student) => {
+    const digits = String(student.studentCode || "").replace(/\D/g, "");
+    if (!digits) {
+      return;
+    }
+
+    const numeric = Number(digits);
+    if (!Number.isNaN(numeric) && numeric > maxNumber) {
+      maxNumber = numeric;
+    }
+  });
+
+  return String(maxNumber + 1).padStart(10, "0");
 };
 
 router.get("/", async (req, res, next) => {
@@ -25,7 +43,9 @@ router.get("/", async (req, res, next) => {
     const { classId, status } = req.query;
     const query = {};
 
-    if (req.user.role !== "admin") {
+    if (req.user.role === "advisor") {
+      query._id = { $in: getAdvisingStudentIds(req.user) };
+    } else if (req.user.role !== "admin") {
       const classes = await Class.find({
         departmentId: {
           $in: (req.user.departmentIds || []).map((item) =>
@@ -73,7 +93,15 @@ router.get("/:id", async (req, res, next) => {
       });
     }
 
-    if (req.user.role !== "admin") {
+    if (req.user.role === "advisor") {
+      const advisingStudentIds = getAdvisingStudentIds(req.user);
+      if (!advisingStudentIds.includes(String(student._id))) {
+        return res.status(403).json({
+          success: false,
+          message: "Bạn không có quyền truy cập học sinh này",
+        });
+      }
+    } else if (req.user.role !== "admin") {
       const allowedDepartmentIds = (req.user.departmentIds || []).map((item) =>
         item?._id ? String(item._id) : String(item),
       );
@@ -102,6 +130,13 @@ router.post("/", async (req, res, next) => {
   const session = await mongoose.startSession();
 
   try {
+    if (req.user.role === "advisor") {
+      return res.status(403).json({
+        success: false,
+        message: "Advisor không có quyền tạo học sinh",
+      });
+    }
+
     const { fullName, dateOfBirth, gender, classId, parentPhone, status } =
       req.body;
 
@@ -185,6 +220,13 @@ router.put("/:id", async (req, res, next) => {
   const session = await mongoose.startSession();
 
   try {
+    if (req.user.role === "advisor") {
+      return res.status(403).json({
+        success: false,
+        message: "Advisor không có quyền cập nhật học sinh",
+      });
+    }
+
     const allowedFields = [
       "fullName",
       "dateOfBirth",
@@ -310,6 +352,13 @@ router.delete("/:id", async (req, res, next) => {
   const session = await mongoose.startSession();
 
   try {
+    if (req.user.role === "advisor") {
+      return res.status(403).json({
+        success: false,
+        message: "Advisor không có quyền xóa học sinh",
+      });
+    }
+
     await session.withTransaction(async () => {
       const student = await Student.findById(req.params.id).session(session);
 

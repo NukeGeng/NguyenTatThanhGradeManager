@@ -116,8 +116,9 @@ interface PredictClassResponse {
                 <mat-label>Học kỳ</mat-label>
                 <mat-select formControlName="semester" (selectionChange)="onFilterChange()">
                   <mat-option [value]="null">Chọn học kỳ</mat-option>
-                  <mat-option [value]="1">Học kỳ 1</mat-option>
-                  <mat-option [value]="2">Học kỳ 2</mat-option>
+                  <mat-option [value]="1">Học kỳ 1 (T9-T12)</mat-option>
+                  <mat-option [value]="2">Học kỳ 2 (T1-T4)</mat-option>
+                  <mat-option [value]="3">Học kỳ 3 - Hè (T5-T8)</mat-option>
                 </mat-select>
               </mat-form-field>
 
@@ -499,7 +500,7 @@ export class GradeImportComponent implements OnInit {
       nonNullable: true,
       validators: [Validators.required],
     }),
-    semester: this.fb.control<1 | 2 | null>(null, { validators: [Validators.required] }),
+    semester: this.fb.control<1 | 2 | 3 | null>(null, { validators: [Validators.required] }),
     classId: this.fb.control<string>('', { nonNullable: true, validators: [Validators.required] }),
   });
 

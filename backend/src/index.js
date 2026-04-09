@@ -1,6 +1,7 @@
 const express = require("express");
 const cors = require("cors");
 const dotenv = require("dotenv");
+const http = require("http");
 
 const connectDatabase = require("./config/database");
 const authRoutes = require("./routes/auth");
@@ -12,12 +13,20 @@ const classRoutes = require("./routes/classes");
 const gradeRoutes = require("./routes/grades");
 const studentRoutes = require("./routes/students");
 const predictionRoutes = require("./routes/predictions");
+const majorRoutes = require("./routes/majors");
+const curriculumRoutes = require("./routes/curricula");
+const studentCurriculumRoutes = require("./routes/studentCurricula");
+const messageRoutes = require("./routes/messages");
+const setupSocket = require("./socket");
 const errorHandler = require("./middleware/errorHandler");
 
 dotenv.config();
 
 const app = express();
+const httpServer = http.createServer(app);
 const PORT = process.env.PORT || 3000;
+
+setupSocket(httpServer);
 
 app.use(cors());
 app.use(express.json());
@@ -38,6 +47,10 @@ app.use("/api/classes", classRoutes);
 app.use("/api/grades", gradeRoutes);
 app.use("/api/students", studentRoutes);
 app.use("/api/predictions", predictionRoutes);
+app.use("/api/majors", majorRoutes);
+app.use("/api/curricula", curriculumRoutes);
+app.use("/api/student-curricula", studentCurriculumRoutes);
+app.use("/api/messages", messageRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
@@ -51,7 +64,7 @@ app.use(errorHandler);
 const startServer = async () => {
   await connectDatabase();
 
-  app.listen(PORT, () => {
+  httpServer.listen(PORT, () => {
     console.log(`Server is running on port ${PORT}`);
   });
 };

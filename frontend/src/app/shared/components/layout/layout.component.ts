@@ -9,14 +9,15 @@ import { filter, map } from 'rxjs';
 
 import { AuthService } from '../../../core/services/auth.service';
 import { ApiService } from '../../../core/services/api.service';
-import { ApiResponse, Prediction, User } from '../../models/interfaces';
+import { ApiResponse, Prediction, User, UserRole } from '../../models/interfaces';
 
 interface LayoutNavItem {
   label: string;
   path: string;
   icon: string;
-  adminOnly?: boolean;
+  allowedRoles?: UserRole[];
   showAlertBadge?: boolean;
+  showMessageBadge?: boolean;
 }
 
 @Component({
@@ -61,6 +62,13 @@ interface LayoutNavItem {
             <a routerLink="/news" class="top-link">Tin tức</a>
           </nav>
 
+          <a routerLink="/chat" class="chat-bell" aria-label="Tin nhan">
+            <lucide-icon name="message-circle" [size]="16"></lucide-icon>
+            @if (unreadMessageCount > 0) {
+              <span class="chat-badge">{{ unreadMessageCount }}</span>
+            }
+          </a>
+
           <details class="user-menu">
             <summary class="user-trigger">
               <span class="avatar">{{ userInitials }}</span>
@@ -72,6 +80,11 @@ interface LayoutNavItem {
             </summary>
 
             <div class="dropdown-menu">
+              <button type="button" class="dropdown-item" (click)="openProfile()">
+                <lucide-icon name="user" [size]="15"></lucide-icon>
+                Thông tin giảng viên
+              </button>
+
               <button type="button" class="dropdown-item" (click)="logout()">
                 <lucide-icon name="log-out" [size]="15"></lucide-icon>
                 Đăng xuất
@@ -86,7 +99,7 @@ interface LayoutNavItem {
           <nav class="menu-list">
             <p class="section-label">TỔNG QUAN</p>
             @for (item of visibleNavItems; track item.path) {
-              @if (item.path === '/dashboard' || item.path === '/news') {
+              @if (item.path === '/dashboard' || item.path === '/news' || item.path === '/chat') {
                 <a
                   [routerLink]="item.path"
                   routerLinkActive="active"
@@ -107,7 +120,8 @@ interface LayoutNavItem {
                 item.path === '/classes' ||
                 item.path === '/students' ||
                 item.path === '/grades' ||
-                item.path === '/predictions'
+                item.path === '/predictions' ||
+                item.path === '/advisor/students'
               ) {
                 <a
                   [routerLink]="item.path"
@@ -123,6 +137,10 @@ interface LayoutNavItem {
                   @if (item.showAlertBadge && highRiskCount > 0) {
                     <span class="alert-badge">{{ highRiskCount }}</span>
                   }
+
+                  @if (item.showMessageBadge && unreadMessageCount > 0) {
+                    <span class="alert-badge">{{ unreadMessageCount }}</span>
+                  }
                 </a>
               }
             }
@@ -133,7 +151,9 @@ interface LayoutNavItem {
                 @if (
                   item.path === '/departments' ||
                   item.path === '/users' ||
-                  item.path === '/subjects'
+                  item.path === '/subjects' ||
+                  item.path === '/majors' ||
+                  item.path === '/curricula'
                 ) {
                   <a
                     [routerLink]="item.path"
@@ -256,6 +276,36 @@ interface LayoutNavItem {
         display: flex;
         align-items: center;
         gap: 0.95rem;
+      }
+
+      .chat-bell {
+        width: 34px;
+        height: 34px;
+        border-radius: 50%;
+        border: 1px solid var(--gray-200);
+        color: var(--navy);
+        text-decoration: none;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        position: relative;
+      }
+
+      .chat-badge {
+        position: absolute;
+        top: -6px;
+        right: -6px;
+        min-width: 1rem;
+        height: 1rem;
+        border-radius: 999px;
+        background: #dc2626;
+        color: #fff;
+        font-size: 0.62rem;
+        font-weight: 700;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding-inline: 0.2rem;
       }
 
       .top-links {
@@ -547,20 +597,51 @@ export class LayoutComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
   readonly navItems: LayoutNavItem[] = [
-    { label: 'Dashboard', path: '/dashboard', icon: 'trending-up' },
-    { label: 'Tin tức', path: '/news', icon: 'newspaper' },
-    { label: 'Lớp học', path: '/classes', icon: 'school' },
-    { label: 'Học sinh', path: '/students', icon: 'users' },
-    { label: 'Nhập điểm', path: '/grades', icon: 'book-open-check' },
+    {
+      label: 'Dashboard',
+      path: '/dashboard',
+      icon: 'trending-up',
+      allowedRoles: ['admin', 'teacher', 'advisor'],
+    },
+    {
+      label: 'Tin tức',
+      path: '/news',
+      icon: 'newspaper',
+      allowedRoles: ['admin', 'teacher', 'advisor'],
+    },
+    {
+      label: 'Tin nhắn',
+      path: '/chat',
+      icon: 'message-circle',
+      allowedRoles: ['admin', 'teacher', 'advisor'],
+      showMessageBadge: true,
+    },
+    { label: 'Lớp học', path: '/classes', icon: 'school', allowedRoles: ['admin', 'teacher'] },
+    { label: 'Học sinh', path: '/students', icon: 'users', allowedRoles: ['admin', 'teacher'] },
+    {
+      label: 'Nhập điểm',
+      path: '/grades',
+      icon: 'book-open-check',
+      allowedRoles: ['admin', 'teacher'],
+    },
+    {
+      label: 'Sinh viên của tôi',
+      path: '/advisor/students',
+      icon: 'graduation-cap',
+      allowedRoles: ['admin', 'advisor'],
+    },
     {
       label: 'Dự đoán AI',
       path: '/predictions',
       icon: 'chart-column-increasing',
+      allowedRoles: ['admin', 'teacher'],
       showAlertBadge: true,
     },
-    { label: 'Khoa', path: '/departments', icon: 'building-2', adminOnly: true },
-    { label: 'Giáo viên', path: '/users', icon: 'user-check', adminOnly: true },
-    { label: 'Môn học', path: '/subjects', icon: 'layers', adminOnly: true },
+    { label: 'Khoa', path: '/departments', icon: 'building-2', allowedRoles: ['admin'] },
+    { label: 'Giáo viên', path: '/users', icon: 'user-check', allowedRoles: ['admin'] },
+    { label: 'Môn học', path: '/subjects', icon: 'layers', allowedRoles: ['admin'] },
+    { label: 'Ngành', path: '/majors', icon: 'graduation-cap', allowedRoles: ['admin'] },
+    { label: 'CTĐT', path: '/curricula', icon: 'workflow', allowedRoles: ['admin'] },
   ];
 
   sidebarOpened = false;
@@ -568,10 +649,15 @@ export class LayoutComponent implements OnInit {
   currentUserName = 'Người dùng';
   currentUserRoleLabel = 'Giáo viên';
   highRiskCount = 0;
+  unreadMessageCount = 0;
 
   get visibleNavItems(): LayoutNavItem[] {
     const role = this.authService.getCurrentRole();
-    return this.navItems.filter((item) => !item.adminOnly || role === 'admin');
+    if (!role) {
+      return [];
+    }
+
+    return this.navItems.filter((item) => !item.allowedRoles || item.allowedRoles.includes(role));
   }
 
   get userInitials(): string {
@@ -594,6 +680,7 @@ export class LayoutComponent implements OnInit {
   ngOnInit(): void {
     this.loadCurrentUser();
     this.loadHighRiskCount();
+    this.loadUnreadMessageCount();
 
     this.router.events
       .pipe(
@@ -603,6 +690,7 @@ export class LayoutComponent implements OnInit {
       .subscribe(() => {
         this.onMenuClick();
         this.loadHighRiskCount();
+        this.loadUnreadMessageCount();
       });
   }
 
@@ -619,6 +707,10 @@ export class LayoutComponent implements OnInit {
     this.router.navigate(['/login']);
   }
 
+  openProfile(): void {
+    this.router.navigate(['/profile']);
+  }
+
   private loadCurrentUser(): void {
     this.authService
       .getCurrentUser()
@@ -632,14 +724,30 @@ export class LayoutComponent implements OnInit {
         },
         error: () => {
           const role = this.authService.getCurrentRole();
-          this.currentUserRoleLabel = role === 'admin' ? 'Quản trị viên' : 'Giáo viên';
+          if (role === 'admin') {
+            this.currentUserRoleLabel = 'Quản trị viên';
+          } else if (role === 'advisor') {
+            this.currentUserRoleLabel = 'Cố vấn học tập';
+          } else {
+            this.currentUserRoleLabel = 'Giáo viên';
+          }
         },
       });
   }
 
   private applyCurrentUser(user: User): void {
     this.currentUserName = user.name?.trim() || 'Người dùng';
-    this.currentUserRoleLabel = user.role === 'admin' ? 'Quản trị viên' : 'Giáo viên';
+    if (user.role === 'admin') {
+      this.currentUserRoleLabel = 'Quản trị viên';
+      return;
+    }
+
+    if (user.role === 'advisor') {
+      this.currentUserRoleLabel = 'Cố vấn học tập';
+      return;
+    }
+
+    this.currentUserRoleLabel = 'Giáo viên';
   }
 
   private loadHighRiskCount(): void {
@@ -655,6 +763,23 @@ export class LayoutComponent implements OnInit {
         },
         error: () => {
           this.highRiskCount = 0;
+        },
+      });
+  }
+
+  private loadUnreadMessageCount(): void {
+    this.apiService
+      .get<ApiResponse<{ unreadCount: number }>>('/messages/unread-count')
+      .pipe(
+        map((response) => Number(response.data?.unreadCount || 0)),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (count) => {
+          this.unreadMessageCount = count;
+        },
+        error: () => {
+          this.unreadMessageCount = 0;
         },
       });
   }

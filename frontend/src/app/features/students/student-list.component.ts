@@ -19,6 +19,7 @@ import { finalize, forkJoin, map } from 'rxjs';
 
 import { ApiService } from '../../core/services/api.service';
 import { ApiResponse, Class, Student, StudentStatus } from '../../shared/models/interfaces';
+import { toTenDigitStudentCode } from '../../shared/utils/code-format.util';
 
 @Component({
   selector: 'app-student-list',
@@ -110,7 +111,7 @@ import { ApiResponse, Class, Student, StudentStatus } from '../../shared/models/
             <table mat-table [dataSource]="dataSource" matSort class="full-table nttu-table">
               <ng-container matColumnDef="studentCode">
                 <th mat-header-cell *matHeaderCellDef mat-sort-header>Mã HS</th>
-                <td mat-cell *matCellDef="let row">{{ row.studentCode }}</td>
+                <td mat-cell *matCellDef="let row">{{ formatStudentCode(row) }}</td>
               </ng-container>
 
               <ng-container matColumnDef="fullName">
@@ -369,9 +370,12 @@ export class StudentListComponent implements OnInit, AfterViewInit {
 
   applyFilters(): void {
     const normalizedKeyword = this.searchText.trim().toLowerCase();
+    const codeKeyword = normalizedKeyword.replace(/\D/g, '');
 
     const filtered = this.students.filter((student) => {
       const matchName = student.fullName.toLowerCase().includes(normalizedKeyword);
+      const matchCode =
+        codeKeyword.length > 0 && this.formatStudentCode(student).includes(codeKeyword);
 
       const classId = this.resolveClassId(student.classId);
       const matchClass = this.selectedClassId === 'all' || classId === this.selectedClassId;
@@ -379,7 +383,9 @@ export class StudentListComponent implements OnInit, AfterViewInit {
       const status = student.status ?? 'active';
       const matchStatus = this.selectedStatus === 'all' || status === this.selectedStatus;
 
-      return matchName && matchClass && matchStatus;
+      return (
+        (matchName || matchCode || normalizedKeyword.length === 0) && matchClass && matchStatus
+      );
     });
 
     this.dataSource.data = filtered;
@@ -452,6 +458,10 @@ export class StudentListComponent implements OnInit, AfterViewInit {
     }
 
     return 'Đang học';
+  }
+
+  formatStudentCode(student: Student): string {
+    return toTenDigitStudentCode(student.studentCode, student._id);
   }
 
   private resolveClassId(value: Student['classId']): string {

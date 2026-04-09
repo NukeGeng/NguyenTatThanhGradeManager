@@ -4,6 +4,7 @@ const auth = require("../middleware/auth");
 const adminOnly = require("../middleware/adminOnly");
 const User = require("../models/User");
 const Department = require("../models/Department");
+const Student = require("../models/Student");
 
 const router = express.Router();
 
@@ -11,7 +12,7 @@ router.use(auth, adminOnly);
 
 router.get("/", async (req, res, next) => {
   try {
-    const query = { role: "teacher" };
+    const query = { role: { $in: ["teacher", "advisor"] } };
 
     if (req.query.departmentId) {
       query.departmentIds = req.query.departmentId;
@@ -20,6 +21,7 @@ router.get("/", async (req, res, next) => {
     const users = await User.find(query)
       .select("-password")
       .populate("departmentIds", "_id code name")
+      .populate("advisingStudentIds", "_id studentCode fullName")
       .sort({ createdAt: -1 });
 
     return res.status(200).json({
@@ -36,7 +38,8 @@ router.get("/:id", async (req, res, next) => {
   try {
     const user = await User.findById(req.params.id)
       .select("-password")
-      .populate("departmentIds", "_id code name");
+      .populate("departmentIds", "_id code name")
+      .populate("advisingStudentIds", "_id studentCode fullName");
 
     if (!user) {
       return res.status(404).json({
@@ -63,6 +66,7 @@ router.post("/", async (req, res, next) => {
       password,
       role = "teacher",
       departmentIds = [],
+      advisingStudentIds = [],
     } = req.body;
 
     if (!name || !email || !password) {
@@ -72,12 +76,17 @@ router.post("/", async (req, res, next) => {
       });
     }
 
-    const normalizedRole = role === "admin" ? "admin" : "teacher";
+    const normalizedRole = ["admin", "teacher", "advisor"].includes(role)
+      ? role
+      : "teacher";
 
-    if (normalizedRole === "teacher" && departmentIds.length === 0) {
+    if (
+      (normalizedRole === "teacher" || normalizedRole === "advisor") &&
+      departmentIds.length === 0
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Teacher must belong to at least one department",
+        message: "Teacher/Advisor must belong to at least one department",
       });
     }
 
@@ -90,6 +99,19 @@ router.post("/", async (req, res, next) => {
         return res.status(400).json({
           success: false,
           message: "Some departmentIds are invalid",
+        });
+      }
+    }
+
+    if (normalizedRole === "advisor" && advisingStudentIds.length > 0) {
+      const studentCount = await Student.countDocuments({
+        _id: { $in: advisingStudentIds },
+      });
+
+      if (studentCount !== advisingStudentIds.length) {
+        return res.status(400).json({
+          success: false,
+          message: "Some advisingStudentIds are invalid",
         });
       }
     }
@@ -112,11 +134,14 @@ router.post("/", async (req, res, next) => {
       password: hashedPassword,
       role: normalizedRole,
       departmentIds: normalizedRole === "admin" ? [] : departmentIds,
+      advisingStudentIds:
+        normalizedRole === "advisor" ? advisingStudentIds : [],
     });
 
     const populated = await User.findById(user._id)
       .select("-password")
-      .populate("departmentIds", "_id code name");
+      .populate("departmentIds", "_id code name")
+      .populate("advisingStudentIds", "_id studentCode fullName");
 
     return res.status(201).json({
       success: true,
@@ -131,7 +156,15 @@ router.post("/", async (req, res, next) => {
 router.put("/:id", async (req, res, next) => {
   try {
     const payload = {};
-    const allowedFields = ["name", "email", "phone", "avatar"];
+    const allowedFields = [
+      "name",
+      "email",
+      "phone",
+      "avatar",
+      "role",
+      "departmentIds",
+      "advisingStudentIds",
+    ];
 
     allowedFields.forEach((field) => {
       if (req.body[field] !== undefined) {
@@ -143,12 +176,66 @@ router.put("/:id", async (req, res, next) => {
     if (payload.email !== undefined)
       payload.email = String(payload.email).toLowerCase().trim();
 
+    if (payload.role !== undefined) {
+      if (!["admin", "teacher", "advisor"].includes(payload.role)) {
+        return res.status(400).json({
+          success: false,
+          message: "Role không hợp lệ",
+        });
+      }
+    }
+
+    if (payload.departmentIds !== undefined) {
+      if (!Array.isArray(payload.departmentIds)) {
+        return res.status(400).json({
+          success: false,
+          message: "departmentIds must be an array",
+        });
+      }
+
+      if (payload.departmentIds.length > 0) {
+        const departmentCount = await Department.countDocuments({
+          _id: { $in: payload.departmentIds },
+        });
+
+        if (departmentCount !== payload.departmentIds.length) {
+          return res.status(400).json({
+            success: false,
+            message: "Some departmentIds are invalid",
+          });
+        }
+      }
+    }
+
+    if (payload.advisingStudentIds !== undefined) {
+      if (!Array.isArray(payload.advisingStudentIds)) {
+        return res.status(400).json({
+          success: false,
+          message: "advisingStudentIds must be an array",
+        });
+      }
+
+      if (payload.advisingStudentIds.length > 0) {
+        const studentCount = await Student.countDocuments({
+          _id: { $in: payload.advisingStudentIds },
+        });
+
+        if (studentCount !== payload.advisingStudentIds.length) {
+          return res.status(400).json({
+            success: false,
+            message: "Some advisingStudentIds are invalid",
+          });
+        }
+      }
+    }
+
     const user = await User.findByIdAndUpdate(req.params.id, payload, {
       new: true,
       runValidators: true,
     })
       .select("-password")
-      .populate("departmentIds", "_id code name");
+      .populate("departmentIds", "_id code name")
+      .populate("advisingStudentIds", "_id studentCode fullName");
 
     if (!user) {
       return res.status(404).json({
@@ -179,10 +266,10 @@ router.patch("/:id/departments", async (req, res, next) => {
       });
     }
 
-    if (user.role !== "teacher") {
+    if (user.role === "admin") {
       return res.status(400).json({
         success: false,
-        message: "Only teacher can update departmentIds",
+        message: "Admin không cập nhật departmentIds qua endpoint này",
       });
     }
 
@@ -199,7 +286,7 @@ router.patch("/:id/departments", async (req, res, next) => {
     if (departmentIds.length === 0) {
       return res.status(400).json({
         success: false,
-        message: "Teacher must belong to at least one department",
+        message: "Teacher/Advisor must belong to at least one department",
       });
     }
 
@@ -208,12 +295,70 @@ router.patch("/:id/departments", async (req, res, next) => {
 
     const populated = await User.findById(user._id)
       .select("-password")
-      .populate("departmentIds", "_id code name");
+      .populate("departmentIds", "_id code name")
+      .populate("advisingStudentIds", "_id studentCode fullName");
 
     return res.status(200).json({
       success: true,
       data: populated,
       message: "Update departments successfully",
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.patch("/:id/advising-students", async (req, res, next) => {
+  try {
+    const { advisingStudentIds = [] } = req.body;
+
+    if (!Array.isArray(advisingStudentIds)) {
+      return res.status(400).json({
+        success: false,
+        message: "advisingStudentIds must be an array",
+      });
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    if (user.role !== "advisor") {
+      return res.status(400).json({
+        success: false,
+        message: "Only advisor can update advising students",
+      });
+    }
+
+    if (advisingStudentIds.length > 0) {
+      const studentCount = await Student.countDocuments({
+        _id: { $in: advisingStudentIds },
+      });
+
+      if (studentCount !== advisingStudentIds.length) {
+        return res.status(400).json({
+          success: false,
+          message: "Some advisingStudentIds are invalid",
+        });
+      }
+    }
+
+    user.advisingStudentIds = advisingStudentIds;
+    await user.save();
+
+    const populated = await User.findById(user._id)
+      .select("-password")
+      .populate("departmentIds", "_id code name")
+      .populate("advisingStudentIds", "_id studentCode fullName");
+
+    return res.status(200).json({
+      success: true,
+      data: populated,
+      message: "Update advising students successfully",
     });
   } catch (error) {
     return next(error);

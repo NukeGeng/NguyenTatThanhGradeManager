@@ -8,10 +8,12 @@ const SchoolYear = require("../models/SchoolYear");
 const Class = require("../models/Class");
 const Student = require("../models/Student");
 const Grade = require("../models/Grade");
+const Major = require("../models/Major");
+const Curriculum = require("../models/Curriculum");
 
 dotenv.config();
 
-const buildStudents = (classes) => {
+const buildStudents = (classes, majorByDepartmentCode) => {
   const names = [
     "Nguyễn Văn An",
     "Trần Thị Bình",
@@ -47,10 +49,15 @@ const buildStudents = (classes) => {
 
   return names.map((fullName, index) => {
     const classRef = classes[index % classes.length];
+    const departmentCode = classRef?.departmentCode || "";
+    const majorRef = majorByDepartmentCode.get(departmentCode) || null;
+
     return {
       studentCode: `HS${String(index + 1).padStart(4, "0")}`,
       fullName,
       classId: classRef._id,
+      majorId: majorRef?._id || null,
+      enrolledYear: "2021",
       gender: index % 2 === 0 ? "male" : "female",
       status: "active",
       parentPhone: `09${String(10000000 + index)}`,
@@ -81,6 +88,29 @@ const seed = async () => {
     departmentDocs.map((item) => [item.code, item]),
   );
 
+  const majorSeeds = [
+    {
+      code: "KTPM",
+      name: "Kỹ thuật phần mềm",
+      departmentId: departmentMap.get("CNTT")?._id,
+      totalCredits: 140,
+      durationYears: 4,
+      isActive: true,
+    },
+    {
+      code: "HTTT",
+      name: "Hệ thống thông tin",
+      departmentId: departmentMap.get("CNTT")?._id,
+      totalCredits: 138,
+      durationYears: 4,
+      isActive: true,
+    },
+  ].filter((item) => item.departmentId);
+
+  await Major.insertMany(majorSeeds, { ordered: false }).catch(() => {});
+  const majorDocs = await Major.find({ code: { $in: ["KTPM", "HTTT"] } });
+  const majorMap = new Map(majorDocs.map((item) => [item.code, item]));
+
   const subjectSeeds = [
     {
       code: "ltcb",
@@ -89,6 +119,16 @@ const seed = async () => {
       semester: 1,
       credits: 3,
       coefficient: 2,
+      defaultWeights: { tx: 10, gk: 30, th: 0, tkt: 60 },
+      txCount: 3,
+    },
+    {
+      code: "tthcm",
+      name: "Tư tưởng Hồ Chí Minh",
+      departmentCode: "CNTT",
+      semester: 1,
+      credits: 2,
+      coefficient: 1,
       defaultWeights: { tx: 10, gk: 30, th: 0, tkt: 60 },
       txCount: 3,
     },
@@ -120,6 +160,56 @@ const seed = async () => {
       credits: 3,
       coefficient: 2,
       defaultWeights: { tx: 10, gk: 20, th: 30, tkt: 40 },
+      txCount: 3,
+    },
+    {
+      code: "ctdlgt",
+      name: "Cấu trúc dữ liệu và giải thuật",
+      departmentCode: "CNTT",
+      semester: 2,
+      credits: 3,
+      coefficient: 2,
+      defaultWeights: { tx: 10, gk: 30, th: 0, tkt: 60 },
+      txCount: 3,
+    },
+    {
+      code: "hdh",
+      name: "Hệ điều hành",
+      departmentCode: "CNTT",
+      semester: 3,
+      credits: 3,
+      coefficient: 2,
+      defaultWeights: { tx: 10, gk: 30, th: 0, tkt: 60 },
+      txCount: 3,
+    },
+    {
+      code: "cnpm",
+      name: "Công nghệ phần mềm",
+      departmentCode: "CNTT",
+      semester: 3,
+      credits: 3,
+      coefficient: 2,
+      defaultWeights: { tx: 10, gk: 20, th: 30, tkt: 40 },
+      txCount: 3,
+    },
+    {
+      code: "ttnt",
+      name: "Trí tuệ nhân tạo",
+      departmentCode: "CNTT",
+      semester: 3,
+      credits: 3,
+      coefficient: 2,
+      defaultWeights: { tx: 10, gk: 30, th: 0, tkt: 60 },
+      txCount: 3,
+    },
+    {
+      code: "attt",
+      name: "An toàn thông tin",
+      departmentCode: "CNTT",
+      semester: 3,
+      credits: 3,
+      coefficient: 2,
+      defaultWeights: { tx: 10, gk: 30, th: 0, tkt: 60 },
       txCount: 3,
     },
     {
@@ -178,6 +268,86 @@ const seed = async () => {
 
   await Subject.insertMany(subjectSeeds, { ordered: false }).catch(() => {});
 
+  const curriculumSubjectCodes = [
+    "ltcb",
+    "tthcm",
+    "csdl",
+    "mmt",
+    "ktpm",
+    "ctdlgt",
+    "hdh",
+    "cnpm",
+    "ttnt",
+    "attt",
+  ];
+
+  const curriculumSubjects = await Subject.find({
+    code: { $in: curriculumSubjectCodes },
+  }).select("_id code name credits");
+
+  const curriculumSubjectByCode = new Map(
+    curriculumSubjects.map((subject) => [subject.code, subject]),
+  );
+
+  const curriculumLayout = [
+    { code: "ltcb", year: 1, semester: 1, subjectType: "required" },
+    { code: "tthcm", year: 1, semester: 1, subjectType: "required" },
+    { code: "csdl", year: 1, semester: 2, subjectType: "required" },
+    { code: "mmt", year: 1, semester: 2, subjectType: "required" },
+    { code: "ktpm", year: 2, semester: 2, subjectType: "required" },
+    { code: "ctdlgt", year: 2, semester: 2, subjectType: "prerequisite" },
+    { code: "hdh", year: 2, semester: 3, subjectType: "required" },
+    { code: "cnpm", year: 3, semester: 3, subjectType: "required" },
+    { code: "ttnt", year: 4, semester: 1, subjectType: "elective" },
+    { code: "attt", year: 4, semester: 2, subjectType: "elective" },
+  ];
+
+  const curriculumItems = curriculumLayout
+    .map((item) => {
+      const subject = curriculumSubjectByCode.get(item.code);
+      if (!subject) {
+        return null;
+      }
+
+      return {
+        subjectId: subject._id,
+        subjectCode: subject.code,
+        subjectName: subject.name,
+        credits: Number(subject.credits || 0),
+        year: item.year,
+        semester: item.semester,
+        subjectType: item.subjectType,
+        prerequisiteIds: [],
+        note: "",
+      };
+    })
+    .filter(Boolean);
+
+  if (majorMap.get("KTPM") && curriculumItems.length > 0) {
+    const totalCredits = curriculumItems.reduce(
+      (sum, item) => sum + Number(item.credits || 0),
+      0,
+    );
+
+    await Curriculum.updateOne(
+      {
+        majorId: majorMap.get("KTPM")._id,
+        schoolYear: "2021-2025",
+      },
+      {
+        $setOnInsert: {
+          majorId: majorMap.get("KTPM")._id,
+          schoolYear: "2021-2025",
+          name: "CTĐT KTPM 2021",
+          items: curriculumItems,
+          totalCredits,
+          isActive: true,
+        },
+      },
+      { upsert: true },
+    );
+  }
+
   const adminPassword = await bcrypt.hash("Admin@123", 10);
   const teacherPassword = await bcrypt.hash("Teacher@123", 10);
 
@@ -213,27 +383,36 @@ const seed = async () => {
   const schoolYearPayload = {
     name: "2024-2025",
     startDate: new Date("2024-09-01"),
-    endDate: new Date("2025-05-31"),
+    endDate: new Date("2025-08-31"),
     isCurrent: true,
     semesters: [
       {
         semesterNumber: 1,
         startDate: new Date("2024-09-01"),
-        endDate: new Date("2025-01-15"),
+        endDate: new Date("2024-12-31"),
         isCurrent: true,
+        isOptional: false,
       },
       {
         semesterNumber: 2,
-        startDate: new Date("2025-01-16"),
-        endDate: new Date("2025-05-31"),
+        startDate: new Date("2025-01-01"),
+        endDate: new Date("2025-04-30"),
         isCurrent: false,
+        isOptional: false,
+      },
+      {
+        semesterNumber: 3,
+        startDate: new Date("2025-05-01"),
+        endDate: new Date("2025-08-31"),
+        isCurrent: false,
+        isOptional: true,
       },
     ],
   };
 
   await SchoolYear.updateOne(
     { name: schoolYearPayload.name },
-    { $setOnInsert: schoolYearPayload },
+    { $set: schoolYearPayload },
     { upsert: true },
   );
   const schoolYear = await SchoolYear.findOne({ name: schoolYearPayload.name });
@@ -269,6 +448,15 @@ const seed = async () => {
       schoolYearId: schoolYear?._id,
       semester: 1,
       teacherId: teacher2?._id || null,
+    },
+    {
+      code: "CNTT-HDH-HE-01",
+      name: "Lớp Hệ điều hành hè 01",
+      subjectCode: "hdh",
+      departmentId: departmentMap.get("CNTT")?._id,
+      schoolYearId: schoolYear?._id,
+      semester: 3,
+      teacherId: teacher1?._id || null,
     },
   ].filter((item) => item.departmentId && item.schoolYearId);
 
@@ -313,8 +501,28 @@ const seed = async () => {
     );
   }
 
-  const classes = await Class.find({ schoolYearId: schoolYear?._id });
-  const students = buildStudents(classes);
+  const classes = await Class.find({ schoolYearId: schoolYear?._id }).populate(
+    "departmentId",
+    "code",
+  );
+  const classesWithDepartmentCode = classes.map((item) => ({
+    ...item.toObject(),
+    departmentCode:
+      typeof item.departmentId === "string"
+        ? ""
+        : item.departmentId?.code || "",
+  }));
+
+  const majorByDepartmentCode = new Map([
+    ["CNTT", majorMap.get("KTPM") || null],
+    ["KTKT", null],
+    ["QTKD", null],
+  ]);
+
+  const students = buildStudents(
+    classesWithDepartmentCode,
+    majorByDepartmentCode,
+  );
   await Student.insertMany(students, { ordered: false }).catch(() => {});
 
   for (const classDoc of classes) {

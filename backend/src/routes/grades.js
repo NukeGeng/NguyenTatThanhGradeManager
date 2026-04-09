@@ -16,6 +16,8 @@ const {
 
 const router = express.Router();
 
+const isValidSemester = (value) => [1, 2, 3].includes(Number(value));
+
 const upload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: 5 * 1024 * 1024 },
@@ -43,6 +45,11 @@ router.use(auth);
 
 const getAllowedDepartmentIds = (user) =>
   (user.departmentIds || []).map((item) =>
+    item?._id ? String(item._id) : String(item),
+  );
+
+const getAdvisingStudentIds = (user) =>
+  (user.advisingStudentIds || []).map((item) =>
     item?._id ? String(item._id) : String(item),
   );
 
@@ -232,6 +239,13 @@ router.post("/import/excel", async (req, res, next) => {
 
 router.post("/", async (req, res, next) => {
   try {
+    if (req.user.role === "advisor") {
+      return res.status(403).json({
+        success: false,
+        message: "Advisor không có quyền nhập điểm",
+      });
+    }
+
     const {
       studentId,
       classId,
@@ -307,6 +321,13 @@ router.post("/", async (req, res, next) => {
     const finalSchoolYearId = schoolYearId || classData.schoolYearId;
     const finalSemester = semester || classData.semester;
 
+    if (!isValidSemester(finalSemester)) {
+      return res.status(400).json({
+        success: false,
+        message: "semester phải thuộc [1,2,3]",
+      });
+    }
+
     const schoolYear = await SchoolYear.findById(finalSchoolYearId);
     if (!schoolYear) {
       return res.status(404).json({
@@ -353,6 +374,13 @@ router.post("/", async (req, res, next) => {
 
 router.put("/:id", async (req, res, next) => {
   try {
+    if (req.user.role === "advisor") {
+      return res.status(403).json({
+        success: false,
+        message: "Advisor không có quyền sửa điểm",
+      });
+    }
+
     const grade = await Grade.findById(req.params.id);
 
     if (!grade) {
@@ -420,6 +448,16 @@ router.put("/:id", async (req, res, next) => {
 
 router.get("/student/:studentId", async (req, res, next) => {
   try {
+    if (req.user.role === "advisor") {
+      const advisingStudentIds = getAdvisingStudentIds(req.user);
+      if (!advisingStudentIds.includes(String(req.params.studentId))) {
+        return res.status(403).json({
+          success: false,
+          message: "Bạn không có quyền xem điểm của sinh viên này",
+        });
+      }
+    }
+
     const grades = await populateGradeQuery(
       Grade.find({ studentId: req.params.studentId }).sort({
         schoolYearId: 1,
@@ -440,12 +478,26 @@ router.get("/student/:studentId", async (req, res, next) => {
 
 router.get("/class/:classId", async (req, res, next) => {
   try {
+    if (req.user.role === "advisor") {
+      return res.status(403).json({
+        success: false,
+        message: "Advisor không có quyền xem bảng điểm toàn lớp",
+      });
+    }
+
     const { semester, schoolYearId } = req.query;
     const query = {
       classId: req.params.classId,
     };
 
     if (semester !== undefined) {
+      if (!isValidSemester(semester)) {
+        return res.status(400).json({
+          success: false,
+          message: "semester phải thuộc [1,2,3]",
+        });
+      }
+
       query.semester = Number(semester);
     }
 

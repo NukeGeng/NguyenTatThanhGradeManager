@@ -10,6 +10,15 @@ const Student = require("../models/Student");
 
 const router = express.Router();
 
+const normalizeSemesterValue = (value) => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const numeric = Number(value);
+  return [1, 2, 3].includes(numeric) ? numeric : null;
+};
+
 router.use(auth);
 
 router.get("/", async (req, res, next) => {
@@ -53,7 +62,10 @@ router.get("/:id", departmentAccess, async (req, res, next) => {
 
     const [subjects, teachers] = await Promise.all([
       Subject.find({ departmentId: department._id }).sort({ name: 1 }),
-      User.find({ departmentIds: department._id, role: "teacher" })
+      User.find({
+        departmentIds: department._id,
+        role: { $in: ["teacher", "advisor"] },
+      })
         .select("_id name email isActive")
         .sort({ name: 1 }),
     ]);
@@ -78,7 +90,15 @@ router.get("/:id/subjects", departmentAccess, async (req, res, next) => {
     const query = { departmentId: req.params.id };
 
     if (semester !== undefined) {
-      query.$or = [{ semester: "both" }, { semester: Number(semester) }];
+      const normalizedSemester = normalizeSemesterValue(semester);
+      if (normalizedSemester === null) {
+        return res.status(400).json({
+          success: false,
+          message: "semester phải thuộc [1,2,3]",
+        });
+      }
+
+      query.$or = [{ semester: "all" }, { semester: normalizedSemester }];
     }
 
     const subjects = await Subject.find(query).sort({ name: 1 });
@@ -117,7 +137,10 @@ router.get("/:id/stats", adminOnly, async (req, res, next) => {
     const [subjects, classes, teachers] = await Promise.all([
       Subject.countDocuments({ departmentId }),
       Class.countDocuments({ departmentId }),
-      User.countDocuments({ departmentIds: departmentId, role: "teacher" }),
+      User.countDocuments({
+        departmentIds: departmentId,
+        role: { $in: ["teacher", "advisor"] },
+      }),
     ]);
 
     const classDocs = await Class.find({ departmentId }).select("_id");

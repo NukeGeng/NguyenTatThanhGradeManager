@@ -13,6 +13,7 @@ import { finalize, forkJoin, map } from 'rxjs';
 
 import { ApiService } from '../../core/services/api.service';
 import { ApiResponse, Class, Student } from '../../shared/models/interfaces';
+import { toTenDigitStudentCode } from '../../shared/utils/code-format.util';
 
 @Component({
   selector: 'app-class-detail',
@@ -88,7 +89,7 @@ import { ApiResponse, Class, Student } from '../../shared/models/interfaces';
             <table mat-table [dataSource]="students" class="full-table nttu-table">
               <ng-container matColumnDef="studentCode">
                 <th mat-header-cell *matHeaderCellDef>Mã HS</th>
-                <td mat-cell *matCellDef="let row">{{ row.studentCode }}</td>
+                <td mat-cell *matCellDef="let row">{{ formatStudentCode(row) }}</td>
               </ng-container>
 
               <ng-container matColumnDef="fullName">
@@ -344,6 +345,10 @@ export class ClassDetailComponent implements OnInit {
     }
 
     return '-';
+  }
+
+  formatStudentCode(student: Student): string {
+    return toTenDigitStudentCode(student.studentCode, student._id);
   }
 
   formatStatus(value: Student['status']): string {

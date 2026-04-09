@@ -39,8 +39,8 @@ const subjectSchema = new mongoose.Schema(
     },
     semester: {
       type: mongoose.Schema.Types.Mixed,
-      enum: [1, 2, "both"],
-      default: "both",
+      enum: [1, 2, 3, "all"],
+      default: "all",
     },
     coefficient: {
       type: Number,

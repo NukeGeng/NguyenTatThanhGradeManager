@@ -15,6 +15,11 @@ export const STUDENTS_ROUTES: Routes = [
     loadComponent: () => import('./student-form.component').then((m) => m.StudentFormComponent),
   },
   {
+    path: ':id/curriculum',
+    loadComponent: () =>
+      import('./student-curriculum.component').then((m) => m.StudentCurriculumComponent),
+  },
+  {
     path: ':id',
     loadComponent: () => import('./student-detail.component').then((m) => m.StudentDetailComponent),
   },

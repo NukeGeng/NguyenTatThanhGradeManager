@@ -2,6 +2,7 @@ import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { Router } from '@angular/router';
 import {
   AbstractControl,
   FormBuilder,
@@ -31,14 +32,16 @@ import { LucideAngularModule } from 'lucide-angular';
 import { finalize, forkJoin, map } from 'rxjs';
 
 import { ApiService } from '../../core/services/api.service';
-import { ApiResponse, Department, User } from '../../shared/models/interfaces';
+import { ApiResponse, Department, Student, User } from '../../shared/models/interfaces';
+import { toTenDigitStudentCode, toTenDigitTeacherCode } from '../../shared/utils/code-format.util';
 
 interface UserCreatePayload {
   name: string;
   email: string;
   password: string;
-  role: 'teacher';
+  role: 'teacher' | 'advisor';
   departmentIds: string[];
+  advisingStudentIds?: string[];
 }
 
 interface UserEditPayload {
@@ -51,6 +54,10 @@ interface UserAssignPayload {
   departmentIds: string[];
 }
 
+interface UserAssignAdvisingPayload {
+  advisingStudentIds: string[];
+}
+
 interface UserDialogData {
   user: User;
 }
@@ -58,6 +65,16 @@ interface UserDialogData {
 interface DepartmentDialogData {
   user: User;
   departments: Department[];
+}
+
+interface UserCreateDialogData {
+  departments: Department[];
+  students: Student[];
+}
+
+interface AdvisingStudentsDialogData {
+  user: User;
+  students: Student[];
 }
 
 @Component({
@@ -83,21 +100,21 @@ interface DepartmentDialogData {
       <nav class="breadcrumb" aria-label="Breadcrumb">
         <span>Dashboard</span>
         <span class="breadcrumb-sep">/</span>
-        <span>Giáo viên</span>
+        <span>Giáo viên & cố vấn</span>
       </nav>
 
       <header class="page-header">
         <div>
           <p class="eyebrow">Quản trị Admin</p>
-          <h1>Tài khoản giáo viên</h1>
+          <h1>Tài khoản giáo viên và cố vấn</h1>
           <p class="subtitle">
-            Quản lý tài khoản, phân khoa giảng dạy và trạng thái hoạt động theo khoa.
+            Quản lý tài khoản, phân khoa giảng dạy và phân công sinh viên cố vấn học tập.
           </p>
         </div>
 
         <button mat-flat-button type="button" class="btn-primary" (click)="openCreateDialog()">
           <lucide-icon name="user-plus" [size]="16"></lucide-icon>
-          Tạo tài khoản GV
+          Tạo tài khoản
         </button>
       </header>
 
@@ -107,7 +124,7 @@ interface DepartmentDialogData {
             <lucide-icon name="users" [size]="18"></lucide-icon>
           </div>
           <p class="stat-card__val">{{ totalTeachers }}</p>
-          <p class="stat-card__label">Tổng giáo viên</p>
+          <p class="stat-card__label">Tổng GV/CVHT</p>
         </article>
 
         <article class="stat-card stat-card--success">
@@ -128,10 +145,10 @@ interface DepartmentDialogData {
 
         <article class="stat-card">
           <div class="stat-card__icon">
-            <lucide-icon name="layers" [size]="18"></lucide-icon>
+            <lucide-icon name="graduation-cap" [size]="18"></lucide-icon>
           </div>
-          <p class="stat-card__val">{{ multiDepartmentTeachers }}</p>
-          <p class="stat-card__label">Dạy nhiều khoa</p>
+          <p class="stat-card__val">{{ advisorCount }}</p>
+          <p class="stat-card__label">Cố vấn học tập</p>
         </article>
       </section>
 
@@ -198,15 +215,25 @@ interface DepartmentDialogData {
           <div class="table-wrap">
             <table mat-table [dataSource]="filteredUsers" class="full-table nttu-table">
               <ng-container matColumnDef="teacher">
-                <th mat-header-cell *matHeaderCellDef>Giáo viên</th>
+                <th mat-header-cell *matHeaderCellDef>Tài khoản</th>
                 <td mat-cell *matCellDef="let row">
                   <div class="teacher-cell">
                     <span class="user-avatar">{{ getInitials(row.name) }}</span>
                     <div>
                       <p class="teacher-name">{{ row.name }}</p>
                       <p class="teacher-email">{{ row.email }}</p>
+                      <p class="teacher-code">MSGV: {{ formatTeacherCode(row) }}</p>
                     </div>
                   </div>
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="role">
+                <th mat-header-cell *matHeaderCellDef>Vai trò</th>
+                <td mat-cell *matCellDef="let row">
+                  <span class="role-badge" [class.role-badge--advisor]="row.role === 'advisor'">
+                    {{ row.role === 'advisor' ? 'Cố vấn học tập' : 'Giáo viên' }}
+                  </span>
                 </td>
               </ng-container>
 
@@ -247,6 +274,16 @@ interface DepartmentDialogData {
                     <button
                       type="button"
                       class="action-btn"
+                      aria-label="Xem hồ sơ giảng viên"
+                      title="Xem hồ sơ"
+                      (click)="openProfile(row)"
+                    >
+                      <lucide-icon name="eye" [size]="15"></lucide-icon>
+                    </button>
+
+                    <button
+                      type="button"
+                      class="action-btn"
                       aria-label="Sửa thông tin"
                       (click)="openEditDialog(row)"
                     >
@@ -261,6 +298,18 @@ interface DepartmentDialogData {
                     >
                       <lucide-icon name="layers" [size]="15"></lucide-icon>
                     </button>
+
+                    @if (row.role === 'advisor') {
+                      <button
+                        type="button"
+                        class="action-btn"
+                        aria-label="Phân sinh viên cố vấn"
+                        title="Phân SV cố vấn"
+                        (click)="openAssignAdvisingStudentsDialog(row)"
+                      >
+                        <lucide-icon name="graduation-cap" [size]="15"></lucide-icon>
+                      </button>
+                    }
 
                     <button
                       type="button"
@@ -371,6 +420,29 @@ interface DepartmentDialogData {
         font-size: 0.8rem;
       }
 
+      .teacher-code {
+        margin: 0.1rem 0 0;
+        color: #64748b;
+        font-size: 0.78rem;
+        letter-spacing: 0.03em;
+      }
+
+      .role-badge {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 0.15rem 0.5rem;
+        font-size: 0.74rem;
+        font-weight: 700;
+        color: #0f172a;
+        background: #e2e8f0;
+      }
+
+      .role-badge--advisor {
+        color: #92400e;
+        background: #fef3c7;
+      }
+
       @media (max-width: 768px) {
         .search-field {
           width: 100%;
@@ -383,13 +455,15 @@ export class UserListComponent implements OnInit {
   private readonly apiService = inject(ApiService);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
+  private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
-  readonly displayedColumns = ['teacher', 'departments', 'status', 'actions'];
+  readonly displayedColumns = ['teacher', 'role', 'departments', 'status', 'actions'];
 
   users: User[] = [];
   filteredUsers: User[] = [];
   departments: Department[] = [];
+  students: Student[] = [];
 
   selectedDepartmentId = 'all';
   selectedStatus: 'all' | 'active' | 'inactive' = 'all';
@@ -414,6 +488,10 @@ export class UserListComponent implements OnInit {
     return this.users.filter((item) => this.getDepartmentIds(item.departmentIds).length > 1).length;
   }
 
+  get advisorCount(): number {
+    return this.users.filter((item) => item.role === 'advisor').length;
+  }
+
   ngOnInit(): void {
     this.loadData();
   }
@@ -429,6 +507,9 @@ export class UserListComponent implements OnInit {
       departments: this.apiService
         .get<ApiResponse<Department[]>>('/departments')
         .pipe(map((response) => response.data ?? [])),
+      students: this.apiService
+        .get<ApiResponse<Student[]>>('/students')
+        .pipe(map((response) => response.data ?? [])),
     })
       .pipe(
         finalize(() => {
@@ -437,9 +518,10 @@ export class UserListComponent implements OnInit {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe({
-        next: ({ users, departments }) => {
-          this.users = users.filter((item) => item.role === 'teacher');
+        next: ({ users, departments, students }) => {
+          this.users = users.filter((item) => item.role === 'teacher' || item.role === 'advisor');
           this.departments = departments;
+          this.students = students;
           this.applyFilters();
         },
         error: (error: unknown) => {
@@ -451,6 +533,7 @@ export class UserListComponent implements OnInit {
 
   applyFilters(): void {
     const keyword = this.searchKeyword.trim().toLowerCase();
+    const codeKeyword = keyword.replace(/\D/g, '');
 
     this.filteredUsers = this.users.filter((item) => {
       const departmentIds = this.getDepartmentIds(item.departmentIds);
@@ -470,7 +553,11 @@ export class UserListComponent implements OnInit {
       }
 
       const text = `${item.name} ${item.email}`.toLowerCase();
-      return byDepartment && byStatus && text.includes(keyword);
+      const codeText = this.formatTeacherCode(item);
+      const byKeyword =
+        text.includes(keyword) || (codeKeyword.length > 0 && codeText.includes(codeKeyword));
+
+      return byDepartment && byStatus && byKeyword;
     });
   }
 
@@ -497,6 +584,14 @@ export class UserListComponent implements OnInit {
       .filter((code, index, list) => list.indexOf(code) === index);
   }
 
+  formatTeacherCode(user: User): string {
+    return toTenDigitTeacherCode(user._id, user.teacherCode);
+  }
+
+  openProfile(user: User): void {
+    this.router.navigate(['/users', user._id]);
+  }
+
   private getDepartmentIds(values: Array<string | Department>): string[] {
     return values.map((item) => (typeof item === 'string' ? item : item._id));
   }
@@ -505,7 +600,10 @@ export class UserListComponent implements OnInit {
     const dialogRef = this.dialog.open(UserCreateDialogComponent, {
       width: '760px',
       maxWidth: '95vw',
-      data: this.departments,
+      data: {
+        departments: this.departments,
+        students: this.students,
+      } satisfies UserCreateDialogData,
     });
 
     dialogRef
@@ -521,7 +619,7 @@ export class UserListComponent implements OnInit {
           .pipe(takeUntilDestroyed(this.destroyRef))
           .subscribe({
             next: () => {
-              this.snackBar.open('Tạo tài khoản giáo viên thành công', 'Đóng', { duration: 2200 });
+              this.snackBar.open('Tạo tài khoản thành công', 'Đóng', { duration: 2200 });
               this.loadData();
             },
             error: (error: unknown) => {
@@ -594,6 +692,44 @@ export class UserListComponent implements OnInit {
       });
   }
 
+  openAssignAdvisingStudentsDialog(user: User): void {
+    const dialogRef = this.dialog.open(UserAssignAdvisingStudentsDialogComponent, {
+      width: '760px',
+      maxWidth: '95vw',
+      data: {
+        user,
+        students: this.students,
+      } satisfies AdvisingStudentsDialogData,
+    });
+
+    dialogRef
+      .afterClosed()
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((payload: UserAssignAdvisingPayload | undefined) => {
+        if (!payload) {
+          return;
+        }
+
+        this.apiService
+          .patch<ApiResponse<User>, UserAssignAdvisingPayload>(
+            `/users/${user._id}/advising-students`,
+            payload,
+          )
+          .pipe(takeUntilDestroyed(this.destroyRef))
+          .subscribe({
+            next: () => {
+              this.snackBar.open('Cập nhật sinh viên cố vấn thành công', 'Đóng', {
+                duration: 2200,
+              });
+              this.loadData();
+            },
+            error: (error: unknown) => {
+              this.snackBar.open(this.resolveErrorMessage(error), 'Đóng', { duration: 2600 });
+            },
+          });
+      });
+  }
+
   toggleUser(user: User): void {
     this.apiService
       .patch<ApiResponse<{ _id: string; isActive: boolean }>, Record<string, never>>(
@@ -638,9 +774,10 @@ export class UserListComponent implements OnInit {
     MatDialogModule,
     MatFormFieldModule,
     MatInputModule,
+    MatSelectModule,
   ],
   template: `
-    <h2 mat-dialog-title>Tạo tài khoản giáo viên</h2>
+    <h2 mat-dialog-title>Tạo tài khoản giáo viên/cố vấn</h2>
 
     <form [formGroup]="form" mat-dialog-content class="dialog-form" (ngSubmit)="submit()">
       <mat-form-field appearance="outline">
@@ -661,9 +798,17 @@ export class UserListComponent implements OnInit {
         <input matInput formControlName="password" type="password" />
       </mat-form-field>
 
+      <mat-form-field appearance="outline">
+        <mat-label>Vai trò</mat-label>
+        <mat-select formControlName="role">
+          <mat-option value="teacher">Giáo viên</mat-option>
+          <mat-option value="advisor">Cố vấn học tập</mat-option>
+        </mat-select>
+      </mat-form-field>
+
       <div class="checkbox-box">
         <p>Phân khoa</p>
-        @for (department of departments; track department._id) {
+        @for (department of data.departments; track department._id) {
           <mat-checkbox
             [checked]="isChecked(department._id)"
             (change)="toggleDepartment(department._id, $event.checked)"
@@ -680,6 +825,20 @@ export class UserListComponent implements OnInit {
       >
         Vui lòng chọn ít nhất 1 khoa.
       </p>
+
+      @if (form.controls.role.value === 'advisor') {
+        <div class="checkbox-box checkbox-box--students">
+          <p>Phân sinh viên cố vấn (tùy chọn)</p>
+          @for (student of data.students; track student._id) {
+            <mat-checkbox
+              [checked]="isStudentChecked(student._id)"
+              (change)="toggleStudent(student._id, $event.checked)"
+            >
+              {{ formatStudentCode(student) }} - {{ student.fullName }}
+            </mat-checkbox>
+          }
+        </div>
+      }
     </form>
 
     <div mat-dialog-actions align="end">
@@ -706,6 +865,11 @@ export class UserListComponent implements OnInit {
         padding: 0.75rem;
       }
 
+      .checkbox-box--students {
+        max-height: 240px;
+        overflow: auto;
+      }
+
       .checkbox-box p {
         margin: 0;
         font-weight: 700;
@@ -729,13 +893,15 @@ export class UserCreateDialogComponent {
   private readonly dialogRef = inject(
     MatDialogRef<UserCreateDialogComponent, UserCreatePayload | undefined>,
   );
-  readonly departments = inject<Department[]>(MAT_DIALOG_DATA);
+  readonly data = inject<UserCreateDialogData>(MAT_DIALOG_DATA);
 
   form = this.fb.nonNullable.group({
     name: ['', [Validators.required]],
     email: ['', [Validators.required, Validators.pattern(/^[a-zA-Z0-9._%+-]+@nttu\.edu\.vn$/)]],
     password: ['', [Validators.required, Validators.minLength(6)]],
+    role: ['teacher' as 'teacher' | 'advisor', [Validators.required]],
     departmentIds: this.fb.nonNullable.control<string[]>([], [arrayRequiredValidator()]),
+    advisingStudentIds: this.fb.nonNullable.control<string[]>([]),
   });
 
   close(): void {
@@ -762,6 +928,29 @@ export class UserCreateDialogComponent {
     this.form.controls.departmentIds.markAsTouched();
   }
 
+  isStudentChecked(id: string): boolean {
+    return this.form.controls.advisingStudentIds.value.includes(id);
+  }
+
+  toggleStudent(id: string, checked: boolean): void {
+    const current = [...this.form.controls.advisingStudentIds.value];
+    const index = current.indexOf(id);
+
+    if (checked && index < 0) {
+      current.push(id);
+    }
+
+    if (!checked && index >= 0) {
+      current.splice(index, 1);
+    }
+
+    this.form.controls.advisingStudentIds.setValue(current);
+  }
+
+  formatStudentCode(student: Student): string {
+    return toTenDigitStudentCode(student.studentCode, student._id);
+  }
+
   submit(): void {
     if (this.form.invalid) {
       this.form.markAllAsTouched();
@@ -774,8 +963,9 @@ export class UserCreateDialogComponent {
       name: raw.name.trim(),
       email: raw.email.trim().toLowerCase(),
       password: raw.password,
-      role: 'teacher',
+      role: raw.role,
       departmentIds: raw.departmentIds,
+      advisingStudentIds: raw.role === 'advisor' ? raw.advisingStudentIds : [],
     });
   }
 }
@@ -991,6 +1181,121 @@ export class UserAssignDepartmentDialogComponent {
 
   private extractCurrentDepartmentIds(): string[] {
     return this.data.user.departmentIds.map((item) => (typeof item === 'string' ? item : item._id));
+  }
+}
+
+@Component({
+  selector: 'app-user-assign-advising-students-dialog',
+  standalone: true,
+  imports: [CommonModule, ReactiveFormsModule, MatButtonModule, MatCheckboxModule, MatDialogModule],
+  template: `
+    <h2 mat-dialog-title>Phân sinh viên cố vấn</h2>
+
+    <div mat-dialog-content class="dialog-form">
+      <p class="desc">
+        Cố vấn: <strong>{{ data.user.name }}</strong>
+      </p>
+
+      <div class="checkbox-box checkbox-box--students">
+        @for (student of data.students; track student._id) {
+          <mat-checkbox
+            [checked]="isChecked(student._id)"
+            (change)="toggleStudent(student._id, $event.checked)"
+          >
+            {{ formatStudentCode(student) }} - {{ student.fullName }}
+          </mat-checkbox>
+        }
+      </div>
+    </div>
+
+    <div mat-dialog-actions align="end">
+      <button mat-button type="button" (click)="close()">Hủy</button>
+      <button mat-flat-button type="button" class="btn-primary" (click)="submit()">
+        Lưu phân công
+      </button>
+    </div>
+  `,
+  styles: [
+    `
+      .dialog-form {
+        width: 100%;
+        min-width: 0;
+        display: grid;
+        gap: 0.75rem;
+      }
+
+      .desc {
+        margin: 0;
+        color: var(--text-sub);
+      }
+
+      .checkbox-box {
+        display: grid;
+        gap: 0.35rem;
+        border: 1px dashed var(--gray-300);
+        border-radius: var(--radius-sm);
+        padding: 0.75rem;
+      }
+
+      .checkbox-box--students {
+        max-height: 320px;
+        overflow: auto;
+      }
+
+      .btn-primary {
+        background: var(--navy) !important;
+        color: #fff !important;
+      }
+    `,
+  ],
+})
+export class UserAssignAdvisingStudentsDialogComponent {
+  private readonly fb = inject(FormBuilder);
+  private readonly dialogRef = inject(
+    MatDialogRef<UserAssignAdvisingStudentsDialogComponent, UserAssignAdvisingPayload | undefined>,
+  );
+  readonly data = inject<AdvisingStudentsDialogData>(MAT_DIALOG_DATA);
+
+  advisingStudentIdsControl = this.fb.nonNullable.control<string[]>(
+    this.extractCurrentAdvisingStudentIds(),
+  );
+
+  close(): void {
+    this.dialogRef.close(undefined);
+  }
+
+  isChecked(id: string): boolean {
+    return this.advisingStudentIdsControl.value.includes(id);
+  }
+
+  toggleStudent(id: string, checked: boolean): void {
+    const current = [...this.advisingStudentIdsControl.value];
+    const index = current.indexOf(id);
+
+    if (checked && index < 0) {
+      current.push(id);
+    }
+
+    if (!checked && index >= 0) {
+      current.splice(index, 1);
+    }
+
+    this.advisingStudentIdsControl.setValue(current);
+  }
+
+  formatStudentCode(student: Student): string {
+    return toTenDigitStudentCode(student.studentCode, student._id);
+  }
+
+  submit(): void {
+    this.dialogRef.close({
+      advisingStudentIds: this.advisingStudentIdsControl.value,
+    });
+  }
+
+  private extractCurrentAdvisingStudentIds(): string[] {
+    const values = this.data.user.advisingStudentIds || [];
+    return values.map((item) => (typeof item === 'string' ? item : item._id));
   }
 }
 

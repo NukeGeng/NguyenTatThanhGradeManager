@@ -7,6 +7,19 @@ const Grade = require("../models/Grade");
 
 const router = express.Router();
 
+const normalizeSemesterValue = (value) => {
+  if (value === "all") {
+    return "all";
+  }
+
+  const numeric = Number(value);
+  if ([1, 2, 3].includes(numeric)) {
+    return numeric;
+  }
+
+  return null;
+};
+
 router.use(auth);
 
 router.get("/", async (req, res, next) => {
@@ -27,7 +40,15 @@ router.get("/", async (req, res, next) => {
     }
 
     if (semester !== undefined) {
-      query.$or = [{ semester: "both" }, { semester: Number(semester) }];
+      const normalizedSemester = normalizeSemesterValue(semester);
+      if (normalizedSemester === null || normalizedSemester === "all") {
+        return res.status(400).json({
+          success: false,
+          message: "semester phải thuộc [1,2,3]",
+        });
+      }
+
+      query.$or = [{ semester: "all" }, { semester: normalizedSemester }];
     }
 
     if (isActive !== undefined) {
@@ -108,6 +129,14 @@ router.post("/", adminOnly, async (req, res, next) => {
       });
     }
 
+    const normalizedSemester = normalizeSemesterValue(semester);
+    if (normalizedSemester === null) {
+      return res.status(400).json({
+        success: false,
+        message: "semester phải thuộc [1,2,3,'all']",
+      });
+    }
+
     const department = await Department.findById(departmentId);
     if (!department) {
       return res.status(404).json({
@@ -136,7 +165,7 @@ router.post("/", adminOnly, async (req, res, next) => {
       code: String(code).trim().toLowerCase(),
       name: String(name).trim(),
       departmentId,
-      semester,
+      semester: normalizedSemester,
       credits: Number(credits),
       coefficient,
       category,
@@ -197,6 +226,18 @@ router.put("/:id", adminOnly, async (req, res, next) => {
         subject[field] = req.body[field];
       }
     });
+
+    if (req.body.semester !== undefined) {
+      const normalizedSemester = normalizeSemesterValue(req.body.semester);
+      if (normalizedSemester === null) {
+        return res.status(400).json({
+          success: false,
+          message: "semester phải thuộc [1,2,3,'all']",
+        });
+      }
+
+      subject.semester = normalizedSemester;
+    }
 
     await subject.save();
 

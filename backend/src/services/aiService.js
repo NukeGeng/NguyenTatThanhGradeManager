@@ -1,6 +1,10 @@
 const axios = require("axios");
+const StudentCurriculum = require("../models/StudentCurriculum");
+const Class = require("../models/Class");
 
 const AI_ENGINE_URL = process.env.AI_ENGINE_URL || "http://localhost:5000";
+const ROADMAP_CACHE_TTL_MS = 60 * 60 * 1000;
+const roadmapCache = new Map();
 
 const CONDUCT_TO_SCORE = {
   Tốt: 3,
@@ -106,6 +110,230 @@ const buildPredictRequest = (gradeData) => {
   };
 };
 
+const getCurrentSemesterYear = () => {
+  const month = new Date().getMonth() + 1;
+  const year = new Date().getFullYear();
+
+  if (month >= 9 && month <= 12) {
+    return { currentSemester: 1, currentYear: year };
+  }
+
+  if (month >= 1 && month <= 4) {
+    return { currentSemester: 2, currentYear: year };
+  }
+
+  return { currentSemester: 3, currentYear: year };
+};
+
+const normalizeRegistrationStatus = (registration) => {
+  const letter = String(registration?.letterGrade || "").toUpperCase();
+  const gpa4 = Number(registration?.gpa4 ?? -1);
+  const status = String(registration?.status || "").toLowerCase();
+
+  if (status === "completed" && gpa4 >= 2) {
+    return "completed";
+  }
+
+  if (status === "failed" || letter === "F" || (gpa4 >= 0 && gpa4 < 2)) {
+    return "failed";
+  }
+
+  if (status === "registered" || status === "retaking") {
+    return "in_progress";
+  }
+
+  return "not_started";
+};
+
+const toSubjectResult = (item, registration) => {
+  const status = normalizeRegistrationStatus(registration);
+
+  return {
+    subjectCode: String(
+      item?.subjectCode ||
+        registration?.subjectCode ||
+        registration?.subjectId?.code ||
+        "",
+    ),
+    subjectName: String(
+      item?.subjectName || registration?.subjectId?.name || "Mon hoc",
+    ),
+    credits: Number(item?.credits || registration?.subjectId?.credits || 0),
+    gpa4: Number(registration?.gpa4 || 0),
+    letterGrade: String(registration?.letterGrade || ""),
+    status,
+    isRequired: String(item?.subjectType || "required") !== "elective",
+  };
+};
+
+const snapshotStudentCurriculum = async (studentId) => {
+  const studentCurriculum = await StudentCurriculum.findOne({ studentId })
+    .populate("studentId", "_id studentCode fullName")
+    .populate("curriculumId", "_id name items")
+    .populate("registrations.subjectId", "_id code name credits");
+
+  if (!studentCurriculum) {
+    throw new Error("Sinh vien chua duoc gan chuong trinh khung");
+  }
+
+  const curriculumItems = Array.isArray(studentCurriculum.curriculumId?.items)
+    ? studentCurriculum.curriculumId.items
+    : [];
+
+  const registrationBySubjectId = new Map();
+  for (const registration of studentCurriculum.registrations || []) {
+    const subjectId = String(
+      registration?.subjectId?._id || registration?.subjectId || "",
+    );
+    if (subjectId) {
+      registrationBySubjectId.set(subjectId, registration);
+    }
+  }
+
+  const completedSubjects = [];
+  const remainingSubjects = [];
+  const failedSubjects = [];
+  const weakSubjects = [];
+
+  let earnedCredits = 0;
+  let weightedGpa = 0;
+
+  for (const item of curriculumItems) {
+    const subjectId = String(item?.subjectId || "");
+    const registration = registrationBySubjectId.get(subjectId);
+    const subjectResult = toSubjectResult(item, registration);
+
+    if (subjectResult.status === "completed") {
+      completedSubjects.push(subjectResult);
+      earnedCredits += subjectResult.credits;
+      weightedGpa += subjectResult.gpa4 * subjectResult.credits;
+      continue;
+    }
+
+    remainingSubjects.push(subjectResult);
+
+    if (subjectResult.status === "failed") {
+      failedSubjects.push(subjectResult);
+      continue;
+    }
+
+    if (
+      subjectResult.letterGrade.toUpperCase() === "C" ||
+      subjectResult.gpa4 === 2
+    ) {
+      weakSubjects.push(subjectResult);
+    }
+  }
+
+  const currentGpaAccumulated =
+    earnedCredits > 0 ? Number((weightedGpa / earnedCredits).toFixed(2)) : 0;
+
+  return {
+    studentCode: String(studentCurriculum.studentId?.studentCode || ""),
+    completedSubjects,
+    remainingSubjects,
+    failedSubjects,
+    weakSubjects,
+    totalCreditsEarned: earnedCredits,
+    currentGpaAccumulated,
+  };
+};
+
+const parseAiError = (error) => {
+  const statusCode = Number(error?.response?.status || 0);
+  const errorCode = String(error?.code || "");
+  const detail = error?.response?.data?.detail;
+
+  let serverMessage = "";
+  if (typeof detail === "string" && detail.trim()) {
+    serverMessage = detail;
+  } else if (Array.isArray(detail) && detail.length > 0) {
+    serverMessage = detail
+      .map((item) => {
+        if (typeof item === "string") {
+          return item;
+        }
+
+        if (item && typeof item === "object") {
+          const message = item.msg || item.message;
+          return typeof message === "string" ? message : "";
+        }
+
+        return "";
+      })
+      .filter(Boolean)
+      .join("; ");
+  } else if (detail && typeof detail === "object") {
+    const detailMessage = detail.message || detail.msg;
+    if (typeof detailMessage === "string" && detailMessage.trim()) {
+      serverMessage = detailMessage;
+    }
+  }
+
+  if (!serverMessage && errorCode === "ECONNREFUSED") {
+    serverMessage = "AI Engine chua chay hoac khong lang nghe cong 5000";
+  }
+
+  if (!serverMessage && errorCode === "ECONNABORTED") {
+    serverMessage = "AI Engine phan hoi qua cham (timeout 10s)";
+  }
+
+  if (!serverMessage && statusCode === 422) {
+    serverMessage = "Du lieu gui sang AI Engine khong hop le";
+  }
+
+  if (!serverMessage && statusCode >= 500) {
+    serverMessage = "AI Engine gap loi noi bo";
+  }
+
+  const fallbackMessage =
+    typeof error?.message === "string" && error.message.trim()
+      ? error.message
+      : "Loi khong xac dinh tu AI Engine";
+
+  return serverMessage || fallbackMessage;
+};
+
+const postToAiEngine = async (path, payload) => {
+  try {
+    const response = await axios.post(`${AI_ENGINE_URL}${path}`, payload, {
+      timeout: 10000,
+      headers: {
+        "Content-Type": "application/json",
+      },
+    });
+
+    if (!response?.data) {
+      throw new Error("AI Engine tra ve du lieu rong");
+    }
+
+    return response.data;
+  } catch (error) {
+    throw new Error(`Khong the goi AI Engine: ${parseAiError(error)}`);
+  }
+};
+
+const getCacheEntry = (key) => {
+  const existing = roadmapCache.get(key);
+  if (!existing) {
+    return null;
+  }
+
+  if (Date.now() - existing.cachedAt > ROADMAP_CACHE_TTL_MS) {
+    roadmapCache.delete(key);
+    return null;
+  }
+
+  return existing.data;
+};
+
+const setCacheEntry = (key, data) => {
+  roadmapCache.set(key, {
+    cachedAt: Date.now(),
+    data,
+  });
+};
+
 const predictStudent = async (gradeData) => {
   if (!gradeData) {
     throw new Error("Thiếu dữ liệu grade để dự đoán");
@@ -117,77 +345,93 @@ const predictStudent = async (gradeData) => {
 
   const payload = buildPredictRequest(gradeData);
 
-  try {
-    const response = await axios.post(`${AI_ENGINE_URL}/predict`, payload, {
-      timeout: 10000,
-      headers: {
-        "Content-Type": "application/json",
-      },
-    });
+  return postToAiEngine("/predict", payload);
+};
 
-    if (!response?.data) {
-      throw new Error("AI Engine trả về dữ liệu rỗng");
-    }
-
-    return response.data;
-  } catch (error) {
-    const statusCode = Number(error?.response?.status || 0);
-    const errorCode = String(error?.code || "");
-    const detail = error?.response?.data?.detail;
-
-    let serverMessage = "";
-    if (typeof detail === "string" && detail.trim()) {
-      serverMessage = detail;
-    } else if (Array.isArray(detail) && detail.length > 0) {
-      serverMessage = detail
-        .map((item) => {
-          if (typeof item === "string") {
-            return item;
-          }
-
-          if (item && typeof item === "object") {
-            const message = item.msg || item.message;
-            return typeof message === "string" ? message : "";
-          }
-
-          return "";
-        })
-        .filter(Boolean)
-        .join("; ");
-    } else if (detail && typeof detail === "object") {
-      const detailMessage = detail.message || detail.msg;
-      if (typeof detailMessage === "string" && detailMessage.trim()) {
-        serverMessage = detailMessage;
-      }
-    }
-
-    if (!serverMessage && errorCode === "ECONNREFUSED") {
-      serverMessage = "AI Engine chưa chạy hoặc không lắng nghe cổng 5000";
-    }
-
-    if (!serverMessage && errorCode === "ECONNABORTED") {
-      serverMessage = "AI Engine phản hồi quá chậm (timeout 10s)";
-    }
-
-    if (!serverMessage && statusCode === 422) {
-      serverMessage = "Dữ liệu gửi sang AI Engine không hợp lệ";
-    }
-
-    if (!serverMessage && statusCode >= 500) {
-      serverMessage = "AI Engine gặp lỗi nội bộ";
-    }
-
-    const fallbackMessage =
-      typeof error?.message === "string" && error.message.trim()
-        ? error.message
-        : "Lỗi không xác định từ AI Engine";
-
-    throw new Error(
-      `Không thể gọi AI Engine: ${serverMessage || fallbackMessage}`,
-    );
+const getGpaRoadmap = async (studentId, targetGpa = 3.2) => {
+  const target = Number(targetGpa || 3.2);
+  const cacheKey = `gpa:${studentId}:${target.toFixed(2)}`;
+  const cached = getCacheEntry(cacheKey);
+  if (cached) {
+    return cached;
   }
+
+  const snapshot = await snapshotStudentCurriculum(studentId);
+
+  const payload = {
+    studentCode: snapshot.studentCode,
+    currentGpaAccumulated: snapshot.currentGpaAccumulated,
+    totalCreditsEarned: snapshot.totalCreditsEarned,
+    completedSubjects: snapshot.completedSubjects,
+    remainingSubjects: snapshot.remainingSubjects,
+    targetGpa: target,
+  };
+
+  const data = await postToAiEngine("/gpa-roadmap", payload);
+  setCacheEntry(cacheKey, data);
+  return data;
+};
+
+const getRetakeRoadmap = async (studentId) => {
+  const snapshot = await snapshotStudentCurriculum(studentId);
+  const { currentSemester, currentYear } = getCurrentSemesterYear();
+
+  const payload = {
+    studentCode: snapshot.studentCode,
+    failedSubjects: snapshot.failedSubjects,
+    weakSubjects: snapshot.weakSubjects,
+    remainingSubjects: snapshot.remainingSubjects,
+    currentSemester,
+    currentYear,
+  };
+
+  return postToAiEngine("/retake-roadmap", payload);
+};
+
+const getSemesterPlan = async (
+  studentId,
+  registeredClassIds = [],
+  targetGpa = 3.2,
+) => {
+  const snapshot = await snapshotStudentCurriculum(studentId);
+
+  const classDocs = await Class.find({
+    _id: { $in: Array.isArray(registeredClassIds) ? registeredClassIds : [] },
+  }).populate("subjectId", "code name credits");
+
+  const registeredSubjects = classDocs.map((classDoc) => {
+    const subjectCode = String(classDoc?.subjectId?.code || "");
+    const fromCurriculum = snapshot.remainingSubjects.find(
+      (item) => item.subjectCode === subjectCode,
+    );
+
+    return {
+      subjectCode,
+      subjectName: String(
+        classDoc?.subjectId?.name || classDoc?.name || "Mon hoc",
+      ),
+      credits: Number(classDoc?.subjectId?.credits || 0),
+      gpa4: 0,
+      letterGrade: "",
+      status: "not_started",
+      isRequired: fromCurriculum ? Boolean(fromCurriculum.isRequired) : true,
+    };
+  });
+
+  const payload = {
+    studentCode: snapshot.studentCode,
+    currentGpaAccumulated: snapshot.currentGpaAccumulated,
+    targetGpa: Number(targetGpa || 3.2),
+    registeredSubjects,
+    weakSubjects: snapshot.weakSubjects,
+  };
+
+  return postToAiEngine("/semester-plan", payload);
 };
 
 module.exports = {
   predictStudent,
+  getGpaRoadmap,
+  getRetakeRoadmap,
+  getSemesterPlan,
 };

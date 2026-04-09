@@ -17,6 +17,9 @@ const signToken = (user) =>
       departmentIds: (user.departmentIds || []).map((item) =>
         item?._id ? item._id : item,
       ),
+      advisingStudentIds: (user.advisingStudentIds || []).map((item) =>
+        item?._id ? item._id : item,
+      ),
     },
     process.env.JWT_SECRET,
     {
@@ -60,7 +63,9 @@ router.post("/register", async (req, res, next) => {
       });
     }
 
-    const normalizedRole = role === "admin" ? "admin" : "teacher";
+    const normalizedRole = ["admin", "teacher", "advisor"].includes(role)
+      ? role
+      : "teacher";
 
     if (!Array.isArray(departmentIds)) {
       return res.status(400).json({
@@ -84,10 +89,13 @@ router.post("/register", async (req, res, next) => {
       });
     }
 
-    if (normalizedRole === "teacher" && normalizedDepartmentIds.length === 0) {
+    if (
+      (normalizedRole === "teacher" || normalizedRole === "advisor") &&
+      normalizedDepartmentIds.length === 0
+    ) {
       return res.status(400).json({
         success: false,
-        message: "Teacher must belong to at least one department",
+        message: "Teacher/Advisor must belong to at least one department",
       });
     }
 
@@ -120,6 +128,7 @@ router.post("/register", async (req, res, next) => {
       password: hashedPassword,
       role: normalizedRole,
       departmentIds: normalizedRole === "admin" ? [] : normalizedDepartmentIds,
+      advisingStudentIds: [],
     });
 
     const token = signToken(user);
@@ -135,6 +144,7 @@ router.post("/register", async (req, res, next) => {
           email: user.email,
           role: user.role,
           departmentIds: user.departmentIds,
+          advisingStudentIds: user.advisingStudentIds || [],
         },
       },
     });
@@ -205,6 +215,7 @@ router.post("/login", async (req, res, next) => {
           email: user.email,
           role: user.role,
           departmentIds: user.departmentIds,
+          advisingStudentIds: user.advisingStudentIds || [],
           lastLogin: user.lastLogin,
         },
       },
@@ -231,7 +242,8 @@ router.post("/logout", auth, async (req, res) => {
 router.get("/me", auth, async (req, res) => {
   const user = await User.findById(req.user._id)
     .select("-password")
-    .populate("departmentIds", "_id code name");
+    .populate("departmentIds", "_id code name")
+    .populate("advisingStudentIds", "_id studentCode fullName");
 
   return res.status(200).json({
     success: true,

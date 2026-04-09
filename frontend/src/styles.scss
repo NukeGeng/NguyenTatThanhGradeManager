@@ -124,6 +124,8 @@ body {
 
 .mat-mdc-dialog-container .mat-mdc-dialog-surface {
   border-radius: 12px !important;
+  border: 1px solid var(--gray-200);
+  padding: 0.2rem 0 0.3rem;
   overflow: hidden;
 }
 
@@ -137,8 +139,60 @@ body {
   scrollbar-gutter: stable;
 }
 
+.mat-mdc-dialog-container .mat-mdc-dialog-content .mat-mdc-form-field {
+  width: 100%;
+  font-size: 0.84rem;
+  --mat-form-field-container-height: 42px;
+  --mat-form-field-container-vertical-padding: 9px;
+}
+
+.mat-mdc-dialog-container .mat-mdc-dialog-content .mat-mdc-text-field-wrapper {
+  border-radius: 8px !important;
+}
+
+.mat-mdc-dialog-container .mat-mdc-dialog-content textarea.mat-mdc-input-element {
+  min-height: 80px;
+}
+
 .mat-mdc-dialog-container .mat-mdc-dialog-actions {
   padding: 0.6rem 1.2rem 1rem !important;
   min-height: auto !important;
   margin: 0 !important;
+}
+
+.grade-weight-dialog-panel .mat-mdc-dialog-surface.mdc-dialog__surface {
+  border-radius: 14px !important;
+  border: 1px solid var(--gray-200);
+  box-shadow: 0 18px 40px rgba(15, 33, 68, 0.2);
+  padding: 0.55rem 0.7rem 0.7rem !important;
+  overflow: hidden;
+}
+
+.grade-weight-dialog-panel .mat-mdc-dialog-title {
+  padding: 0.3rem 0.45rem 0.35rem !important;
+  font-size: 1.05rem;
+  font-weight: 800;
+  color: var(--navy);
+}
+
+.grade-weight-dialog-panel .mat-mdc-dialog-content {
+  padding: 0.08rem 0.45rem 0.75rem !important;
+}
+
+.grade-weight-dialog-panel .mat-mdc-dialog-content .mat-mdc-form-field {
+  --mat-form-field-container-height: 36px;
+  --mat-form-field-container-vertical-padding: 6px;
+  font-size: 0.8rem;
+}
+
+.grade-weight-dialog-panel .mat-mdc-dialog-content .mdc-notched-outline__leading,
+.grade-weight-dialog-panel .mat-mdc-dialog-content .mdc-notched-outline__notch,
+.grade-weight-dialog-panel .mat-mdc-dialog-content .mdc-notched-outline__trailing {
+  border-color: var(--gray-300) !important;
+}
+
+.grade-weight-dialog-panel .mat-mdc-dialog-actions {
+  padding: 0.55rem 0.45rem 0.2rem !important;
+  border-top: 1px solid var(--gray-100);
+  background: #fbfdff;
 }

@@ -45,7 +45,10 @@ export class AuthService {
   getCurrentRole(): UserRole | null {
     const payload = this.decodeTokenPayload();
 
-    if (!payload || (payload.role !== 'admin' && payload.role !== 'teacher')) {
+    if (
+      !payload ||
+      (payload.role !== 'admin' && payload.role !== 'teacher' && payload.role !== 'advisor')
+    ) {
       return null;
     }
 
@@ -54,6 +57,17 @@ export class AuthService {
 
   getToken(): string | null {
     return localStorage.getItem(this.localTokenKey) ?? sessionStorage.getItem(this.sessionTokenKey);
+  }
+
+  getCurrentUserId(): string | null {
+    const payload = this.decodeTokenPayload();
+    const id = payload?.id;
+
+    if (typeof id === 'string' && id.trim()) {
+      return id;
+    }
+
+    return null;
   }
 
   private storeToken(token: string, rememberMe: boolean): void {
@@ -67,7 +81,7 @@ export class AuthService {
     localStorage.removeItem(this.localTokenKey);
   }
 
-  private decodeTokenPayload(): { role?: unknown } | null {
+  private decodeTokenPayload(): { id?: unknown; role?: unknown } | null {
     const token = this.getToken();
 
     if (!token) {
@@ -86,7 +100,7 @@ export class AuthService {
       const parsed: unknown = JSON.parse(decoded);
 
       if (typeof parsed === 'object' && parsed !== null) {
-        return parsed as { role?: unknown };
+        return parsed as { id?: unknown; role?: unknown };
       }
     } catch {
       return null;

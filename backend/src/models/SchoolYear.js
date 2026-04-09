@@ -4,7 +4,7 @@ const semesterSchema = new mongoose.Schema(
   {
     semesterNumber: {
       type: Number,
-      enum: [1, 2],
+      enum: [1, 2, 3],
       required: true,
     },
     startDate: {
@@ -16,6 +16,10 @@ const semesterSchema = new mongoose.Schema(
       default: null,
     },
     isCurrent: {
+      type: Boolean,
+      default: false,
+    },
+    isOptional: {
       type: Boolean,
       default: false,
     },

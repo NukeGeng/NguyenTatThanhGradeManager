@@ -13,6 +13,7 @@ import { finalize, forkJoin, map } from 'rxjs';
 
 import { ApiService } from '../../core/services/api.service';
 import { ApiResponse, Grade, Prediction, Student } from '../../shared/models/interfaces';
+import { toTenDigitStudentCode } from '../../shared/utils/code-format.util';
 
 @Component({
   selector: 'app-student-detail',
@@ -79,7 +80,9 @@ import { ApiResponse, Grade, Prediction, Student } from '../../shared/models/int
           <div>
             <p class="eyebrow">Hồ sơ học sinh</p>
             <h1>{{ student.fullName }}</h1>
-            <p>Mã HS: {{ student.studentCode }} · Lớp: {{ getClassName(student.classId) }}</p>
+            <p>
+              Mã HS: {{ formatStudentCode(student) }} · Lớp: {{ getClassName(student.classId) }}
+            </p>
             <p>
               Giới tính: {{ formatGender(student.gender) }} · Trạng thái:
               {{ formatStatus(student.status) }}
@@ -416,6 +419,10 @@ export class StudentDetailComponent implements OnInit {
     }
 
     return value.name;
+  }
+
+  formatStudentCode(student: Student): string {
+    return toTenDigitStudentCode(student.studentCode, student._id);
   }
 
   formatGender(value: Student['gender']): string {

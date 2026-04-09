@@ -27,6 +27,16 @@ const studentSchema = new mongoose.Schema(
       ref: "Class",
       required: [true, "Class is required"],
     },
+    majorId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Major",
+      default: null,
+    },
+    enrolledYear: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     address: {
       type: String,
       trim: true,
@@ -69,5 +79,6 @@ const studentSchema = new mongoose.Schema(
 );
 
 studentSchema.index({ classId: 1, status: 1 });
+studentSchema.index({ majorId: 1 });
 
 module.exports = mongoose.model("Student", studentSchema);

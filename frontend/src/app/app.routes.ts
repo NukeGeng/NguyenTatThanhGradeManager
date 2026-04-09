@@ -1,6 +1,8 @@
 import { Routes } from '@angular/router';
 import { authGuard } from './core/guards/auth.guard';
 import { adminOnlyGuard } from './core/guards/admin-only.guard';
+import { adminGuard } from './core/guards/admin.guard';
+import { advisorGuard } from './core/guards/advisor.guard';
 
 export const routes: Routes = [
   {
@@ -22,6 +24,12 @@ export const routes: Routes = [
     loadComponent: () => import('./features/news/news.component').then((m) => m.NewsComponent),
   },
   {
+    path: 'profile',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./features/users/teacher-profile.component').then((m) => m.TeacherProfileComponent),
+  },
+  {
     path: 'departments',
     canActivate: [authGuard, adminOnlyGuard],
     loadChildren: () =>
@@ -37,6 +45,17 @@ export const routes: Routes = [
     canActivate: [authGuard, adminOnlyGuard],
     loadChildren: () =>
       import('./features/subjects/subjects.routes').then((m) => m.SUBJECTS_ROUTES),
+  },
+  {
+    path: 'majors',
+    canActivate: [authGuard, adminGuard],
+    loadChildren: () => import('./features/majors/majors.routes').then((m) => m.MAJORS_ROUTES),
+  },
+  {
+    path: 'curricula',
+    canActivate: [authGuard, adminGuard],
+    loadChildren: () =>
+      import('./features/curricula/curricula.routes').then((m) => m.CURRICULA_ROUTES),
   },
   {
     path: 'students',
@@ -65,6 +84,16 @@ export const routes: Routes = [
     canActivate: [authGuard],
     loadChildren: () =>
       import('./features/notifications/notifications.routes').then((m) => m.NOTIFICATIONS_ROUTES),
+  },
+  {
+    path: 'advisor',
+    canActivate: [authGuard, advisorGuard],
+    loadChildren: () => import('./features/advisor/advisor.routes').then((m) => m.ADVISOR_ROUTES),
+  },
+  {
+    path: 'chat',
+    canActivate: [authGuard],
+    loadChildren: () => import('./features/chat/chat.routes').then((m) => m.CHAT_ROUTES),
   },
   {
     path: '**',

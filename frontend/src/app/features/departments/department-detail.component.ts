@@ -40,7 +40,7 @@ interface SubjectUpsertPayload {
   code?: string;
   name: string;
   departmentId: string;
-  semester: 1 | 2 | 'both';
+  semester: 1 | 2 | 3 | 'all';
   coefficient: number;
   credits: number;
   gradeLevel: number[];
@@ -135,6 +135,7 @@ interface SubjectUpsertPayload {
                     <mat-option value="all">Tất cả</mat-option>
                     <mat-option value="1">HK1</mat-option>
                     <mat-option value="2">HK2</mat-option>
+                    <mat-option value="3">HK3 - Hè</mat-option>
                   </mat-select>
                 </mat-form-field>
 
@@ -165,7 +166,11 @@ interface SubjectUpsertPayload {
 
                   <ng-container matColumnDef="semester">
                     <th mat-header-cell *matHeaderCellDef>Học kỳ</th>
-                    <td mat-cell *matCellDef="let row">{{ formatSemester(row.semester) }}</td>
+                    <td mat-cell *matCellDef="let row">
+                      <span class="sem-badge" [class.sem-badge--summer]="row.semester === 3">
+                        {{ formatSemester(row.semester) }}
+                      </span>
+                    </td>
                   </ng-container>
 
                   <ng-container matColumnDef="coefficient">
@@ -261,7 +266,11 @@ interface SubjectUpsertPayload {
 
                   <ng-container matColumnDef="semester">
                     <th mat-header-cell *matHeaderCellDef>Học kỳ</th>
-                    <td mat-cell *matCellDef="let row">HK{{ row.semester }}</td>
+                    <td mat-cell *matCellDef="let row">
+                      <span class="sem-badge" [class.sem-badge--summer]="row.semester === 3">
+                        HK{{ row.semester }}{{ row.semester === 3 ? ' - Hè' : '' }}
+                      </span>
+                    </td>
                   </ng-container>
 
                   <ng-container matColumnDef="students">
@@ -440,6 +449,22 @@ interface SubjectUpsertPayload {
         white-space: nowrap;
       }
 
+      .sem-badge {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        background: #e8efff;
+        color: #1d4ed8;
+        padding: 0.16rem 0.5rem;
+        font-size: 0.74rem;
+        font-weight: 700;
+      }
+
+      .sem-badge--summer {
+        background: #fff5cc;
+        color: #9a6700;
+      }
+
       .actions-wrap {
         display: inline-flex;
         align-items: center;
@@ -499,7 +524,7 @@ export class DepartmentDetailComponent implements OnInit {
   readonly isLoading = signal(true);
   readonly errorMessage = signal('');
 
-  readonly subjectSemesterFilter = signal<'all' | '1' | '2'>('all');
+  readonly subjectSemesterFilter = signal<'all' | '1' | '2' | '3'>('all');
   readonly schoolYearFilter = signal<string>('all');
 
   readonly schoolYearOptions = computed(() => {
@@ -577,7 +602,7 @@ export class DepartmentDetailComponent implements OnInit {
       });
   }
 
-  onSemesterFilterChange(value: 'all' | '1' | '2'): void {
+  onSemesterFilterChange(value: 'all' | '1' | '2' | '3'): void {
     this.subjectSemesterFilter.set(value);
     this.getSubjectRequest()
       .pipe(takeUntilDestroyed(this.destroyRef))
@@ -701,8 +726,12 @@ export class DepartmentDetailComponent implements OnInit {
   }
 
   formatSemester(value: Subject['semester']): string {
-    if (value === 'both') {
-      return 'Cả hai';
+    if (value === 'all') {
+      return 'Tất cả kỳ';
+    }
+
+    if (value === 3) {
+      return 'HK3 - Hè';
     }
 
     return `HK${value}`;
@@ -777,7 +806,8 @@ export class DepartmentDetailComponent implements OnInit {
         <mat-select formControlName="semester">
           <mat-option [value]="1">HK1</mat-option>
           <mat-option [value]="2">HK2</mat-option>
-          <mat-option value="both">Cả hai</mat-option>
+          <mat-option [value]="3">HK3 - Hè</mat-option>
+          <mat-option value="all">Tất cả kỳ</mat-option>
         </mat-select>
       </mat-form-field>
 
@@ -857,7 +887,7 @@ export class DepartmentSubjectDialogComponent {
   form = this.fb.nonNullable.group({
     code: ['', [Validators.required, Validators.pattern(/^[a-z0-9]+$/)]],
     name: ['', [Validators.required]],
-    semester: ['both' as 1 | 2 | 'both', [Validators.required]],
+    semester: ['all' as 1 | 2 | 3 | 'all', [Validators.required]],
     coefficient: [1, [Validators.required, Validators.min(1), Validators.max(3)]],
     gradeLevel: [[10, 11, 12] as number[]],
   });

@@ -10,7 +10,19 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
 
-from schemas import PredictRequest, PredictResponse
+from schemas import (
+    GpaRoadmapRequest,
+    GpaRoadmapResponse,
+    PredictRequest,
+    PredictResponse,
+    RetakeRoadmapRequest,
+    RetakeRoadmapResponse,
+    RetakeSubject,
+    SemesterPlanRequest,
+    SemesterPlanResponse,
+    SubjectPlan,
+    SubjectResult,
+)
 
 
 BASE_DIR = Path(__file__).resolve().parent
@@ -222,6 +234,312 @@ def _predict_single(request_data: PredictRequest) -> PredictResponse:
     )
 
 
+def _target_label(target_gpa: float) -> str:
+    if target_gpa >= 3.6:
+        return "Xuat sac"
+    return "Gioi"
+
+
+def _next_semester_year(semester: int, year: int) -> tuple[int, int]:
+    if semester >= 3:
+        return 1, year + 1
+    return semester + 1, year
+
+
+def _subject_priority(subject: SubjectResult) -> str:
+    if subject.isRequired and subject.credits >= 3:
+        return "critical"
+    if subject.isRequired or subject.credits >= 3:
+        return "high"
+    return "normal"
+
+
+def _target_grade(required_remaining: float, priority: str) -> tuple[str, float]:
+    if required_remaining >= 3.8:
+        return "A", 4.0
+
+    if required_remaining >= 3.2:
+        if priority in {"critical", "high"}:
+            return "A", 4.0
+        return "B", 3.0
+
+    if required_remaining >= 2.5:
+        if priority == "critical":
+            return "A", 4.0
+        return "B", 3.0
+
+    return "B", 3.0
+
+
+def _build_subject_reason(subject: SubjectResult, priority: str, target_grade: str) -> str:
+    if priority == "critical":
+        return (
+            f"Mon cot loi ({subject.credits} tin chi), can dat {target_grade} de keo GPA tich luy"
+        )
+
+    if priority == "high":
+        return f"Mon quan trong, nen dat toi thieu {target_grade} de giu tien do GPA"
+
+    return f"Mon bo tro, muc tieu {target_grade} la phu hop de can bang tai"
+
+
+def _build_gpa_roadmap(request_data: GpaRoadmapRequest) -> GpaRoadmapResponse:
+    remaining = request_data.remainingSubjects
+    remaining_credits = sum(item.credits for item in remaining)
+    total_future_credits = request_data.totalCreditsEarned + remaining_credits
+
+    if remaining_credits <= 0:
+        return GpaRoadmapResponse(
+            studentCode=request_data.studentCode,
+            currentGpa=round(request_data.currentGpaAccumulated, 2),
+            targetGpa=round(request_data.targetGpa, 2),
+            targetLabel=_target_label(request_data.targetGpa),
+            isAchievable=request_data.currentGpaAccumulated >= request_data.targetGpa,
+            requiredGpaRemaining=0,
+            subjectPlans=[],
+            summary="Ban da hoan thanh toan bo mon hoc trong chuong trinh khung.",
+            semesterBreakdown=[],
+        )
+
+    numerator = (
+        request_data.targetGpa * total_future_credits
+        - request_data.currentGpaAccumulated * request_data.totalCreditsEarned
+    )
+    required_remaining = numerator / remaining_credits
+    is_achievable = required_remaining <= 4.0
+
+    priority_order = {"critical": 0, "high": 1, "normal": 2}
+    sorted_remaining = sorted(
+        remaining,
+        key=lambda item: (priority_order[_subject_priority(item)], -item.credits, item.subjectCode),
+    )
+
+    subject_plans: list[SubjectPlan] = []
+    semester_map: dict[str, dict[str, Any]] = {}
+
+    semester = 1
+    year = 1
+    subjects_in_current_slot = 0
+    max_subjects_per_semester = 6
+
+    for subject in sorted_remaining:
+        if subjects_in_current_slot >= max_subjects_per_semester:
+            semester, year = _next_semester_year(semester, year)
+            subjects_in_current_slot = 0
+
+        priority = _subject_priority(subject)
+        target_grade, target_gpa4 = _target_grade(required_remaining, priority)
+
+        plan = SubjectPlan(
+            subjectCode=subject.subjectCode,
+            subjectName=subject.subjectName,
+            credits=subject.credits,
+            targetGrade=target_grade,
+            targetGpa4=target_gpa4,
+            priority=priority,
+            reason=_build_subject_reason(subject, priority, target_grade),
+            semester=semester,
+            year=year,
+        )
+        subject_plans.append(plan)
+
+        key = f"year_{year}_semester_{semester}"
+        if key not in semester_map:
+            semester_map[key] = {
+                "year": year,
+                "semester": semester,
+                "subjects": [],
+                "totalCredits": 0,
+            }
+        semester_map[key]["subjects"].append(
+            {
+                "subjectCode": subject.subjectCode,
+                "subjectName": subject.subjectName,
+                "credits": subject.credits,
+                "priority": priority,
+                "targetGrade": target_grade,
+            },
+        )
+        semester_map[key]["totalCredits"] += subject.credits
+
+        subjects_in_current_slot += 1
+
+    focus_subjects = ", ".join(item.subjectName for item in sorted_remaining[:3])
+    summary = (
+        f"De dat GPA {request_data.targetGpa:.2f} ({_target_label(request_data.targetGpa)}), "
+        f"ban can dat trung binh {required_remaining:.2f} GPA o {len(sorted_remaining)} mon con lai. "
+        f"Can uu tien cac mon: {focus_subjects}."
+    )
+
+    return GpaRoadmapResponse(
+        studentCode=request_data.studentCode,
+        currentGpa=round(request_data.currentGpaAccumulated, 2),
+        targetGpa=round(request_data.targetGpa, 2),
+        targetLabel=_target_label(request_data.targetGpa),
+        isAchievable=is_achievable,
+        requiredGpaRemaining=round(required_remaining, 2),
+        subjectPlans=subject_plans,
+        summary=summary,
+        semesterBreakdown=list(semester_map.values()),
+    )
+
+
+def _build_retake_item(
+    subject: SubjectResult,
+    urgency: str,
+    suggested_semester: int,
+) -> RetakeSubject:
+    target_grade = "B" if urgency == "urgent" else "A"
+    reason = (
+        "Mon F anh huong manh den GPA, can hoc lai ngay"
+        if urgency == "urgent"
+        else "Mon C nen cai thien de tang GPA tich luy"
+    )
+
+    return RetakeSubject(
+        subjectCode=subject.subjectCode,
+        subjectName=subject.subjectName,
+        credits=subject.credits,
+        currentGrade=subject.letterGrade or ("F" if urgency == "urgent" else "C"),
+        currentGpa4=subject.gpa4,
+        targetGrade=target_grade,
+        urgency=urgency,
+        prerequisiteFor=[],
+        suggestedSemester=suggested_semester,
+        reason=reason,
+    )
+
+
+def _build_retake_roadmap(request_data: RetakeRoadmapRequest) -> RetakeRoadmapResponse:
+    failed_sorted = sorted(request_data.failedSubjects, key=lambda item: (-item.credits, item.subjectCode))
+    weak_sorted = sorted(request_data.weakSubjects, key=lambda item: (-item.credits, item.subjectCode))
+
+    urgent_retakes: list[RetakeSubject] = []
+    recommended_retakes: list[RetakeSubject] = []
+
+    semester = request_data.currentSemester
+    year = request_data.currentYear
+
+    for subject in failed_sorted:
+        semester, year = _next_semester_year(semester, year)
+        urgent_retakes.append(_build_retake_item(subject, "urgent", semester))
+
+    for subject in weak_sorted:
+        semester, year = _next_semester_year(semester, year)
+        recommended_retakes.append(_build_retake_item(subject, "recommended", semester))
+
+    all_items = [
+        {"item": item, "urgency": "urgent"} for item in urgent_retakes
+    ] + [
+        {"item": item, "urgency": "recommended"} for item in recommended_retakes
+    ]
+
+    retake_plan: list[dict[str, Any]] = []
+    slot_semester, slot_year = _next_semester_year(request_data.currentSemester, request_data.currentYear)
+    index = 0
+    while index < len(all_items):
+        chunk = all_items[index:index + 2]
+        retake_plan.append(
+            {
+                "year": slot_year,
+                "semester": slot_semester,
+                "subjects": [
+                    {
+                        "subjectCode": part["item"].subjectCode,
+                        "subjectName": part["item"].subjectName,
+                        "urgency": part["urgency"],
+                        "targetGrade": part["item"].targetGrade,
+                    }
+                    for part in chunk
+                ],
+            },
+        )
+        index += 2
+        slot_semester, slot_year = _next_semester_year(slot_semester, slot_year)
+
+    note = (
+        f"Can uu tien hoc lai {len(urgent_retakes)} mon F truoc, "
+        f"sau do cai thien {len(recommended_retakes)} mon C de tang GPA."
+    )
+
+    return RetakeRoadmapResponse(
+        studentCode=request_data.studentCode,
+        urgentRetakes=urgent_retakes,
+        recommendedRetakes=recommended_retakes,
+        retakePlan=retake_plan,
+        note=note,
+    )
+
+
+def _build_semester_plan(request_data: SemesterPlanRequest) -> SemesterPlanResponse:
+    subjects = sorted(
+        request_data.registeredSubjects,
+        key=lambda item: (0 if item.isRequired else 1, -item.credits, item.subjectCode),
+    )
+
+    gap = request_data.targetGpa - request_data.currentGpaAccumulated
+    subject_targets: list[dict[str, Any]] = []
+
+    total_weighted = 0.0
+    total_credits = 0
+
+    for subject in subjects:
+        if gap >= 0.6:
+            target_grade = "A" if (subject.isRequired or subject.credits >= 3) else "B"
+        elif gap >= 0.2:
+            target_grade = "A" if subject.isRequired and subject.credits >= 3 else "B"
+        else:
+            target_grade = "B"
+
+        target_gpa4 = 4.0 if target_grade == "A" else 3.0
+
+        reason = (
+            "Mon cot loi, can diem cao de bao toan muc tieu GPA"
+            if target_grade == "A"
+            else "Dat B la du de giu tien do va tranh qua tai"
+        )
+
+        subject_targets.append(
+            {
+                "subjectCode": subject.subjectCode,
+                "subjectName": subject.subjectName,
+                "credits": subject.credits,
+                "targetGrade": target_grade,
+                "targetGpa4": target_gpa4,
+                "reason": reason,
+            },
+        )
+
+        total_weighted += target_gpa4 * subject.credits
+        total_credits += subject.credits
+
+    predicted_semester_gpa = total_weighted / total_credits if total_credits else 0
+
+    warnings: list[str] = []
+    weak_names = [item.subjectName for item in request_data.weakSubjects[:3]]
+    if weak_names:
+        warnings.append("Can theo sat cac mon yeu tu ky truoc: " + ", ".join(weak_names))
+
+    if gap > 0.6:
+        warnings.append("Muc tieu GPA cao, can uu tien nhip hoc deu va giu diem qua trinh")
+
+    summary = (
+        f"Ky nay can duy tri GPA trung binh khoang {predicted_semester_gpa:.2f}. "
+        f"Tap trung mon trong diem cao de huong den muc tieu {request_data.targetGpa:.2f}."
+    )
+
+    return SemesterPlanResponse(
+        studentCode=request_data.studentCode,
+        currentGpa=round(request_data.currentGpaAccumulated, 2),
+        targetGpa=round(request_data.targetGpa, 2),
+        predictedSemesterGpa=round(predicted_semester_gpa, 2),
+        requiredAverage=round(max(request_data.targetGpa, 0), 2),
+        subjectTargets=subject_targets,
+        warnings=warnings,
+        summary=summary,
+    )
+
+
 def _load_subject_codes_from_db() -> list[str]:
     _load_env()
     mongo_uri = os.getenv("MONGO_URI")
@@ -279,6 +597,21 @@ def predict_batch(request_list: list[PredictRequest]) -> list[PredictResponse]:
         return []
 
     return [_predict_single(item) for item in request_list]
+
+
+@app.post("/gpa-roadmap", response_model=GpaRoadmapResponse)
+def gpa_roadmap(request_data: GpaRoadmapRequest) -> GpaRoadmapResponse:
+    return _build_gpa_roadmap(request_data)
+
+
+@app.post("/retake-roadmap", response_model=RetakeRoadmapResponse)
+def retake_roadmap(request_data: RetakeRoadmapRequest) -> RetakeRoadmapResponse:
+    return _build_retake_roadmap(request_data)
+
+
+@app.post("/semester-plan", response_model=SemesterPlanResponse)
+def semester_plan(request_data: SemesterPlanRequest) -> SemesterPlanResponse:
+    return _build_semester_plan(request_data)
 
 
 @app.get("/retrain-required")

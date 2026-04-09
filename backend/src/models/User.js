@@ -23,13 +23,19 @@ const userSchema = new mongoose.Schema(
     },
     role: {
       type: String,
-      enum: ["admin", "teacher"],
+      enum: ["admin", "teacher", "advisor"],
       default: "teacher",
     },
     departmentIds: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Department",
+      },
+    ],
+    advisingStudentIds: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Student",
       },
     ],
     phone: {
@@ -58,6 +64,10 @@ const userSchema = new mongoose.Schema(
 
 userSchema.virtual("isAdmin").get(function isAdminGetter() {
   return this.role === "admin";
+});
+
+userSchema.virtual("isAdvisor").get(function isAdvisorGetter() {
+  return this.role === "advisor";
 });
 
 userSchema.methods.comparePassword = async function comparePassword(

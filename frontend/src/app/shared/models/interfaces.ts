@@ -5,7 +5,7 @@ export interface ApiResponse<T> {
   errors?: string[];
 }
 
-export type UserRole = 'admin' | 'teacher';
+export type UserRole = 'admin' | 'teacher' | 'advisor';
 export type Gender = 'male' | 'female';
 export type StudentStatus = 'active' | 'inactive' | 'transferred';
 export type PredictionRiskLevel = 'low' | 'medium' | 'high';
@@ -21,10 +21,192 @@ export interface DefaultWeights {
 }
 
 export interface SemesterConfig {
-  semesterNumber: 1 | 2;
+  semesterNumber: 1 | 2 | 3;
   startDate: string;
   endDate: string;
   isCurrent: boolean;
+  isOptional?: boolean;
+}
+
+export interface Major {
+  _id: string;
+  code: string;
+  name: string;
+  departmentId: string | Department;
+  totalCredits: number;
+  durationYears: number;
+  isActive: boolean;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type CurriculumSubjectType = 'required' | 'elective' | 'prerequisite';
+
+export interface CurriculumItem {
+  subjectId: string | Subject;
+  subjectCode: string;
+  subjectName: string;
+  credits: number;
+  year: number;
+  semester: 1 | 2 | 3;
+  subjectType: CurriculumSubjectType;
+  prerequisiteIds: string[];
+  note?: string;
+}
+
+export interface Curriculum {
+  _id: string;
+  majorId: string | Major;
+  schoolYear: string;
+  name: string;
+  items: CurriculumItem[];
+  totalCredits: number;
+  isActive: boolean;
+  createdBy?: string | User;
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type RegistrationStatus = 'registered' | 'completed' | 'failed' | 'retaking';
+
+export interface StudentRegistration {
+  subjectId: string | Subject;
+  subjectCode: string;
+  classId?: string | Class | null;
+  schoolYear: string;
+  semester: 1 | 2 | 3;
+  status: RegistrationStatus;
+  gradeId?: string | Grade | null;
+  gpa4?: number | null;
+  letterGrade?: string;
+}
+
+export interface StudentCurriculum {
+  _id: string;
+  studentId: string | Student;
+  curriculumId: string | Curriculum;
+  majorId?: string | Major | null;
+  advisorId?: string | User | null;
+  enrolledYear: string;
+  registrations: StudentRegistration[];
+  createdAt?: string;
+  updatedAt?: string;
+}
+
+export type MessageRoomType = 'department' | 'direct';
+
+export interface Message {
+  _id: string;
+  roomId: string;
+  roomType: MessageRoomType;
+  senderId: string | User;
+  senderName: string;
+  content: string;
+  isRead: boolean;
+  readBy: Array<string | User>;
+  createdAt: string;
+}
+
+export interface MessageRoomSummary {
+  roomId: string;
+  roomType: MessageRoomType;
+  roomName?: string;
+  roomCode?: string;
+  unreadCount: number;
+  lastMessage?: Message | null;
+}
+
+export interface SubjectResult {
+  subjectCode: string;
+  subjectName: string;
+  credits: number;
+  gpa4: number;
+  letterGrade: string;
+  status: 'completed' | 'failed' | 'not_started' | 'in_progress';
+  isRequired: boolean;
+}
+
+export interface SubjectPlan {
+  subjectCode: string;
+  subjectName: string;
+  credits: number;
+  targetGrade: 'A' | 'B';
+  targetGpa4: number;
+  priority: 'critical' | 'high' | 'normal';
+  reason: string;
+  semester: 1 | 2 | 3;
+  year: number;
+}
+
+export interface GpaRoadmap {
+  studentCode: string;
+  currentGpa: number;
+  targetGpa: number;
+  targetLabel: string;
+  isAchievable: boolean;
+  requiredGpaRemaining: number;
+  subjectPlans: SubjectPlan[];
+  summary: string;
+  semesterBreakdown: Array<{
+    year: number;
+    semester: 1 | 2 | 3;
+    totalCredits: number;
+    subjects: Array<{
+      subjectCode: string;
+      subjectName: string;
+      credits: number;
+      priority: 'critical' | 'high' | 'normal';
+      targetGrade: 'A' | 'B';
+    }>;
+  }>;
+}
+
+export interface RetakeSubject {
+  subjectCode: string;
+  subjectName: string;
+  credits: number;
+  currentGrade: string;
+  currentGpa4: number;
+  targetGrade: string;
+  urgency: 'urgent' | 'recommended';
+  prerequisiteFor: string[];
+  suggestedSemester: 1 | 2 | 3;
+  reason: string;
+}
+
+export interface RetakeRoadmap {
+  studentCode: string;
+  urgentRetakes: RetakeSubject[];
+  recommendedRetakes: RetakeSubject[];
+  retakePlan: Array<{
+    year: number;
+    semester: 1 | 2 | 3;
+    subjects: Array<{
+      subjectCode: string;
+      subjectName: string;
+      urgency: 'urgent' | 'recommended';
+      targetGrade: string;
+    }>;
+  }>;
+  note: string;
+}
+
+export interface SemesterPlan {
+  studentCode: string;
+  currentGpa: number;
+  targetGpa: number;
+  predictedSemesterGpa: number;
+  requiredAverage: number;
+  warnings: string[];
+  summary: string;
+  subjectTargets: Array<{
+    subjectCode: string;
+    subjectName: string;
+    credits: number;
+    targetGrade: 'A' | 'B';
+    targetGpa4: number;
+    reason: string;
+  }>;
 }
 
 export interface Department {
@@ -40,10 +222,12 @@ export interface Department {
 
 export interface User {
   _id: string;
+  teacherCode?: string;
   name: string;
   email: string;
   role: UserRole;
   departmentIds: Array<string | Department>;
+  advisingStudentIds?: Array<string | Student>;
   phone?: string;
   avatar?: string;
   isActive?: boolean;
@@ -70,7 +254,7 @@ export interface Subject {
   departmentId: string | Department;
   credits: number;
   coefficient?: number;
-  semester: 1 | 2 | 'both';
+  semester: 1 | 2 | 3 | 'all';
   category:
     | 'theory'
     | 'practice'
@@ -94,6 +278,8 @@ export interface Student {
   dateOfBirth?: string | null;
   gender?: Gender | null;
   classId: string | Class;
+  majorId?: string | Major | null;
+  enrolledYear?: string;
   address?: string;
   parentName?: string;
   parentPhone?: string;
@@ -112,7 +298,7 @@ export interface Class {
   subjectId: string | Subject;
   departmentId: string | Department;
   schoolYearId: string | SchoolYear;
-  semester: 1 | 2;
+  semester: 1 | 2 | 3;
   teacherId: string | User | null;
   weights: DefaultWeights;
   txCount?: number;
@@ -129,7 +315,7 @@ export interface Grade {
   subjectId: string | Subject;
   departmentId?: string | Department;
   schoolYearId: string | SchoolYear;
-  semester: 1 | 2;
+  semester: 1 | 2 | 3;
   weights: DefaultWeights;
   txScores: number[];
   gkScore: number | null;
@@ -159,7 +345,7 @@ export interface Prediction {
   _id: string;
   studentId: string | Student;
   schoolYearId?: string | SchoolYear;
-  semester?: 1 | 2;
+  semester?: 1 | 2 | 3;
   gradeId?: string | Grade;
   predictedGpaHK?: number;
   predictedDiemTB?: number;

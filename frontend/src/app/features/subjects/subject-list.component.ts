@@ -25,7 +25,7 @@ import { finalize, forkJoin, map } from 'rxjs';
 import { ApiService } from '../../core/services/api.service';
 import { ApiResponse, Department, Subject } from '../../shared/models/interfaces';
 
-type SemesterFilter = 'all' | '1' | '2';
+type SemesterFilter = 'all' | '1' | '2' | '3';
 
 interface SubjectFormData {
   mode: 'create' | 'edit';
@@ -37,7 +37,7 @@ interface SubjectUpsertPayload {
   code?: string;
   name: string;
   departmentId: string;
-  semester: 1 | 2 | 'both';
+  semester: 1 | 2 | 3 | 'all';
   coefficient: number;
   credits: number;
   gradeLevel: number[];
@@ -112,6 +112,7 @@ interface SubjectUpsertPayload {
               <mat-option value="all">Tất cả</mat-option>
               <mat-option value="1">HK1</mat-option>
               <mat-option value="2">HK2</mat-option>
+              <mat-option value="3">HK3 - Hè</mat-option>
             </mat-select>
           </mat-form-field>
 
@@ -169,7 +170,11 @@ interface SubjectUpsertPayload {
 
               <ng-container matColumnDef="semester">
                 <th mat-header-cell *matHeaderCellDef>Học kỳ</th>
-                <td mat-cell *matCellDef="let row">{{ formatSemester(row.semester) }}</td>
+                <td mat-cell *matCellDef="let row">
+                  <span class="sem-badge" [class.sem-badge--summer]="row.semester === 3">
+                    {{ formatSemester(row.semester) }}
+                  </span>
+                </td>
               </ng-container>
 
               <ng-container matColumnDef="coefficient">
@@ -303,6 +308,22 @@ interface SubjectUpsertPayload {
 
       .actions-cell {
         white-space: nowrap;
+      }
+
+      .sem-badge {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        background: #e8efff;
+        color: #1d4ed8;
+        padding: 0.16rem 0.5rem;
+        font-size: 0.74rem;
+        font-weight: 700;
+      }
+
+      .sem-badge--summer {
+        background: #fff5cc;
+        color: #9a6700;
       }
 
       .actions-wrap {
@@ -568,8 +589,12 @@ export class SubjectListComponent implements OnInit {
   }
 
   formatSemester(value: Subject['semester']): string {
-    if (value === 'both') {
-      return 'Cả hai';
+    if (value === 'all') {
+      return 'Tất cả kỳ';
+    }
+
+    if (value === 3) {
+      return 'HK3 - Hè';
     }
 
     return `HK${value}`;
@@ -668,7 +693,8 @@ export class SubjectListComponent implements OnInit {
         <mat-select formControlName="semester">
           <mat-option [value]="1">HK1</mat-option>
           <mat-option [value]="2">HK2</mat-option>
-          <mat-option value="both">Cả hai</mat-option>
+          <mat-option [value]="3">HK3 - Hè</mat-option>
+          <mat-option value="all">Tất cả kỳ</mat-option>
         </mat-select>
       </mat-form-field>
 
@@ -746,7 +772,7 @@ export class SubjectFormDialogComponent {
     code: ['', [Validators.required, Validators.pattern(/^[a-z0-9]+$/)]],
     name: ['', [Validators.required]],
     departmentId: ['', [Validators.required]],
-    semester: ['both' as 1 | 2 | 'both', [Validators.required]],
+    semester: ['all' as 1 | 2 | 3 | 'all', [Validators.required]],
     coefficient: [1, [Validators.required, Validators.min(1), Validators.max(3)]],
     gradeLevel: [[10, 11, 12] as number[]],
   });

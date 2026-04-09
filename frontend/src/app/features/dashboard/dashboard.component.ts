@@ -1,7 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
-  AfterViewInit,
   ChangeDetectorRef,
   Component,
   ElementRef,
@@ -43,13 +42,24 @@ interface DashboardStats {
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
 })
-export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
+export class DashboardComponent implements OnInit, OnDestroy {
   private readonly apiService = inject(ApiService);
   private readonly cdr = inject(ChangeDetectorRef);
   private readonly requestTimeoutMs = 10000;
   private loadingGuardTimer: ReturnType<typeof setTimeout> | null = null;
 
   @ViewChild('gradeChartCanvas')
+  set gradeChartCanvasRef(value: ElementRef<HTMLCanvasElement> | undefined) {
+    this.gradeChartCanvas = value;
+
+    if (!value) {
+      this.destroyChart();
+      return;
+    }
+
+    this.renderOrUpdateGradeChart();
+  }
+
   private gradeChartCanvas?: ElementRef<HTMLCanvasElement>;
 
   isLoading = true;
@@ -71,16 +81,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
 
   alertRows: AlertRow[] = [];
 
-  private gradeChart?: Chart<'doughnut', number[], string>;
-  private chartViewReady = false;
-
+  private gradeChart?: Chart<'bar', number[], string>;
   ngOnInit(): void {
     this.loadDashboardData();
-  }
-
-  ngAfterViewInit(): void {
-    this.chartViewReady = true;
-    this.renderOrUpdateGradeChart();
   }
 
   ngOnDestroy(): void {
@@ -242,7 +245,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private renderOrUpdateGradeChart(): void {
-    if (!this.chartViewReady || !this.gradeChartCanvas) {
+    if (!this.gradeChartCanvas) {
       return;
     }
 
@@ -265,25 +268,54 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
 
-    const chartConfig: ChartConfiguration<'doughnut', number[], string> = {
-      type: 'doughnut',
+    const chartConfig: ChartConfiguration<'bar', number[], string> = {
+      type: 'bar',
       data: {
         labels: ['Giỏi (A)', 'Khá (B)', 'Trung Bình (C)', 'Yếu (F)'],
         datasets: [
           {
+            label: 'Số lượng sinh viên',
             data: chartData,
             backgroundColor: ['#16a34a', '#2563eb', '#d97706', '#dc2626'],
-            borderWidth: 0,
-            hoverOffset: 6,
+            borderRadius: 8,
+            borderSkipped: false,
+            maxBarThickness: 52,
           },
         ],
       },
       options: {
         responsive: true,
         maintainAspectRatio: false,
-        cutout: '68%',
+        scales: {
+          x: {
+            grid: {
+              display: false,
+            },
+            ticks: {
+              font: {
+                family: 'Be Vietnam Pro',
+                size: 12,
+              },
+            },
+          },
+          y: {
+            beginAtZero: true,
+            ticks: {
+              precision: 0,
+              stepSize: 1,
+              font: {
+                family: 'Be Vietnam Pro',
+                size: 12,
+              },
+            },
+            grid: {
+              color: 'rgba(148, 163, 184, 0.2)',
+            },
+          },
+        },
         plugins: {
           legend: {
+            display: false,
             position: 'bottom',
             labels: {
               usePointStyle: true,

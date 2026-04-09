@@ -46,7 +46,7 @@ interface ClassUpsertPayload {
   subjectId: string;
   departmentId: string;
   schoolYearId: string;
-  semester: 1 | 2;
+  semester: 1 | 2 | 3;
   teacherId: string | null;
 }
 
@@ -104,8 +104,9 @@ interface ClassUpsertPayload {
             <mat-label>Học kỳ</mat-label>
             <mat-select [(ngModel)]="selectedSemester" (ngModelChange)="applyFilters()">
               <mat-option value="all">Tất cả học kỳ</mat-option>
-              <mat-option value="1">Học kỳ 1</mat-option>
-              <mat-option value="2">Học kỳ 2</mat-option>
+              <mat-option value="1">Học kỳ 1 (T9-T12)</mat-option>
+              <mat-option value="2">Học kỳ 2 (T1-T4)</mat-option>
+              <mat-option value="3">Học kỳ 3 - Hè (T5-T8)</mat-option>
             </mat-select>
           </mat-form-field>
 
@@ -187,7 +188,11 @@ interface ClassUpsertPayload {
 
               <ng-container matColumnDef="semester">
                 <th mat-header-cell *matHeaderCellDef>Học kỳ</th>
-                <td mat-cell *matCellDef="let row">HK{{ row.semester }}</td>
+                <td mat-cell *matCellDef="let row">
+                  <span class="sem-badge" [class.sem-badge--summer]="row.semester === 3">
+                    HK{{ row.semester }}{{ row.semester === 3 ? ' - Hè' : '' }}
+                  </span>
+                </td>
               </ng-container>
 
               <ng-container matColumnDef="credits">
@@ -339,6 +344,22 @@ interface ClassUpsertPayload {
         white-space: nowrap;
       }
 
+      .sem-badge {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        background: #e8efff;
+        color: #1d4ed8;
+        padding: 0.16rem 0.5rem;
+        font-size: 0.74rem;
+        font-weight: 700;
+      }
+
+      .sem-badge--summer {
+        background: #fff5cc;
+        color: #9a6700;
+      }
+
       .actions-wrap {
         display: inline-flex;
         align-items: center;
@@ -384,7 +405,7 @@ export class ClassListComponent implements OnInit {
   teachers: User[] = [];
 
   selectedSchoolYearId = 'all';
-  selectedSemester: 'all' | '1' | '2' = 'all';
+  selectedSemester: 'all' | '1' | '2' | '3' = 'all';
   selectedDepartmentId = 'all';
   searchKeyword = '';
 
@@ -720,6 +741,7 @@ export class ClassListComponent implements OnInit {
           <mat-select formControlName="semester">
             <mat-option [value]="1">HK1</mat-option>
             <mat-option [value]="2">HK2</mat-option>
+            <mat-option [value]="3">HK3 - Hè</mat-option>
           </mat-select>
         </mat-form-field>
       </div>
@@ -794,7 +816,7 @@ export class ClassFormDialogComponent {
     gradeLevel: [10, [Validators.required]],
     schoolYearId: ['', [Validators.required]],
     departmentId: ['', [Validators.required]],
-    semester: [1 as 1 | 2, [Validators.required]],
+    semester: [1 as 1 | 2 | 3, [Validators.required]],
     subjectId: ['', [Validators.required]],
     teacherId: [''],
   });

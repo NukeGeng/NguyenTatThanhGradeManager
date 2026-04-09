@@ -40,7 +40,7 @@ const classSchema = new mongoose.Schema(
     },
     semester: {
       type: Number,
-      enum: [1, 2],
+      enum: [1, 2, 3],
       required: [true, "semester is required"],
     },
     teacherId: {

@@ -9,6 +9,8 @@ const Subject = require("../models/Subject");
 
 const router = express.Router();
 
+const isValidSemester = (value) => [1, 2, 3].includes(Number(value));
+
 router.use(auth);
 
 router.get("/", async (req, res, next) => {
@@ -134,6 +136,7 @@ router.post("/", adminOnly, async (req, res, next) => {
     } = req.body;
 
     const normalizedCode = String(code || name || "").trim();
+    const normalizedSemester = Number(semester);
 
     if (
       !normalizedCode ||
@@ -146,6 +149,13 @@ router.post("/", adminOnly, async (req, res, next) => {
         success: false,
         message:
           "code, subjectId, departmentId, schoolYearId, semester are required",
+      });
+    }
+
+    if (!isValidSemester(normalizedSemester)) {
+      return res.status(400).json({
+        success: false,
+        message: "semester phải thuộc [1,2,3]",
       });
     }
 
@@ -189,7 +199,7 @@ router.post("/", adminOnly, async (req, res, next) => {
       subjectId,
       departmentId,
       schoolYearId,
-      semester: Number(semester),
+      semester: normalizedSemester,
       teacherId: teacherId || null,
       weights,
       txCount,
@@ -294,8 +304,16 @@ router.put("/:id", async (req, res, next) => {
       }
     }
 
-    if (payload.semester !== undefined)
+    if (payload.semester !== undefined) {
+      if (!isValidSemester(payload.semester)) {
+        return res.status(400).json({
+          success: false,
+          message: "semester phải thuộc [1,2,3]",
+        });
+      }
+
       payload.semester = Number(payload.semester);
+    }
 
     if (payload.studentCount !== undefined) {
       payload.studentCount = Math.max(0, Number(payload.studentCount));

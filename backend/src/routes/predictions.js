@@ -4,7 +4,12 @@ const Grade = require("../models/Grade");
 const Class = require("../models/Class");
 const Student = require("../models/Student");
 const Prediction = require("../models/Prediction");
-const { predictStudent } = require("../services/aiService");
+const {
+  predictStudent,
+  getGpaRoadmap,
+  getRetakeRoadmap,
+  getSemesterPlan,
+} = require("../services/aiService");
 
 const router = express.Router();
 
@@ -12,6 +17,11 @@ router.use(auth);
 
 const getAllowedDepartmentIds = (user) =>
   (user.departmentIds || []).map((item) =>
+    item?._id ? String(item._id) : String(item),
+  );
+
+const getAdvisingStudentIds = (user) =>
+  (user.advisingStudentIds || []).map((item) =>
     item?._id ? String(item._id) : String(item),
   );
 
@@ -156,8 +166,49 @@ const populatePredictionQuery = (query) =>
       ],
     });
 
+const ensureCanReadStudent = async (user, studentId) => {
+  const student = await Student.findById(studentId)
+    .populate("classId", "departmentId")
+    .select("_id classId");
+
+  if (!student) {
+    const error = new Error("Student not found");
+    error.statusCode = 404;
+    throw error;
+  }
+
+  if (user.role === "advisor") {
+    const advisingStudentIds = getAdvisingStudentIds(user);
+    if (!advisingStudentIds.includes(String(student._id))) {
+      const error = new Error(
+        "Bạn không có quyền xem dữ liệu của học sinh này",
+      );
+      error.statusCode = 403;
+      throw error;
+    }
+  } else if (user.role !== "admin") {
+    const allowedDepartmentIds = getAllowedDepartmentIds(user);
+    if (!allowedDepartmentIds.includes(String(student.classId?.departmentId))) {
+      const error = new Error(
+        "Bạn không có quyền xem dữ liệu của học sinh này",
+      );
+      error.statusCode = 403;
+      throw error;
+    }
+  }
+
+  return student;
+};
+
 router.post("/predict", async (req, res, next) => {
   try {
+    if (req.user.role === "advisor") {
+      return res.status(403).json({
+        success: false,
+        message: "Advisor không có quyền chạy dự đoán",
+      });
+    }
+
     const { gradeId } = req.body;
 
     if (!gradeId) {
@@ -221,6 +272,13 @@ router.post("/predict", async (req, res, next) => {
 
 router.post("/predict-class", async (req, res, next) => {
   try {
+    if (req.user.role === "advisor") {
+      return res.status(403).json({
+        success: false,
+        message: "Advisor không có quyền chạy dự đoán cả lớp",
+      });
+    }
+
     const { classId } = req.body;
 
     if (!classId) {
@@ -322,7 +380,15 @@ router.get("/student/:studentId", async (req, res, next) => {
       });
     }
 
-    if (req.user.role !== "admin") {
+    if (req.user.role === "advisor") {
+      const advisingStudentIds = getAdvisingStudentIds(req.user);
+      if (!advisingStudentIds.includes(String(student._id))) {
+        return res.status(403).json({
+          success: false,
+          message: "Bạn không có quyền xem dự đoán của học sinh này",
+        });
+      }
+    } else if (req.user.role !== "admin") {
       const allowedDepartmentIds = getAllowedDepartmentIds(req.user);
       if (
         !allowedDepartmentIds.includes(String(student.classId?.departmentId))
@@ -437,6 +503,11 @@ router.get("/alerts", async (req, res, next) => {
       req.user.role === "admin"
         ? highRiskPredictions
         : highRiskPredictions.filter((item) => {
+            if (req.user.role === "advisor") {
+              const advisingStudentIds = getAdvisingStudentIds(req.user);
+              return advisingStudentIds.includes(String(item.studentId?._id));
+            }
+
             const allowedDepartmentIds = getAllowedDepartmentIds(req.user);
             return allowedDepartmentIds.includes(
               String(item.studentId?.classId?.departmentId),
@@ -449,6 +520,78 @@ router.get("/alerts", async (req, res, next) => {
       message: "Get high risk alerts successfully",
     });
   } catch (error) {
+    return next(error);
+  }
+});
+
+router.get("/student/:studentId/gpa-roadmap", async (req, res, next) => {
+  try {
+    await ensureCanReadStudent(req.user, req.params.studentId);
+
+    const targetGpa = Number(req.query.targetGpa || 3.2);
+    const data = await getGpaRoadmap(req.params.studentId, targetGpa);
+
+    return res.status(200).json({
+      success: true,
+      data,
+      message: "Get GPA roadmap successfully",
+    });
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+    }
+    return next(error);
+  }
+});
+
+router.get("/student/:studentId/retake-roadmap", async (req, res, next) => {
+  try {
+    await ensureCanReadStudent(req.user, req.params.studentId);
+
+    const data = await getRetakeRoadmap(req.params.studentId);
+
+    return res.status(200).json({
+      success: true,
+      data,
+      message: "Get retake roadmap successfully",
+    });
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+    }
+    return next(error);
+  }
+});
+
+router.post("/student/:studentId/semester-plan", async (req, res, next) => {
+  try {
+    await ensureCanReadStudent(req.user, req.params.studentId);
+
+    const { registeredClassIds = [], targetGpa = 3.2 } = req.body;
+    const data = await getSemesterPlan(
+      req.params.studentId,
+      registeredClassIds,
+      targetGpa,
+    );
+
+    return res.status(200).json({
+      success: true,
+      data,
+      message: "Get semester plan successfully",
+    });
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+    }
     return next(error);
   }
 });

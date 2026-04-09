@@ -38,6 +38,7 @@ import {
   SchoolYear,
   Student,
 } from '../../../shared/models/interfaces';
+import { toTenDigitStudentCode } from '../../../shared/utils/code-format.util';
 
 interface GradeUpsertPayload {
   studentId: string;
@@ -45,7 +46,7 @@ interface GradeUpsertPayload {
   subjectId: string;
   departmentId: string;
   schoolYearId: string;
-  semester: 1 | 2;
+  semester: 1 | 2 | 3;
   weights: DefaultWeights;
   txScores: Array<number | null>;
   gkScore: number | null;
@@ -136,8 +137,9 @@ interface WeightDialogData {
             <mat-label>Học kỳ</mat-label>
             <mat-select formControlName="semester" (selectionChange)="onFilterChange()">
               <mat-option [value]="null">Chọn học kỳ</mat-option>
-              <mat-option [value]="1">Học kỳ 1</mat-option>
-              <mat-option [value]="2">Học kỳ 2</mat-option>
+              <mat-option [value]="1">Học kỳ 1 (T9-T12)</mat-option>
+              <mat-option [value]="2">Học kỳ 2 (T1-T4)</mat-option>
+              <mat-option [value]="3">Học kỳ 3 - Hè (T5-T8)</mat-option>
             </mat-select>
           </mat-form-field>
 
@@ -364,7 +366,7 @@ interface WeightDialogData {
           <div class="student-head">
             <p>
               <strong>Sinh viên:</strong> {{ selectedStudent.fullName }} ({{
-                selectedStudent.studentCode
+                formatStudentCode(selectedStudent)
               }})
             </p>
           </div>
@@ -800,7 +802,7 @@ export class GradeEntryComponent implements OnInit {
       nonNullable: true,
       validators: [Validators.required],
     }),
-    semester: this.fb.control<1 | 2 | null>(null, { validators: [Validators.required] }),
+    semester: this.fb.control<1 | 2 | 3 | null>(null, { validators: [Validators.required] }),
     classId: this.fb.control<string>('', { nonNullable: true, validators: [Validators.required] }),
   });
 
@@ -1010,8 +1012,9 @@ export class GradeEntryComponent implements OnInit {
 
   openWeightDialog(): void {
     const dialogRef = this.dialog.open(GradeWeightDialogComponent, {
-      width: '640px',
+      width: '700px',
       maxWidth: '94vw',
+      panelClass: 'grade-weight-dialog-panel',
       data: {
         weights: this.currentWeights,
       } satisfies WeightDialogData,
@@ -1219,6 +1222,10 @@ export class GradeEntryComponent implements OnInit {
 
   getStudentGrade(studentId: string): Grade | null {
     return this.findStudentGrade(studentId);
+  }
+
+  formatStudentCode(student: Student): string {
+    return toTenDigitStudentCode(student.studentCode, student._id);
   }
 
   scoreAt(values: Array<number | null> | undefined, index: number): number | null {
@@ -1474,9 +1481,9 @@ export class GradeEntryComponent implements OnInit {
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, MatButtonModule, MatFormFieldModule, MatInputModule],
   template: `
-    <h2 mat-dialog-title>Chỉnh trọng số điểm</h2>
+    <h2 mat-dialog-title class="weight-dialog-title">Chỉnh trọng số điểm</h2>
 
-    <div mat-dialog-content>
+    <div mat-dialog-content class="weight-dialog-content">
       <form [formGroup]="form" class="weight-grid">
         <mat-form-field appearance="outline">
           <mat-label>TX (%)</mat-label>
@@ -1503,7 +1510,7 @@ export class GradeEntryComponent implements OnInit {
       <p class="help-note">Tổng TX + GK + TH + TKT bắt buộc bằng 100.</p>
     </div>
 
-    <div mat-dialog-actions align="end">
+    <div mat-dialog-actions align="end" class="weight-dialog-actions">
       <button mat-button type="button" (click)="close()">Hủy</button>
       <button
         mat-flat-button
@@ -1521,7 +1528,24 @@ export class GradeEntryComponent implements OnInit {
       .weight-grid {
         display: grid;
         grid-template-columns: repeat(2, minmax(0, 1fr));
-        gap: 0.75rem;
+        gap: 0.85rem;
+      }
+
+      .weight-dialog-title {
+        margin: 0;
+      }
+
+      .weight-dialog-content {
+        display: grid;
+        gap: 0.3rem;
+      }
+
+      .weight-dialog-content .mat-mdc-form-field {
+        margin: 0;
+      }
+
+      .weight-dialog-actions {
+        gap: 0.45rem;
       }
 
       .sum-note {

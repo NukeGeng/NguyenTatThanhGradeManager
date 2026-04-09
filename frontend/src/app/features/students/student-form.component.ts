@@ -18,6 +18,7 @@ import { finalize, forkJoin, map, of } from 'rxjs';
 
 import { ApiService } from '../../core/services/api.service';
 import { ApiResponse, Class, Student } from '../../shared/models/interfaces';
+import { toTenDigitStudentCode } from '../../shared/utils/code-format.util';
 
 interface StudentUpsertPayload {
   fullName: string;
@@ -90,7 +91,7 @@ interface StudentUpsertPayload {
               <mat-form-field appearance="outline">
                 <mat-label>Mã HS</mat-label>
                 <input matInput [value]="studentCodeHint" readonly />
-                <mat-hint>Tự sinh theo định dạng HS0001</mat-hint>
+                <mat-hint>Tự sinh theo định dạng 10 chữ số</mat-hint>
               </mat-form-field>
 
               <mat-form-field appearance="outline">
@@ -293,7 +294,7 @@ export class StudentFormComponent implements OnInit {
   errorMessage = '';
 
   studentId = '';
-  studentCodeHint = 'HSxxxx';
+  studentCodeHint = '0000000000';
 
   form = this.fb.nonNullable.group({
     fullName: ['', [Validators.required]],
@@ -339,7 +340,7 @@ export class StudentFormComponent implements OnInit {
           this.classes = classes;
 
           if (student) {
-            this.studentCodeHint = student.studentCode;
+            this.studentCodeHint = toTenDigitStudentCode(student.studentCode, student._id);
             this.form.patchValue({
               fullName: student.fullName,
               dateOfBirth: student.dateOfBirth ? new Date(student.dateOfBirth) : null,
