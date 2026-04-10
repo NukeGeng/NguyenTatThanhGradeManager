@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { AfterViewInit, Component, DestroyRef, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, DestroyRef, OnInit, ViewChild, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -18,8 +18,20 @@ import { LucideAngularModule } from 'lucide-angular';
 import { finalize, forkJoin, map } from 'rxjs';
 
 import { ApiService } from '../../core/services/api.service';
-import { ApiResponse, Class, Student, StudentStatus } from '../../shared/models/interfaces';
+import {
+  ApiResponse,
+  Class,
+  Department,
+  Student,
+  StudentStatus,
+} from '../../shared/models/interfaces';
 import { toTenDigitStudentCode } from '../../shared/utils/code-format.util';
+
+interface DepartmentOption {
+  id: string;
+  label: string;
+  name: string;
+}
 
 @Component({
   selector: 'app-student-list',
@@ -51,7 +63,7 @@ import { toTenDigitStudentCode } from '../../shared/utils/code-format.util';
         <div>
           <p class="eyebrow">Quản lý học sinh</p>
           <h1 class="page-title">Danh sách học sinh</h1>
-          <p class="subtitle">Tìm kiếm nhanh theo tên, lọc theo lớp và trạng thái.</p>
+          <p class="subtitle">Tìm kiếm theo tên, lọc theo khoa, lớp và trạng thái.</p>
         </div>
 
         <button mat-flat-button type="button" class="btn-primary" (click)="createStudent()">
@@ -73,10 +85,20 @@ import { toTenDigitStudentCode } from '../../shared/utils/code-format.util';
           </mat-form-field>
 
           <mat-form-field appearance="outline">
+            <mat-label>Khoa</mat-label>
+            <mat-select [(ngModel)]="selectedDepartmentId" (selectionChange)="onDepartmentChange()">
+              <mat-option value="all">Tất cả khoa</mat-option>
+              @for (department of departmentOptions; track department.id) {
+                <mat-option [value]="department.id">{{ department.label }}</mat-option>
+              }
+            </mat-select>
+          </mat-form-field>
+
+          <mat-form-field appearance="outline">
             <mat-label>Lớp</mat-label>
-            <mat-select [(ngModel)]="selectedClassId" (selectionChange)="applyFilters()">
+            <mat-select [(ngModel)]="selectedClassId" (selectionChange)="onClassChange()">
               <mat-option value="all">Tất cả lớp</mat-option>
-              @for (classItem of classes; track classItem._id) {
+              @for (classItem of classOptions; track classItem._id) {
                 <mat-option [value]="classItem._id">{{
                   classItem.name || classItem.code
                 }}</mat-option>
@@ -238,7 +260,7 @@ import { toTenDigitStudentCode } from '../../shared/utils/code-format.util';
 
       .filters {
         display: grid;
-        grid-template-columns: 1.5fr 1fr 1fr;
+        grid-template-columns: 1.5fr 1fr 1fr 1fr;
         gap: 0.75rem;
         padding: 0.3rem;
         margin-bottom: 0.4rem;
@@ -307,22 +329,39 @@ import { toTenDigitStudentCode } from '../../shared/utils/code-format.util';
     `,
   ],
 })
-export class StudentListComponent implements OnInit, AfterViewInit {
+export class StudentListComponent implements OnInit {
   private readonly apiService = inject(ApiService);
   private readonly router = inject(Router);
   private readonly snackBar = inject(MatSnackBar);
   private readonly destroyRef = inject(DestroyRef);
 
-  @ViewChild(MatPaginator) paginator?: MatPaginator;
-  @ViewChild(MatSort) sort?: MatSort;
+  private paginator?: MatPaginator;
+  private sort?: MatSort;
+
+  @ViewChild(MatPaginator)
+  set matPaginator(value: MatPaginator | undefined) {
+    this.paginator = value;
+    this.dataSource.paginator = value ?? null;
+  }
+
+  @ViewChild(MatSort)
+  set matSort(value: MatSort | undefined) {
+    this.sort = value;
+    this.dataSource.sort = value ?? null;
+  }
 
   readonly displayedColumns = ['studentCode', 'fullName', 'class', 'gender', 'status', 'actions'];
   readonly dataSource = new MatTableDataSource<Student>([]);
 
   students: Student[] = [];
+  allStudents: Student[] = [];
   classes: Class[] = [];
+  departmentOptions: DepartmentOption[] = [];
+  classDepartmentMap = new Map<string, string>();
+  classScopedStudentsCache = new Map<string, Student[]>();
 
   searchText = '';
+  selectedDepartmentId = 'all';
   selectedClassId = 'all';
   selectedStatus: StudentStatus | 'all' = 'all';
 
@@ -333,9 +372,15 @@ export class StudentListComponent implements OnInit, AfterViewInit {
     this.loadData();
   }
 
-  ngAfterViewInit(): void {
-    this.dataSource.paginator = this.paginator ?? null;
-    this.dataSource.sort = this.sort ?? null;
+  get classOptions(): Class[] {
+    if (this.selectedDepartmentId === 'all') {
+      return this.classes;
+    }
+
+    return this.classes.filter((classItem) => {
+      const departmentId = this.resolveDepartmentId(classItem.departmentId);
+      return departmentId === this.selectedDepartmentId;
+    });
   }
 
   loadData(): void {
@@ -344,10 +389,10 @@ export class StudentListComponent implements OnInit, AfterViewInit {
 
     forkJoin({
       students: this.apiService
-        .get<ApiResponse<Student[]>>('/students')
+        .get<ApiResponse<Student[]>>('/students', { fromClasses: true })
         .pipe(map((response) => response.data ?? [])),
       classes: this.apiService
-        .get<ApiResponse<Class[]>>('/classes')
+        .get<ApiResponse<Class[]>>('/classes', { hasStudents: true })
         .pipe(map((response) => response.data ?? [])),
     })
       .pipe(
@@ -358,8 +403,24 @@ export class StudentListComponent implements OnInit, AfterViewInit {
       )
       .subscribe({
         next: ({ students, classes }) => {
-          this.students = students;
+          const allowedClassIds = new Set(classes.map((classItem) => classItem._id));
+          this.allStudents = students.filter((student) => {
+            const classId = this.resolveClassId(student.classId);
+            return allowedClassIds.has(classId);
+          });
+          this.students = this.allStudents;
           this.classes = classes;
+          this.departmentOptions = this.buildDepartmentOptions(classes);
+          this.classScopedStudentsCache.clear();
+
+          this.classDepartmentMap.clear();
+          classes.forEach((classItem) => {
+            const departmentId = this.resolveDepartmentId(classItem.departmentId);
+            if (departmentId) {
+              this.classDepartmentMap.set(classItem._id, departmentId);
+            }
+          });
+
           this.applyFilters();
         },
         error: (error: unknown) => {
@@ -378,13 +439,20 @@ export class StudentListComponent implements OnInit, AfterViewInit {
         codeKeyword.length > 0 && this.formatStudentCode(student).includes(codeKeyword);
 
       const classId = this.resolveClassId(student.classId);
-      const matchClass = this.selectedClassId === 'all' || classId === this.selectedClassId;
+      const classDepartmentId = this.classDepartmentMap.get(classId) || null;
+      const matchDepartment =
+        this.selectedClassId !== 'all'
+          ? true
+          : this.selectedDepartmentId === 'all' ||
+            classDepartmentId === this.selectedDepartmentId;
 
       const status = student.status ?? 'active';
       const matchStatus = this.selectedStatus === 'all' || status === this.selectedStatus;
 
       return (
-        (matchName || matchCode || normalizedKeyword.length === 0) && matchClass && matchStatus
+        (matchName || matchCode || normalizedKeyword.length === 0) &&
+        matchDepartment &&
+        matchStatus
       );
     });
 
@@ -393,6 +461,57 @@ export class StudentListComponent implements OnInit, AfterViewInit {
     if (this.paginator) {
       this.paginator.firstPage();
     }
+  }
+
+  onDepartmentChange(): void {
+    if (!this.classOptions.some((classItem) => classItem._id === this.selectedClassId)) {
+      this.selectedClassId = 'all';
+    }
+
+    if (this.selectedClassId === 'all') {
+      this.students = this.allStudents;
+    }
+
+    this.applyFilters();
+  }
+
+  onClassChange(): void {
+    if (this.selectedClassId === 'all') {
+      this.students = this.allStudents;
+      this.applyFilters();
+      return;
+    }
+
+    const cached = this.classScopedStudentsCache.get(this.selectedClassId);
+    if (cached) {
+      this.students = cached;
+      this.applyFilters();
+      return;
+    }
+
+    this.dataSource.data = [];
+
+    this.apiService
+      .get<ApiResponse<Student[]>>('/students', {
+        fromClasses: true,
+        classId: this.selectedClassId,
+      })
+      .pipe(
+        map((response) => response.data ?? []),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (students) => {
+          this.classScopedStudentsCache.set(this.selectedClassId, students);
+          this.students = students;
+          this.applyFilters();
+        },
+        error: (error: unknown) => {
+          this.students = [];
+          this.snackBar.open(this.resolveErrorMessage(error), 'Đóng', { duration: 2800 });
+          this.applyFilters();
+        },
+      });
   }
 
   createStudent(): void {
@@ -466,6 +585,51 @@ export class StudentListComponent implements OnInit, AfterViewInit {
 
   private resolveClassId(value: Student['classId']): string {
     return typeof value === 'string' ? value : value._id;
+  }
+
+  private resolveDepartmentId(value: Class['departmentId']): string | null {
+    if (!value) {
+      return null;
+    }
+
+    if (typeof value === 'string') {
+      return value;
+    }
+
+    return value._id;
+  }
+
+  private buildDepartmentOptions(classes: Class[]): DepartmentOption[] {
+    const optionsMap = new Map<string, DepartmentOption>();
+
+    classes.forEach((classItem) => {
+      const department = classItem.departmentId;
+      const departmentId = this.resolveDepartmentId(department);
+      if (!departmentId || optionsMap.has(departmentId)) {
+        return;
+      }
+
+      if (typeof department === 'string') {
+        optionsMap.set(departmentId, {
+          id: departmentId,
+          name: departmentId,
+          label: departmentId,
+        });
+        return;
+      }
+
+      const code = String((department as Department).code || '').trim();
+      const name = String((department as Department).name || code || departmentId).trim();
+      optionsMap.set(departmentId, {
+        id: departmentId,
+        name,
+        label: code ? `${code} - ${name}` : name,
+      });
+    });
+
+    return Array.from(optionsMap.values()).sort((a, b) =>
+      a.name.localeCompare(b.name, 'vi', { sensitivity: 'base' }),
+    );
   }
 
   private resolveErrorMessage(error: unknown): string {

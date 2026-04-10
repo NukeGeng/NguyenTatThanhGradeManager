@@ -19,7 +19,7 @@ const auth = async (req, res, next) => {
     const user = await User.findById(userId)
       .select("-password")
       .populate("departmentIds", "_id code name")
-      .populate("advisingStudentIds", "_id studentCode fullName");
+      .lean();
 
     if (!user) {
       return res.status(401).json({

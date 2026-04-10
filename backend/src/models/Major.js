@@ -29,6 +29,11 @@ const majorSchema = new mongoose.Schema(
       default: 4,
       min: 1,
     },
+    durationLabel: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     isActive: {
       type: Boolean,
       default: true,

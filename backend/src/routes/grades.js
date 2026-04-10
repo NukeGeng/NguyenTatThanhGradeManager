@@ -53,6 +53,8 @@ const getAdvisingStudentIds = (user) =>
     item?._id ? String(item._id) : String(item),
   );
 
+const DASHBOARD_GRADE_LETTERS = ["A", "B", "C", "F"];
+
 const normalizeScoreArray = (scores) => {
   if (!Array.isArray(scores)) {
     return [];
@@ -442,6 +444,106 @@ router.put("/:id", async (req, res, next) => {
       });
     }
 
+    return next(error);
+  }
+});
+
+router.get("/summary/dashboard", async (req, res, next) => {
+  try {
+    const classQuery = {};
+    const activeOnly =
+      String(req.query.activeOnly || "true").toLowerCase() !== "false";
+
+    if (req.user.role !== "admin") {
+      const allowedDepartmentIds = getAllowedDepartmentIds(req.user);
+      classQuery.departmentId = { $in: allowedDepartmentIds };
+    }
+
+    if (req.query.departmentId) {
+      const departmentId = String(req.query.departmentId);
+
+      if (req.user.role !== "admin") {
+        const allowedDepartmentIds = getAllowedDepartmentIds(req.user);
+        if (!allowedDepartmentIds.includes(departmentId)) {
+          return res.status(403).json({
+            success: false,
+            message: "Bạn không có quyền xem khoa này",
+          });
+        }
+      }
+
+      classQuery.departmentId = departmentId;
+    }
+
+    const classes = await Class.find(classQuery).select("_id").lean();
+    const classIds = classes.map((item) => item._id);
+
+    if (!classIds.length) {
+      return res.status(200).json({
+        success: true,
+        data: {
+          totalStudents: 0,
+          totalClasses: 0,
+          gradeCounts: {
+            A: 0,
+            B: 0,
+            C: 0,
+            F: 0,
+          },
+        },
+        message: "Get dashboard summary successfully",
+      });
+    }
+
+    const studentQuery = {
+      classId: { $in: classIds },
+    };
+
+    if (activeOnly) {
+      studentQuery.status = "active";
+    }
+
+    const [totalStudents, gradeRows] = await Promise.all([
+      Student.countDocuments(studentQuery),
+      Grade.aggregate([
+        {
+          $match: {
+            classId: { $in: classIds },
+            letterGrade: { $in: DASHBOARD_GRADE_LETTERS },
+          },
+        },
+        {
+          $group: {
+            _id: "$letterGrade",
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+    ]);
+
+    const gradeCounts = {
+      A: 0,
+      B: 0,
+      C: 0,
+      F: 0,
+    };
+
+    gradeRows.forEach((item) => {
+      if (item?._id && gradeCounts[item._id] !== undefined) {
+        gradeCounts[item._id] = Number(item.count || 0);
+      }
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: {
+        totalStudents,
+        totalClasses: classes.length,
+        gradeCounts,
+      },
+      message: "Get dashboard summary successfully",
+    });
+  } catch (error) {
     return next(error);
   }
 });

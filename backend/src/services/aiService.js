@@ -1,6 +1,7 @@
 const axios = require("axios");
 const StudentCurriculum = require("../models/StudentCurriculum");
 const Class = require("../models/Class");
+const Student = require("../models/Student");
 
 const AI_ENGINE_URL = process.env.AI_ENGINE_URL || "http://localhost:5000";
 const ROADMAP_CACHE_TTL_MS = 60 * 60 * 1000;
@@ -125,6 +126,9 @@ const getCurrentSemesterYear = () => {
   return { currentSemester: 3, currentYear: year };
 };
 
+const toTargetLabel = (targetGpa) =>
+  Number(targetGpa || 0) >= 3.6 ? "Xuat sac" : "Gioi";
+
 const normalizeRegistrationStatus = (registration) => {
   const letter = String(registration?.letterGrade || "").toUpperCase();
   const gpa4 = Number(registration?.gpa4 ?? -1);
@@ -173,7 +177,39 @@ const snapshotStudentCurriculum = async (studentId) => {
     .populate("registrations.subjectId", "_id code name credits");
 
   if (!studentCurriculum) {
-    throw new Error("Sinh vien chua duoc gan chuong trinh khung");
+    const student = await Student.findById(studentId)
+      .select("_id studentCode fullName")
+      .lean();
+
+    if (!student) {
+      const error = new Error("Student not found");
+      error.statusCode = 404;
+      throw error;
+    }
+
+    return {
+      hasCurriculum: false,
+      studentCode: String(student.studentCode || ""),
+      completedSubjects: [],
+      remainingSubjects: [],
+      failedSubjects: [],
+      weakSubjects: [],
+      totalCreditsEarned: 0,
+      currentGpaAccumulated: 0,
+    };
+  }
+
+  if (!studentCurriculum.curriculumId) {
+    return {
+      hasCurriculum: false,
+      studentCode: String(studentCurriculum.studentId?.studentCode || ""),
+      completedSubjects: [],
+      remainingSubjects: [],
+      failedSubjects: [],
+      weakSubjects: [],
+      totalCreditsEarned: 0,
+      currentGpaAccumulated: 0,
+    };
   }
 
   const curriculumItems = Array.isArray(studentCurriculum.curriculumId?.items)
@@ -229,6 +265,7 @@ const snapshotStudentCurriculum = async (studentId) => {
     earnedCredits > 0 ? Number((weightedGpa / earnedCredits).toFixed(2)) : 0;
 
   return {
+    hasCurriculum: true,
     studentCode: String(studentCurriculum.studentId?.studentCode || ""),
     completedSubjects,
     remainingSubjects,
@@ -358,6 +395,24 @@ const getGpaRoadmap = async (studentId, targetGpa = 3.2) => {
 
   const snapshot = await snapshotStudentCurriculum(studentId);
 
+  if (!snapshot.hasCurriculum) {
+    const data = {
+      studentCode: snapshot.studentCode,
+      currentGpa: 0,
+      targetGpa: Number(target.toFixed(2)),
+      targetLabel: toTargetLabel(target),
+      isAchievable: false,
+      requiredGpaRemaining: 0,
+      subjectPlans: [],
+      summary:
+        "Sinh vien chua duoc gan chuong trinh khung. Vui long gan CTDT de tao lo trinh GPA.",
+      semesterBreakdown: [],
+    };
+
+    setCacheEntry(cacheKey, data);
+    return data;
+  }
+
   const payload = {
     studentCode: snapshot.studentCode,
     currentGpaAccumulated: snapshot.currentGpaAccumulated,
@@ -374,6 +429,17 @@ const getGpaRoadmap = async (studentId, targetGpa = 3.2) => {
 
 const getRetakeRoadmap = async (studentId) => {
   const snapshot = await snapshotStudentCurriculum(studentId);
+
+  if (!snapshot.hasCurriculum) {
+    return {
+      studentCode: snapshot.studentCode,
+      urgentRetakes: [],
+      recommendedRetakes: [],
+      retakePlan: [],
+      note: "Sinh vien chua duoc gan chuong trinh khung nen chua the tao lo trinh hoc lai.",
+    };
+  }
+
   const { currentSemester, currentYear } = getCurrentSemesterYear();
 
   const payload = {
@@ -394,6 +460,19 @@ const getSemesterPlan = async (
   targetGpa = 3.2,
 ) => {
   const snapshot = await snapshotStudentCurriculum(studentId);
+
+  if (!snapshot.hasCurriculum) {
+    return {
+      studentCode: snapshot.studentCode,
+      currentGpa: 0,
+      targetGpa: Number(targetGpa || 3.2),
+      predictedSemesterGpa: 0,
+      requiredAverage: Number(targetGpa || 3.2),
+      subjectTargets: [],
+      warnings: ["Sinh vien chua duoc gan chuong trinh khung."],
+      summary: "Can gan CTDT truoc khi lap ke hoach hoc ky.",
+    };
+  }
 
   const classDocs = await Class.find({
     _id: { $in: Array.isArray(registeredClassIds) ? registeredClassIds : [] },

@@ -5,10 +5,12 @@ import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSelectModule } from '@angular/material/select';
 import { LucideAngularModule } from 'lucide-angular';
-import { catchError, finalize, forkJoin, map, of, switchMap } from 'rxjs';
+import { finalize } from 'rxjs';
 
 import { ApiService } from '../../core/services/api.service';
 import { ApiResponse, Student } from '../../shared/models/interfaces';
@@ -20,6 +22,22 @@ interface StudentProgress {
   failed: number;
 }
 
+interface AdvisorStudentOverview {
+  student: Student;
+  progress: StudentProgress;
+  hasCurriculum: boolean;
+}
+
+interface AdvisorStudentsOverviewPayload {
+  items: AdvisorStudentOverview[];
+  pagination: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
 @Component({
   selector: 'app-advisor-students',
   standalone: true,
@@ -27,8 +45,10 @@ interface StudentProgress {
     CommonModule,
     MatButtonModule,
     MatCardModule,
+    MatFormFieldModule,
     MatProgressBarModule,
     MatProgressSpinnerModule,
+    MatSelectModule,
     LucideAngularModule,
   ],
   template: `
@@ -99,6 +119,43 @@ interface StudentProgress {
             </mat-card>
           }
         </div>
+
+        @if (totalPages > 1) {
+          <div class="pager">
+            <mat-form-field appearance="outline" class="pager-size">
+              <mat-label>Items per page</mat-label>
+              <mat-select
+                [value]="pageSize"
+                [disabled]="isLoading"
+                (selectionChange)="onPageSizeChange($event.value)"
+              >
+                @for (size of pageSizeOptions; track size) {
+                  <mat-option [value]="size">{{ size }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <button
+              mat-stroked-button
+              type="button"
+              [disabled]="page <= 1 || isLoading"
+              (click)="prevPage()"
+            >
+              Trang truoc
+            </button>
+
+            <p>Trang {{ page }}/{{ totalPages }} · Tong {{ totalStudents }} sinh vien</p>
+
+            <button
+              mat-stroked-button
+              type="button"
+              [disabled]="page >= totalPages || isLoading"
+              (click)="nextPage()"
+            >
+              Trang sau
+            </button>
+          </div>
+        }
 
         @if (!students.length) {
           <mat-card class="state-card empty">
@@ -193,6 +250,24 @@ interface StudentProgress {
         color: #fff !important;
       }
 
+      .pager {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 0.75rem;
+        flex-wrap: wrap;
+      }
+
+      .pager-size {
+        width: 170px;
+      }
+
+      .pager p {
+        margin: 0;
+        color: var(--text-sub);
+        font-size: 0.85rem;
+      }
+
       .state-card {
         min-height: 180px;
         display: grid;
@@ -218,6 +293,11 @@ export class AdvisorStudentsComponent implements OnInit {
 
   students: Student[] = [];
   progressMap = new Map<string, StudentProgress>();
+  page = 1;
+  pageSize = 24;
+  readonly pageSizeOptions = [12, 24, 36, 48, 60];
+  totalStudents = 0;
+  totalPages = 0;
 
   isLoading = true;
   errorMessage = '';
@@ -231,61 +311,64 @@ export class AdvisorStudentsComponent implements OnInit {
     this.errorMessage = '';
 
     this.apiService
-      .get<ApiResponse<Student[]>>('/students')
+      .get<ApiResponse<AdvisorStudentsOverviewPayload>>('/student-curricula/advisor/students', {
+        page: this.page,
+        limit: this.pageSize,
+      })
       .pipe(
-        map((response) => response.data ?? []),
-        switchMap((students) => {
-          this.students = students;
-
-          if (!students.length) {
-            return of([] as Array<{ id: string; progress: StudentProgress }>);
-          }
-
-          return forkJoin(
-            students.map((student) =>
-              this.apiService
-                .get<
-                  ApiResponse<{
-                    studentCurriculum: unknown;
-                    progress: StudentProgress;
-                  }>
-                >(`/student-curricula/${student._id}`)
-                .pipe(
-                  map((response) => ({
-                    id: student._id,
-                    progress: response.data?.progress,
-                  })),
-                  catchError(() =>
-                    of({
-                      id: student._id,
-                      progress: {
-                        progressPercent: 0,
-                        creditsEarned: 0,
-                        creditsRequired: 0,
-                        failed: 0,
-                      },
-                    }),
-                  ),
-                ),
-            ),
-          );
-        }),
         finalize(() => {
           this.isLoading = false;
         }),
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe({
-        next: (items) => {
+        next: (response) => {
+          const payload = response.data;
+          const items = Array.isArray(payload?.items) ? payload.items : [];
+
+          this.students = items.map((item) => item.student);
+          this.totalStudents = Number(payload?.pagination?.total || 0);
+          this.totalPages = Number(payload?.pagination?.totalPages || 0);
+          this.page = Number(payload?.pagination?.page || this.page);
+
           this.progressMap.clear();
           for (const item of items) {
-            this.progressMap.set(item.id, item.progress);
+            this.progressMap.set(item.student._id, item.progress);
           }
         },
         error: (error: unknown) => {
           this.errorMessage = this.resolveErrorMessage(error);
         },
       });
+  }
+
+  prevPage(): void {
+    if (this.page <= 1 || this.isLoading) {
+      return;
+    }
+
+    this.page -= 1;
+    this.loadData();
+  }
+
+  nextPage(): void {
+    if (this.page >= this.totalPages || this.isLoading) {
+      return;
+    }
+
+    this.page += 1;
+    this.loadData();
+  }
+
+  onPageSizeChange(value: number): void {
+    const nextSize = Number(value);
+    if (!Number.isFinite(nextSize) || nextSize <= 0 || nextSize === this.pageSize) {
+      return;
+    }
+
+    this.pageSize = Math.floor(nextSize);
+    this.page = 1;
+    this.loadData();
   }
 
   progress(studentId: string): StudentProgress {

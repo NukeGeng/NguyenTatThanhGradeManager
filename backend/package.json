@@ -6,7 +6,8 @@
   "scripts": {
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
-    "seed": "node src/scripts/seedData.js"
+    "seed": "node src/scripts/seedData.js",
+    "seed:large": "node src/scripts/seedLargeScaleData.js"
   },
   "keywords": [
     "express",

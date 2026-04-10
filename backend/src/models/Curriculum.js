@@ -25,7 +25,7 @@ const curriculumItemSchema = new mongoose.Schema(
     year: {
       type: Number,
       min: 1,
-      max: 4,
+      max: 8,
       required: [true, "year is required"],
     },
     semester: {

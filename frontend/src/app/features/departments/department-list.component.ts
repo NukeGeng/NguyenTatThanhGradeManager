@@ -18,7 +18,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { LucideAngularModule } from 'lucide-angular';
-import { catchError, finalize, forkJoin, map, of, switchMap } from 'rxjs';
+import { catchError, finalize, forkJoin, map, of } from 'rxjs';
 
 import { ApiService } from '../../core/services/api.service';
 import { ApiResponse, Department, User } from '../../shared/models/interfaces';
@@ -28,6 +28,10 @@ interface DepartmentStats {
   classes: number;
   teachers: number;
   students: number;
+}
+
+interface DepartmentStatsOverviewRow extends DepartmentStats {
+  departmentId: string;
 }
 
 interface DepartmentRow extends Department {
@@ -387,54 +391,43 @@ export class DepartmentListComponent implements OnInit {
       teachers: this.apiService
         .get<ApiResponse<User[]>>('/users')
         .pipe(map((response) => (response.data ?? []).filter((item) => item.role === 'teacher'))),
+      statsRows: this.apiService
+        .get<ApiResponse<DepartmentStatsOverviewRow[]>>('/departments/stats/overview')
+        .pipe(
+          map((response) => response.data ?? []),
+          catchError(() => of([] as DepartmentStatsOverviewRow[])),
+        ),
     })
       .pipe(
-        switchMap(({ departments, teachers }) => {
-          this.teachers = teachers;
-
-          if (departments.length === 0) {
-            return of([] as DepartmentRow[]);
-          }
-
-          const statsRequests = departments.map((department) =>
-            this.apiService
-              .get<ApiResponse<DepartmentStats>>(`/departments/${department._id}/stats`)
-              .pipe(
-                map((response) => ({ id: department._id, stats: response.data })),
-                catchError(() =>
-                  of({
-                    id: department._id,
-                    stats: { subjects: 0, classes: 0, teachers: 0, students: 0 },
-                  }),
-                ),
-              ),
-          );
-
-          return forkJoin(statsRequests).pipe(
-            map((statsRows) => {
-              const statsMap = new Map<string, DepartmentStats>();
-              statsRows.forEach((item) => statsMap.set(item.id, item.stats));
-
-              return departments.map((department) => {
-                const stats = statsMap.get(department._id);
-                return {
-                  ...department,
-                  subjectCount: stats?.subjects ?? 0,
-                  classCount: stats?.classes ?? 0,
-                  teacherCount: stats?.teachers ?? 0,
-                };
-              });
-            }),
-          );
-        }),
         finalize(() => {
           this.isLoading = false;
         }),
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe({
-        next: (rows) => {
-          this.rows = rows;
+        next: ({ departments, teachers, statsRows }) => {
+          this.teachers = teachers;
+
+          const statsMap = new Map<string, DepartmentStats>();
+          statsRows.forEach((item) => {
+            statsMap.set(item.departmentId, {
+              subjects: item.subjects,
+              classes: item.classes,
+              teachers: item.teachers,
+              students: item.students,
+            });
+          });
+
+          this.rows = departments.map((department) => {
+            const stats = statsMap.get(department._id);
+
+            return {
+              ...department,
+              subjectCount: stats?.subjects ?? 0,
+              classCount: stats?.classes ?? 0,
+              teacherCount: stats?.teachers ?? 0,
+            };
+          });
         },
         error: (error: unknown) => {
           this.errorMessage = this.resolveErrorMessage(error);

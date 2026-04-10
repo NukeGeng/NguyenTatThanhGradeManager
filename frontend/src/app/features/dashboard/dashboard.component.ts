@@ -13,7 +13,7 @@ import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { LucideAngularModule } from 'lucide-angular';
-import { catchError, finalize, forkJoin, map, of, switchMap, timeout } from 'rxjs';
+import { catchError, finalize, forkJoin, map, of, timeout } from 'rxjs';
 
 import { ApiService } from '../../core/services/api.service';
 import { ApiResponse, Class, Grade, Prediction, Student } from '../../shared/models/interfaces';
@@ -34,6 +34,12 @@ interface DashboardStats {
   totalClasses: number;
   totalAlerts: number;
   excellentRate: number;
+}
+
+interface DashboardSummaryResponse {
+  totalStudents: number;
+  totalClasses: number;
+  gradeCounts: Partial<Record<GradeBucket, number>>;
 }
 
 @Component({
@@ -110,19 +116,28 @@ export class DashboardComponent implements OnInit, OnDestroy {
       this.syncView();
     }, this.requestTimeoutMs + 2000);
 
-    const studentsRequest = this.apiService
-      .get<ApiResponse<Student[]>>('/students', { status: 'active' })
+    const summaryRequest = this.apiService
+      .get<ApiResponse<DashboardSummaryResponse>>('/grades/summary/dashboard', {
+        activeOnly: true,
+      })
       .pipe(
         timeout(this.requestTimeoutMs),
-        map((response) => response.data ?? []),
-        catchError(() => of([] as Student[])),
+        map(
+          (response) =>
+            response.data ?? {
+              totalStudents: 0,
+              totalClasses: 0,
+              gradeCounts: { A: 0, B: 0, C: 0, F: 0 },
+            },
+        ),
+        catchError(() =>
+          of({
+            totalStudents: 0,
+            totalClasses: 0,
+            gradeCounts: { A: 0, B: 0, C: 0, F: 0 },
+          }),
+        ),
       );
-
-    const classesRequest = this.apiService.get<ApiResponse<Class[]>>('/classes').pipe(
-      timeout(this.requestTimeoutMs),
-      map((response) => response.data ?? []),
-      catchError(() => of([] as Class[])),
-    );
 
     const alertsRequest = this.apiService
       .get<ApiResponse<Prediction[]>>('/predictions/alerts')
@@ -133,34 +148,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
       );
 
     forkJoin({
-      students: studentsRequest,
-      classes: classesRequest,
+      summary: summaryRequest,
       alerts: alertsRequest,
     })
       .pipe(
-        switchMap(({ students, classes, alerts }) => {
-          if (!classes.length) {
-            return of({ students, classes, alerts, grades: [] as Grade[] });
-          }
-
-          const gradeRequests = classes.map((classItem) =>
-            this.apiService.get<ApiResponse<Grade[]>>(`/grades/class/${classItem._id}`).pipe(
-              timeout(this.requestTimeoutMs),
-              map((response) => response.data ?? []),
-              catchError(() => of([] as Grade[])),
-            ),
-          );
-
-          return forkJoin(gradeRequests).pipe(
-            map((grades) => ({
-              students,
-              classes,
-              alerts,
-              grades: grades.flat(),
-            })),
-            catchError(() => of({ students, classes, alerts, grades: [] as Grade[] })),
-          );
-        }),
         finalize(() => {
           if (this.loadingGuardTimer) {
             clearTimeout(this.loadingGuardTimer);
@@ -172,9 +163,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
         }),
       )
       .subscribe({
-        next: ({ students, classes, alerts, grades }) => {
+        next: ({ summary, alerts }) => {
           try {
-            this.applyDashboardData(students, classes, alerts, grades);
+            this.applyDashboardData(summary, alerts);
             this.syncView();
           } catch (error: unknown) {
             this.errorMessage = this.resolveErrorMessage(error);
@@ -190,20 +181,21 @@ export class DashboardComponent implements OnInit, OnDestroy {
       });
   }
 
-  private applyDashboardData(
-    students: Student[],
-    classes: Class[],
-    alerts: Prediction[],
-    grades: Grade[],
-  ): void {
+  private applyDashboardData(summary: DashboardSummaryResponse, alerts: Prediction[]): void {
     this.alertRows = this.mapAlertRows(alerts);
-    this.gradeCounts = this.calculateGradeCounts(grades);
+
+    this.gradeCounts = {
+      A: Number(summary.gradeCounts?.A || 0),
+      B: Number(summary.gradeCounts?.B || 0),
+      C: Number(summary.gradeCounts?.C || 0),
+      F: Number(summary.gradeCounts?.F || 0),
+    };
 
     const totalGraded = Object.values(this.gradeCounts).reduce((sum, count) => sum + count, 0);
 
     this.stats = {
-      totalStudents: students.length,
-      totalClasses: classes.length,
+      totalStudents: Number(summary.totalStudents || 0),
+      totalClasses: Number(summary.totalClasses || 0),
       totalAlerts: this.alertRows.length,
       excellentRate:
         totalGraded > 0 ? Number(((this.gradeCounts.A / totalGraded) * 100).toFixed(1)) : 0,
@@ -224,24 +216,6 @@ export class DashboardComponent implements OnInit, OnDestroy {
         riskLevel: alert.riskLevel ?? 'high',
       };
     });
-  }
-
-  private calculateGradeCounts(grades: Grade[]): Record<GradeBucket, number> {
-    const buckets: Record<GradeBucket, number> = {
-      A: 0,
-      B: 0,
-      C: 0,
-      F: 0,
-    };
-
-    for (const grade of grades) {
-      if (grade.letterGrade && grade.letterGrade in buckets) {
-        const letter = grade.letterGrade as GradeBucket;
-        buckets[letter] += 1;
-      }
-    }
-
-    return buckets;
   }
 
   private renderOrUpdateGradeChart(): void {

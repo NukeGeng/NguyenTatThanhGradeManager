@@ -45,7 +45,7 @@ interface ProgressSummary {
 }
 
 interface StudentCurriculumPayload {
-  studentCurriculum: StudentCurriculum;
+  studentCurriculum: StudentCurriculum | null;
   progress: ProgressSummary;
 }
 

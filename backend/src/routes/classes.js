@@ -3,6 +3,8 @@ const auth = require("../middleware/auth");
 const adminOnly = require("../middleware/adminOnly");
 const Class = require("../models/Class");
 const Student = require("../models/Student");
+const Grade = require("../models/Grade");
+const StudentCurriculum = require("../models/StudentCurriculum");
 const Department = require("../models/Department");
 const SchoolYear = require("../models/SchoolYear");
 const Subject = require("../models/Subject");
@@ -16,6 +18,8 @@ router.use(auth);
 router.get("/", async (req, res, next) => {
   try {
     const { departmentId } = req.query;
+    const hasStudentsOnly =
+      String(req.query.hasStudents || "false").toLowerCase() === "true";
     const query = {};
 
     if (req.user.role !== "admin") {
@@ -40,6 +44,33 @@ router.get("/", async (req, res, next) => {
 
     if (departmentId) {
       query.departmentId = departmentId;
+    }
+
+    if (hasStudentsOnly) {
+      const [directClassIds, curriculumClassIds] = await Promise.all([
+        Student.distinct("classId", { classId: { $exists: true, $ne: null } }),
+        StudentCurriculum.distinct("registrations.classId", {
+          "registrations.classId": { $exists: true, $ne: null },
+        }),
+      ]);
+
+      const classIds = Array.from(
+        new Set(
+          [...directClassIds, ...curriculumClassIds]
+            .filter(Boolean)
+            .map((item) => String(item)),
+        ),
+      );
+
+      if (!classIds.length) {
+        return res.status(200).json({
+          success: true,
+          data: [],
+          message: "Get classes successfully",
+        });
+      }
+
+      query._id = { $in: classIds };
     }
 
     const classes = await Class.find(query)
@@ -107,9 +138,24 @@ router.get("/:id/students", async (req, res, next) => {
       }
     }
 
-    const students = await Student.find({ classId: classData._id }).sort({
-      fullName: 1,
-    });
+    const [directStudentIds, registeredStudentIds] = await Promise.all([
+      Student.distinct("_id", { classId: classData._id }),
+      StudentCurriculum.distinct("studentId", {
+        "registrations.classId": classData._id,
+      }),
+    ]);
+
+    const studentIds = Array.from(
+      new Set(
+        [...directStudentIds, ...registeredStudentIds]
+          .filter(Boolean)
+          .map((item) => String(item)),
+      ),
+    );
+
+    const students = studentIds.length
+      ? await Student.find({ _id: { $in: studentIds } }).sort({ fullName: 1 })
+      : [];
 
     return res.status(200).json({
       success: true,
@@ -354,13 +400,18 @@ router.delete("/:id", async (req, res, next) => {
       });
     }
 
-    const studentCount = await Student.countDocuments({
-      classId: req.params.id,
-    });
-    if (studentCount > 0) {
+    const [studentCount, registrationCount, gradeCount] = await Promise.all([
+      Student.countDocuments({ classId: req.params.id }),
+      StudentCurriculum.countDocuments({
+        "registrations.classId": req.params.id,
+      }),
+      Grade.countDocuments({ classId: req.params.id }),
+    ]);
+
+    if (studentCount > 0 || registrationCount > 0 || gradeCount > 0) {
       return res.status(400).json({
         success: false,
-        message: "Không thể xóa lớp đang có học sinh",
+        message: "Không thể xóa lớp đang có dữ liệu sinh viên/đăng ký/điểm",
       });
     }
 

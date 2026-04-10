@@ -67,6 +67,20 @@ interface WeightDialogData {
   weights: DefaultWeights;
 }
 
+interface RegistrationTermOption {
+  key: string;
+  schoolYearId: string;
+  semester: 1 | 2 | 3;
+  label: string;
+}
+
+interface DepartmentFilterOption {
+  id: string;
+  code: string;
+  name: string;
+  label: string;
+}
+
 @Component({
   selector: 'app-grade-entry',
   standalone: true,
@@ -124,22 +138,25 @@ interface WeightDialogData {
 
         <form [formGroup]="selectionForm" class="filters-grid filter-bar">
           <mat-form-field appearance="outline">
-            <mat-label>Năm học</mat-label>
-            <mat-select formControlName="schoolYearId" (selectionChange)="onFilterChange()">
-              <mat-option value="">Chọn năm học</mat-option>
-              <mat-option *ngFor="let year of schoolYears" [value]="year._id">
-                {{ year.name }}
-              </mat-option>
+            <mat-label>Đợt đăng ký</mat-label>
+            <mat-select
+              formControlName="registrationTerm"
+              (selectionChange)="onRegistrationTermChange()"
+            >
+              <mat-option value="">Chọn đợt đăng ký</mat-option>
+              @for (term of registrationTerms; track term.key) {
+                <mat-option [value]="term.key">{{ term.label }}</mat-option>
+              }
             </mat-select>
           </mat-form-field>
 
           <mat-form-field appearance="outline">
-            <mat-label>Học kỳ</mat-label>
-            <mat-select formControlName="semester" (selectionChange)="onFilterChange()">
-              <mat-option [value]="null">Chọn học kỳ</mat-option>
-              <mat-option [value]="1">Học kỳ 1 (T9-T12)</mat-option>
-              <mat-option [value]="2">Học kỳ 2 (T1-T4)</mat-option>
-              <mat-option [value]="3">Học kỳ 3 - Hè (T5-T8)</mat-option>
+            <mat-label>Khoa</mat-label>
+            <mat-select formControlName="departmentId" (selectionChange)="onFilterChange()">
+              <mat-option value="all">Tất cả khoa</mat-option>
+              @for (department of departmentOptions; track department.id) {
+                <mat-option [value]="department.id">{{ department.label }}</mat-option>
+              }
             </mat-select>
           </mat-form-field>
 
@@ -798,6 +815,13 @@ export class GradeEntryComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
   readonly selectionForm = this.fb.group({
+    registrationTerm: this.fb.control<string>('', {
+      nonNullable: true,
+      validators: [Validators.required],
+    }),
+    departmentId: this.fb.control<string>('all', {
+      nonNullable: true,
+    }),
     schoolYearId: this.fb.control<string>('', {
       nonNullable: true,
       validators: [Validators.required],
@@ -816,6 +840,8 @@ export class GradeEntryComponent implements OnInit {
   });
 
   schoolYears: SchoolYear[] = [];
+  registrationTerms: RegistrationTermOption[] = [];
+  departmentOptions: DepartmentFilterOption[] = [];
   classes: Class[] = [];
   filteredClasses: Class[] = [];
 
@@ -978,6 +1004,22 @@ export class GradeEntryComponent implements OnInit {
       this.selectedGrade = null;
       this.loadErrorMessage = '';
     }
+  }
+
+  onRegistrationTermChange(): void {
+    const selectedTermKey = this.selectionForm.controls.registrationTerm.value;
+    const selectedTerm = this.registrationTerms.find((item) => item.key === selectedTermKey);
+
+    if (!selectedTerm) {
+      this.selectionForm.controls.schoolYearId.setValue('');
+      this.selectionForm.controls.semester.setValue(null);
+      this.onFilterChange();
+      return;
+    }
+
+    this.selectionForm.controls.schoolYearId.setValue(selectedTerm.schoolYearId);
+    this.selectionForm.controls.semester.setValue(selectedTerm.semester);
+    this.onFilterChange();
   }
 
   onClassChange(): void {
@@ -1290,14 +1332,24 @@ export class GradeEntryComponent implements OnInit {
         .get<ApiResponse<SchoolYear[]>>('/school-years')
         .pipe(map((response) => response.data ?? [])),
       classes: this.apiService
-        .get<ApiResponse<Class[]>>('/classes')
+        .get<ApiResponse<Class[]>>('/classes', { hasStudents: true })
         .pipe(map((response) => response.data ?? [])),
     })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: ({ schoolYears, classes }) => {
           this.schoolYears = schoolYears;
+          this.registrationTerms = this.buildRegistrationTerms(schoolYears);
           this.classes = classes;
+          this.departmentOptions = this.buildDepartmentOptions(classes);
+
+          if (this.registrationTerms.length > 0) {
+            this.selectionForm.controls.registrationTerm.setValue(this.registrationTerms[0].key);
+            this.onRegistrationTermChange();
+          } else {
+            this.filterClasses();
+          }
+
           this.filterClasses();
         },
         error: (error: unknown) => {
@@ -1311,13 +1363,74 @@ export class GradeEntryComponent implements OnInit {
   private filterClasses(): void {
     const schoolYearId = this.selectionForm.controls.schoolYearId.value;
     const semester = this.selectionForm.controls.semester.value;
+    const departmentId = this.selectionForm.controls.departmentId.value;
 
     this.filteredClasses = this.classes.filter((classItem) => {
       const classYearId = this.resolveRefId(classItem.schoolYearId);
+      const classDepartmentId = this.resolveRefId(classItem.departmentId);
       const sameYear = schoolYearId ? classYearId === schoolYearId : true;
       const sameSemester = semester ? classItem.semester === semester : true;
-      return sameYear && sameSemester;
+      const sameDepartment = departmentId === 'all' ? true : classDepartmentId === departmentId;
+      return sameYear && sameSemester && sameDepartment;
     });
+  }
+
+  private buildDepartmentOptions(classes: Class[]): DepartmentFilterOption[] {
+    const optionsById = new Map<string, DepartmentFilterOption>();
+
+    for (const classItem of classes) {
+      const departmentId = this.resolveRefId(classItem.departmentId);
+      if (!departmentId || optionsById.has(departmentId)) {
+        continue;
+      }
+
+      if (typeof classItem.departmentId === 'string') {
+        optionsById.set(departmentId, {
+          id: departmentId,
+          code: '',
+          name: departmentId,
+          label: departmentId,
+        });
+        continue;
+      }
+
+      const code = String(classItem.departmentId.code || '').trim();
+      const name = String(classItem.departmentId.name || code || departmentId).trim();
+
+      optionsById.set(departmentId, {
+        id: departmentId,
+        code,
+        name,
+        label: code ? `${code} - ${name}` : name,
+      });
+    }
+
+    return Array.from(optionsById.values()).sort((a, b) =>
+      a.name.localeCompare(b.name, 'vi', { sensitivity: 'base' }),
+    );
+  }
+
+  private buildRegistrationTerms(schoolYears: SchoolYear[]): RegistrationTermOption[] {
+    const sortedYears = [...schoolYears].sort((a, b) => {
+      const aStart = Number(String(a.name || '').split('-')[0] || 0);
+      const bStart = Number(String(b.name || '').split('-')[0] || 0);
+      return bStart - aStart;
+    });
+
+    const options: RegistrationTermOption[] = [];
+    for (const year of sortedYears) {
+      for (const semester of [3, 2, 1] as const) {
+        const key = `${year._id}:${semester}`;
+        options.push({
+          key,
+          schoolYearId: year._id,
+          semester,
+          label: `HK ${semester} NH ${year.name}`,
+        });
+      }
+    }
+
+    return options;
   }
 
   private findStudentGrade(studentId: string): Grade | null {

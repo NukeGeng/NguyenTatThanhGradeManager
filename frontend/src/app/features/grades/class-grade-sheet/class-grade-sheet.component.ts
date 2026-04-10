@@ -22,6 +22,13 @@ import {
   Student,
 } from '../../../shared/models/interfaces';
 
+interface RegistrationTermOption {
+  key: string;
+  schoolYearId: string;
+  semester: 1 | 2 | 3;
+  label: string;
+}
+
 @Component({
   selector: 'app-class-grade-sheet',
   standalone: true,
@@ -62,22 +69,15 @@ import {
       <mat-card class="content-card card-block">
         <form [formGroup]="selectionForm" class="filters-grid filter-bar">
           <mat-form-field appearance="outline">
-            <mat-label>Năm học</mat-label>
-            <mat-select formControlName="schoolYearId" (selectionChange)="onFilterChange()">
-              <mat-option value="">Chọn năm học</mat-option>
-              @for (year of schoolYears; track year._id) {
-                <mat-option [value]="year._id">{{ year.name }}</mat-option>
+            <mat-label>Đợt đăng ký</mat-label>
+            <mat-select
+              formControlName="registrationTerm"
+              (selectionChange)="onRegistrationTermChange()"
+            >
+              <mat-option value="">Chọn đợt đăng ký</mat-option>
+              @for (term of registrationTerms; track term.key) {
+                <mat-option [value]="term.key">{{ term.label }}</mat-option>
               }
-            </mat-select>
-          </mat-form-field>
-
-          <mat-form-field appearance="outline">
-            <mat-label>Học kỳ</mat-label>
-            <mat-select formControlName="semester" (selectionChange)="onFilterChange()">
-              <mat-option [value]="null">Chọn học kỳ</mat-option>
-              <mat-option [value]="1">Học kỳ 1 (T9-T12)</mat-option>
-              <mat-option [value]="2">Học kỳ 2 (T1-T4)</mat-option>
-              <mat-option [value]="3">Học kỳ 3 - Hè (T5-T8)</mat-option>
             </mat-select>
           </mat-form-field>
 
@@ -327,6 +327,10 @@ export class ClassGradeSheetComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
   readonly selectionForm = this.fb.group({
+    registrationTerm: this.fb.control<string>('', {
+      nonNullable: true,
+      validators: [Validators.required],
+    }),
     schoolYearId: this.fb.control<string>('', {
       nonNullable: true,
       validators: [Validators.required],
@@ -336,6 +340,7 @@ export class ClassGradeSheetComponent implements OnInit {
   });
 
   schoolYears: SchoolYear[] = [];
+  registrationTerms: RegistrationTermOption[] = [];
   classes: Class[] = [];
   filteredClasses: Class[] = [];
 
@@ -376,7 +381,19 @@ export class ClassGradeSheetComponent implements OnInit {
     return (passCount / this.students.length) * 100;
   }
 
-  onFilterChange(): void {
+  onRegistrationTermChange(): void {
+    const selectedTermKey = this.selectionForm.controls.registrationTerm.value;
+    const selectedTerm = this.registrationTerms.find((item) => item.key === selectedTermKey);
+
+    if (!selectedTerm) {
+      this.selectionForm.controls.schoolYearId.setValue('');
+      this.selectionForm.controls.semester.setValue(null);
+      this.filterClasses();
+      return;
+    }
+
+    this.selectionForm.controls.schoolYearId.setValue(selectedTerm.schoolYearId);
+    this.selectionForm.controls.semester.setValue(selectedTerm.semester);
     this.filterClasses();
 
     const selectedClassId = this.selectionForm.controls.classId.value;
@@ -516,14 +533,21 @@ export class ClassGradeSheetComponent implements OnInit {
         .get<ApiResponse<SchoolYear[]>>('/school-years')
         .pipe(map((response) => response.data ?? [])),
       classes: this.apiService
-        .get<ApiResponse<Class[]>>('/classes')
+        .get<ApiResponse<Class[]>>('/classes', { hasStudents: true })
         .pipe(map((response) => response.data ?? [])),
     })
       .pipe(takeUntilDestroyed(this.destroyRef))
       .subscribe({
         next: ({ schoolYears, classes }) => {
           this.schoolYears = schoolYears;
+          this.registrationTerms = this.buildRegistrationTerms(schoolYears);
           this.classes = classes;
+
+          if (this.registrationTerms.length > 0) {
+            this.selectionForm.controls.registrationTerm.setValue(this.registrationTerms[0].key);
+            this.onRegistrationTermChange();
+          }
+
           this.filterClasses();
         },
         error: (error: unknown) => {
@@ -542,6 +566,28 @@ export class ClassGradeSheetComponent implements OnInit {
       const sameSemester = semester ? classItem.semester === semester : true;
       return sameYear && sameSemester;
     });
+  }
+
+  private buildRegistrationTerms(schoolYears: SchoolYear[]): RegistrationTermOption[] {
+    const sortedYears = [...schoolYears].sort((a, b) => {
+      const aStart = Number(String(a.name || '').split('-')[0] || 0);
+      const bStart = Number(String(b.name || '').split('-')[0] || 0);
+      return bStart - aStart;
+    });
+
+    const options: RegistrationTermOption[] = [];
+    for (const year of sortedYears) {
+      for (const semester of [3, 2, 1] as const) {
+        options.push({
+          key: `${year._id}:${semester}`,
+          schoolYearId: year._id,
+          semester,
+          label: `HK ${semester} NH ${year.name}`,
+        });
+      }
+    }
+
+    return options;
   }
 
   private resolveRefId(value: string | { _id: string } | null | undefined): string | null {

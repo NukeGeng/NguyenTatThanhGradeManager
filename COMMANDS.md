@@ -38,7 +38,7 @@ python train.py
 
 # 6. Seed dữ liệu mẫu vào MongoDB
 cd ../backend
-npm run seed
+npm run seed:large   # khuyến nghị: dữ liệu CTDT đầy đủ + lớp học phần theo HK
 ```
 
 ---
@@ -82,7 +82,7 @@ npx ng serve
 
 # Terminal 4 — (tuỳ chọn) Seed data
 cd backend
-npm run seed
+npm run seed:large   # dùng bộ seed lớn để có đủ học phần CTDT
 ```
 
 ---
@@ -134,7 +134,10 @@ uvicorn main:app --port 5000 --reload
 ```bash
 # Seed dữ liệu mẫu (chỉ chạy 1 lần hoặc khi muốn reset)
 cd backend
-npm run seed
+npm run seed:large
+
+# Seed nhỏ (demo nhanh, dữ liệu rút gọn)
+# npm run seed
 
 # Xóa toàn bộ data và seed lại từ đầu
 npm run seed:reset   # nếu có script này

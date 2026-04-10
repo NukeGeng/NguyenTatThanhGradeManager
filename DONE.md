@@ -332,6 +332,24 @@
 - File đã tạo/sửa: frontend/src/app/shared/styles/\_page.scss, DONE.md
 - Ghi chú: Bỏ cơ chế width cứng ở `score-sheet--compact` (left/name/num/tx/group), chuyển sang `table-layout: auto` + `width: max-content` + `min-width: 100%` để độ rộng cột tự co giãn theo nội dung từng cột như mẫu tham chiếu. Build frontend pass.
 
+## [DONE-050] Tổng hợp cập nhật chính ngày 08/04/2026
+
+- Ngày: 08/04/2026
+- File đã tạo/sửa: frontend/src/app/features/users/user-list.component.ts, backend/src/routes/messages.js, backend/src/socket.js, frontend/src/app/features/chat/chat.component.ts, frontend/src/app/shared/models/interfaces.ts, package.json (root)
+- Ghi chú: Hoàn thiện quản lý user role advisor ở màn admin users; bổ sung quyền admin xem toàn bộ room chat theo khoa + metadata tên phòng dễ đọc; css lại layout danh sách chat theo mẫu và thu gọn tile active; thêm script chạy đồng thời backend + ai-engine + frontend bằng một lệnh ở root.
+
+## [DONE-051] Tổng hợp cập nhật chính ngày 09/04/2026
+
+- Ngày: 09/04/2026
+- File đã tạo/sửa: backend/src/routes/studentCurricula.js, frontend/src/app/features/advisor/advisor-student-detail.component.ts, backend/src/services/aiService.js, BUGS.md, DONE.md
+- Ghi chú: Fix lỗi advisor/students bị 404 khi học sinh chưa gán CTĐT bằng cách trả payload 200 hợp lệ; fix lỗi roadmap AI (`gpa-roadmap`, `retake-roadmap`) trả 500 bằng fallback roadmap rỗng khi thiếu StudentCurriculum; cập nhật nhật ký bug và công việc hoàn thành.
+
+## [DONE-052] Nâng cấp dữ liệu AI + CTĐT 140 tín + retrain model lớn
+
+- Ngày: 09/04/2026
+- File đã tạo/sửa: backend/src/scripts/seedLargeScaleData.js, backend/src/scripts/checkSeedSummary.js, backend/src/scripts/checkRoadmapSmoke.js, backend/package.json, ai-engine/data/generate_data.py, ai-engine/train.py, ai-engine/main.py, ai-engine/risk_logic.py, ai-engine/data/predict_input_template.json, BUGS.md, DONE.md
+- Ghi chú: Hoàn thiện CTĐT KTPM 140 tín với 56 học phần phủ đủ 12 học kỳ (1-1 đến 4-3), seed và backfill đạt tổng 10,000 sinh viên + 10,000 StudentCurriculum; tạo dataset train từ DB thật đạt 20,898 mẫu và retrain model mới (27 features); hiệu chỉnh confidence/risk để nhóm yếu/trung bình không còn confidence ảo cao và roadmap đã sinh kế hoạch học tập thành công cho sinh viên có dữ liệu CTĐT.
+
 ```
 ## [DONE-001]
 - Ngày:

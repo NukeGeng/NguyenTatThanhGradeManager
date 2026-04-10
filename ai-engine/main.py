@@ -9,6 +9,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pymongo import MongoClient
+from risk_logic import calibrate_confidence, infer_risk_level
 
 from schemas import (
     GpaRoadmapRequest,
@@ -37,6 +38,7 @@ LABEL_ENCODER_FILE = MODELS_DIR / "label_encoder.pkl"
 model: Any = None
 feature_names: list[str] = []
 label_encoder: dict[Any, str] = {}
+SPECIAL_FEATURES = {"diem_hk_truoc", "so_buoi_vang", "hanh_kiem"}
 
 
 def _load_env() -> None:
@@ -193,22 +195,38 @@ def _predict_single(request_data: PredictRequest) -> PredictResponse:
 
     predicted_class = model.predict(input_vector)[0]
     probabilities = model.predict_proba(input_vector)[0]
-
-    confidence = float(np.max(probabilities) * 100)
     predicted_rank = _safe_label(predicted_class)
-
-    if confidence < 60:
-        risk_level = "high"
-    elif confidence < 75:
-        risk_level = "medium"
-    else:
-        risk_level = "low"
 
     weak_subjects = [
         code
         for code, score in request_data.scores.items()
         if float(score) < 5.0
     ]
+
+    subject_feature_count = len([name for name in feature_names if name not in SPECIAL_FEATURES])
+    provided_subject_count = len(
+        [
+            code
+            for code in request_data.scores.keys()
+            if code in feature_names and code not in SPECIAL_FEATURES
+        ],
+    )
+
+    confidence = calibrate_confidence(
+        predicted_rank=predicted_rank,
+        probabilities=list(probabilities),
+        provided_subject_count=provided_subject_count,
+        total_subject_feature_count=subject_feature_count,
+        so_buoi_vang=request_data.so_buoi_vang,
+        weak_subject_count=len(weak_subjects),
+    )
+
+    risk_level = infer_risk_level(
+        predicted_rank=predicted_rank,
+        confidence=confidence,
+        so_buoi_vang=request_data.so_buoi_vang,
+        weak_subject_count=len(weak_subjects),
+    )
 
     suggestions = _build_suggestions(
         weak_subjects=weak_subjects,

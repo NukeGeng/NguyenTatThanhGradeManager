@@ -46,6 +46,89 @@ router.get("/", async (req, res, next) => {
   }
 });
 
+router.get("/stats/overview", adminOnly, async (req, res, next) => {
+  try {
+    const [departments, subjectRows, classRows, teacherRows, studentRows] =
+      await Promise.all([
+        Department.find({}).select("_id").lean(),
+        Subject.aggregate([
+          {
+            $group: {
+              _id: "$departmentId",
+              count: { $sum: 1 },
+            },
+          },
+        ]),
+        Class.aggregate([
+          {
+            $group: {
+              _id: "$departmentId",
+              count: { $sum: 1 },
+            },
+          },
+        ]),
+        User.aggregate([
+          {
+            $match: {
+              role: { $in: ["teacher", "advisor"] },
+            },
+          },
+          { $unwind: "$departmentIds" },
+          {
+            $group: {
+              _id: "$departmentIds",
+              count: { $sum: 1 },
+            },
+          },
+        ]),
+        Student.aggregate([
+          {
+            $lookup: {
+              from: "classes",
+              localField: "classId",
+              foreignField: "_id",
+              as: "classInfo",
+            },
+          },
+          { $unwind: "$classInfo" },
+          {
+            $group: {
+              _id: "$classInfo.departmentId",
+              count: { $sum: 1 },
+            },
+          },
+        ]),
+      ]);
+
+    const toCountMap = (rows) =>
+      new Map(rows.map((item) => [String(item._id), Number(item.count || 0)]));
+
+    const subjectMap = toCountMap(subjectRows);
+    const classMap = toCountMap(classRows);
+    const teacherMap = toCountMap(teacherRows);
+    const studentMap = toCountMap(studentRows);
+
+    const overview = departments.map((department) => {
+      const id = String(department._id);
+      return {
+        departmentId: id,
+        subjects: subjectMap.get(id) || 0,
+        classes: classMap.get(id) || 0,
+        teachers: teacherMap.get(id) || 0,
+        students: studentMap.get(id) || 0,
+      };
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: overview,
+      message: "Get departments stats overview successfully",
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.get("/:id", departmentAccess, async (req, res, next) => {
   try {
     const department = await Department.findById(req.params.id).populate(

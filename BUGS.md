@@ -191,6 +191,69 @@
 - Fix: Import và thêm `Table` vào danh sách icon provider trong `frontend/src/app/app.config.ts`.
 - Trạng thái: ✅ Đã fix
 
+## [BUG-020] Trang /majors và /curricula trống dữ liệu
+
+- Ngày: 08/04/2026
+- File/Vị trí: MongoDB collections `majors`, `curricula`
+- Mô tả: Mở trang `/majors` và `/curricula` không thấy bản ghi nào dù UI/API hoạt động.
+- Nguyên nhân: DB chưa có dữ liệu seed cho ngành và CTĐT.
+- Fix: Chạy lại script seed backend để tạo dữ liệu majors/curricula, kiểm tra lại số lượng bản ghi sau seed.
+- Trạng thái: ✅ Đã fix
+
+## [BUG-021] Chat room theo khoa hiển thị thiếu quyền admin và tên phòng khó đọc
+
+- Ngày: 08/04/2026
+- File/Vị trí: `backend/src/routes/messages.js`, `backend/src/socket.js`, `frontend/src/app/features/chat/chat.component.ts`, `frontend/src/app/shared/models/interfaces.ts`
+- Mô tả: Admin không thấy đầy đủ nhóm chat theo khoa; danh sách room hiển thị mã/ID kỹ thuật thay vì tên phòng dễ đọc.
+- Nguyên nhân: Logic room listing chỉ dựa vào phạm vi được gán trước đó và chưa enrich metadata hiển thị (`roomName`, `roomCode`).
+- Fix: Mở quyền admin xem toàn bộ room khoa active, auto-join socket theo khoa cho admin, trả thêm metadata tên/mã phòng từ backend và render theo metadata ở frontend.
+- Trạng thái: ✅ Đã fix
+
+## [BUG-022] UI chat room-item active bị to và giãn không đúng layout
+
+- Ngày: 08/04/2026
+- File/Vị trí: `frontend/src/app/features/chat/chat.component.ts`
+- Mô tả: Item phòng chat ở trạng thái active quá to, lệch tỷ lệ so với thiết kế tham chiếu.
+- Nguyên nhân: Kích thước padding/avatar/font và cách stretch của list container làm tile bị phồng.
+- Fix: Thu gọn kích thước room tile (padding, avatar, font-size, line-height), điều chỉnh list container để không kéo giãn theo trục dọc.
+- Trạng thái: ✅ Đã fix
+
+## [BUG-023] Trang advisor/students gọi /student-curricula trả 404 hàng loạt
+
+- Ngày: 09/04/2026
+- File/Vị trí: `backend/src/routes/studentCurricula.js`, `frontend/src/app/features/advisor/advisor-student-detail.component.ts`
+- Mô tả: Vào danh sách/chi tiết học sinh cố vấn phát sinh nhiều lỗi 404 từ API student-curricula.
+- Nguyên nhân: Backend trả 404 cả khi học sinh tồn tại nhưng chưa được gán StudentCurriculum.
+- Fix: Chỉ trả 404 khi học sinh không tồn tại; nếu chưa gán CTĐT thì trả 200 với `studentCurriculum: null` + `progress` rỗng/hợp lệ; cập nhật type phía frontend cho payload nullable.
+- Trạng thái: ✅ Đã fix
+
+## [BUG-024] API roadmap AI trả 500 khi sinh viên chưa gán CTĐT
+
+- Ngày: 09/04/2026
+- File/Vị trí: `backend/src/services/aiService.js`
+- Mô tả: `GET /api/predictions/student/:id/gpa-roadmap` và `GET /api/predictions/student/:id/retake-roadmap` trả 500 ở trang advisor student detail.
+- Nguyên nhân: Service roadmap throw exception khi không tìm thấy `StudentCurriculum`, lỗi này không được chuyển thành payload fallback.
+- Fix: Bổ sung fallback trong `aiService`: khi chưa có CTĐT thì trả roadmap rỗng hợp lệ (summary/note rõ ràng) thay vì throw 500; giữ 404 cho trường hợp student không tồn tại.
+- Trạng thái: ✅ Đã fix
+
+## [BUG-025] Generate dataset AI lỗi do Mongo sort vượt giới hạn bộ nhớ
+
+- Ngày: 09/04/2026
+- File/Vị trí: `ai-engine/data/generate_data.py`
+- Mô tả: Chạy generate_data trên tập Grade lớn bị lỗi `Sort exceeded memory limit`.
+- Nguyên nhân: Query `grades.find(...).sort("createdAt", 1)` thực hiện server-side sort trên tập lớn mà không bật disk use.
+- Fix: Bỏ sort phía Mongo trong `_load_grades`, xử lý logic tổng hợp theo dữ liệu đã đọc ở Python để tránh chạm giới hạn sort memory.
+- Trạng thái: ✅ Đã fix
+
+## [BUG-026] Seed dữ liệu lớn cảm giác treo do batch tạo Grade quá nặng
+
+- Ngày: 09/04/2026
+- File/Vị trí: `backend/src/scripts/seedLargeScaleData.js`
+- Mô tả: Script seed 10k chạy rất chậm, log tiến độ thưa nên dễ hiểu nhầm bị treo.
+- Nguyên nhân: Mỗi batch tạo quá nhiều Grade/registration dẫn đến insert nặng; script luôn seed thêm 10k mới thay vì target tổng.
+- Fix: Tối ưu script theo target tổng (`SEED_TARGET_STUDENTS`), thêm tuning qua env (`SEED_BATCH_SIZE`, `SEED_GRADE_RATIO`), giảm tải tạo Grade, giữ progress log rõ ràng và hoàn tất mốc 10k ổn định hơn.
+- Trạng thái: ✅ Đã fix
+
 ---
 
 ## TEMPLATE THÊM BUG MỚI

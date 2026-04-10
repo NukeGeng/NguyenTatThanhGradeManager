@@ -1,0 +1,18 @@
+{
+  "name": "nguyen-tat-thanh-grade-manager",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Monorepo scripts for running backend, ai engine, and frontend together",
+  "scripts": {
+    "dev": "concurrently -n BACKEND,AI,FRONTEND -c blue,magenta,green \"npm run dev:backend\" \"npm run dev:ai\" \"npm run dev:frontend\"",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:ai": "if exist ai-engine\\venv\\Scripts\\python.exe (cd ai-engine && venv\\Scripts\\python -m uvicorn main:app --port 5000 --reload) else (cd ai-engine && ..\\.venv\\Scripts\\python -m uvicorn main:app --port 5000 --reload)",
+    "dev:frontend": "npm run start --prefix frontend",
+    "seed": "npm run seed --prefix backend",
+    "seed:large": "npm run seed:large --prefix backend",
+    "build:frontend": "npm run build --prefix frontend"
+  },
+  "devDependencies": {
+    "concurrently": "^9.0.1"
+  }
+}

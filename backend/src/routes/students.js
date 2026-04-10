@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const auth = require("../middleware/auth");
 const Student = require("../models/Student");
 const Class = require("../models/Class");
+const StudentCurriculum = require("../models/StudentCurriculum");
 
 const router = express.Router();
 
@@ -41,23 +42,111 @@ const generateStudentCode = async () => {
 router.get("/", async (req, res, next) => {
   try {
     const { classId, status } = req.query;
+    const fromClasses =
+      String(req.query.fromClasses || "false").toLowerCase() === "true";
     const query = {};
 
-    if (req.user.role === "advisor") {
+    const allowedDepartmentIds = (req.user.departmentIds || []).map((item) =>
+      item?._id ? String(item._id) : String(item),
+    );
+
+    if (fromClasses) {
+      let candidateClassIds = [];
+
+      if (classId) {
+        const classAccessQuery = { _id: classId };
+        if (req.user.role !== "admin") {
+          classAccessQuery.departmentId = { $in: allowedDepartmentIds };
+        }
+
+        const classData = await Class.findOne(classAccessQuery).select("_id");
+        if (!classData) {
+          return res.status(403).json({
+            success: false,
+            message: "Bạn không có quyền truy cập lớp này",
+          });
+        }
+
+        candidateClassIds = [String(classData._id)];
+      } else {
+        const [directClassIds, curriculumClassIds] = await Promise.all([
+          Student.distinct("classId", { classId: { $exists: true, $ne: null } }),
+          StudentCurriculum.distinct("registrations.classId", {
+            "registrations.classId": { $exists: true, $ne: null },
+          }),
+        ]);
+
+        const usedClassIds = new Set(
+          [...directClassIds, ...curriculumClassIds]
+            .filter(Boolean)
+            .map((item) => String(item)),
+        );
+
+        if (req.user.role !== "admin") {
+          const allowedClasses = await Class.find({
+            departmentId: { $in: allowedDepartmentIds },
+            _id: { $in: Array.from(usedClassIds) },
+          }).select("_id");
+
+          candidateClassIds = allowedClasses.map((item) => String(item._id));
+        } else {
+          candidateClassIds = Array.from(usedClassIds);
+        }
+      }
+
+      if (candidateClassIds.length === 0) {
+        return res.status(200).json({
+          success: true,
+          data: [],
+          message: "Get students successfully",
+        });
+      }
+
+      const [directStudentIds, registeredStudentIds] = await Promise.all([
+        Student.distinct("_id", { classId: { $in: candidateClassIds } }),
+        StudentCurriculum.distinct("studentId", {
+          "registrations.classId": { $in: candidateClassIds },
+        }),
+      ]);
+
+      let studentIds = Array.from(
+        new Set(
+          [...directStudentIds, ...registeredStudentIds]
+            .filter(Boolean)
+            .map((item) => String(item)),
+        ),
+      );
+
+      if (req.user.role === "advisor") {
+        const advisingStudentIds = getAdvisingStudentIds(req.user);
+        const advisingSet = new Set(advisingStudentIds);
+        studentIds = studentIds.filter((item) => advisingSet.has(item));
+      }
+
+      if (!studentIds.length) {
+        return res.status(200).json({
+          success: true,
+          data: [],
+          message: "Get students successfully",
+        });
+      }
+
+      query._id = { $in: studentIds };
+    }
+
+    if (!fromClasses && req.user.role === "advisor") {
       query._id = { $in: getAdvisingStudentIds(req.user) };
-    } else if (req.user.role !== "admin") {
+    } else if (!fromClasses && req.user.role !== "admin") {
       const classes = await Class.find({
         departmentId: {
-          $in: (req.user.departmentIds || []).map((item) =>
-            item?._id ? item._id : item,
-          ),
+          $in: allowedDepartmentIds,
         },
       }).select("_id");
 
       query.classId = { $in: classes.map((item) => item._id) };
     }
 
-    if (classId) {
+    if (!fromClasses && classId) {
       query.classId = classId;
     }
 
