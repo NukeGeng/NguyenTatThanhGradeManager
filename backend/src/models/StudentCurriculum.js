@@ -90,8 +90,8 @@ const studentCurriculumSchema = new mongoose.Schema(
   },
 );
 
-studentCurriculumSchema.index({ studentId: 1 }, { unique: true });
 studentCurriculumSchema.index({ advisorId: 1 });
 studentCurriculumSchema.index({ curriculumId: 1 });
+studentCurriculumSchema.index({ "registrations.classId": 1 });
 
 module.exports = mongoose.model("StudentCurriculum", studentCurriculumSchema);

@@ -3,9 +3,10 @@ import { HttpClient, HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, ViewChild, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
-import { Router, RouterLink } from '@angular/router';
+import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
+import { MatCheckboxModule } from '@angular/material/checkbox';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
@@ -55,6 +56,12 @@ interface PredictClassResponse {
   failures: Array<{ gradeId: string; studentId: string; message: string }>;
 }
 
+interface ImportPresetParams {
+  schoolYearId: string;
+  semester: 1 | 2 | 3;
+  classId: string;
+}
+
 @Component({
   selector: 'app-grade-import',
   standalone: true,
@@ -64,6 +71,7 @@ interface PredictClassResponse {
     RouterLink,
     MatButtonModule,
     MatCardModule,
+    MatCheckboxModule,
     MatFormFieldModule,
     MatProgressSpinnerModule,
     MatSelectModule,
@@ -85,7 +93,7 @@ interface PredictClassResponse {
 
       <header class="page-header">
         <div>
-          <p class="eyebrow">Ngày 11 - Import điểm</p>
+          <p class="eyebrow">Import điểm</p>
           <h1 class="page-title">Import Excel/CSV</h1>
           <p class="subtitle">Quy trình 4 bước: chọn lớp, upload file, preview, xác nhận import.</p>
         </div>
@@ -259,6 +267,14 @@ interface PredictClassResponse {
                 lỗi.
               </p>
 
+              <mat-checkbox
+                class="auto-predict-check"
+                [checked]="autoPredictAfterImport"
+                (change)="autoPredictAfterImport = $event.checked"
+              >
+                Tự động gọi AI dự đoán cả lớp sau khi import
+              </mat-checkbox>
+
               <div class="actions-row">
                 <button mat-stroked-button type="button" (click)="prevStep(1)">Quay lại</button>
                 <button
@@ -333,6 +349,10 @@ interface PredictClassResponse {
                   Về trang điểm
                 </button>
               </div>
+
+              <p class="summary-text" *ngIf="autoPredictResultMessage">
+                {{ autoPredictResultMessage }}
+              </p>
             </ng-container>
           </mat-step>
         </mat-stepper>
@@ -384,6 +404,7 @@ interface PredictClassResponse {
         display: grid;
         grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 0.75rem;
+        padding: 0.75rem;
         margin-bottom: 0.75rem;
       }
 
@@ -444,6 +465,10 @@ interface PredictClassResponse {
         color: var(--text-sub);
       }
 
+      .auto-predict-check {
+        margin-top: 0.8rem;
+      }
+
       .preview-table-wrap {
         overflow-x: auto;
         margin-top: 0.75rem;
@@ -488,6 +513,7 @@ export class GradeImportComponent implements OnInit {
   private readonly snackBar = inject(MatSnackBar);
   private readonly http = inject(HttpClient);
   private readonly router = inject(Router);
+  private readonly route = inject(ActivatedRoute);
   private readonly destroyRef = inject(DestroyRef);
 
   @ViewChild('stepper') private stepper?: MatStepper;
@@ -511,13 +537,18 @@ export class GradeImportComponent implements OnInit {
   selectedFile: File | null = null;
   previewResult: ImportPreviewResponse | null = null;
   importResult: ImportExecuteResponse | null = null;
+  autoPredictAfterImport = true;
+  autoPredictResultMessage = '';
 
   isPreviewLoading = false;
   isImporting = false;
   isDownloadingTemplate = false;
   isPredictingClass = false;
 
+  private importPreset: ImportPresetParams | null = null;
+
   ngOnInit(): void {
+    this.captureImportPresetFromQuery();
     this.loadMasterData();
   }
 
@@ -570,9 +601,12 @@ export class GradeImportComponent implements OnInit {
   downloadTemplate(): void {
     this.isDownloadingTemplate = true;
 
+    const classId = this.setupForm.controls.classId.value;
+    const query = classId ? `?classId=${encodeURIComponent(classId)}` : '';
+
     // Tải template dạng blob để browser tự tải file .xlsx.
     this.http
-      .get('http://localhost:3000/api/grades/import/template', {
+      .get(`http://localhost:3000/api/grades/import/template${query}`, {
         responseType: 'blob',
       })
       .pipe(
@@ -653,7 +687,14 @@ export class GradeImportComponent implements OnInit {
       .subscribe({
         next: (response) => {
           this.importResult = response;
+          this.autoPredictResultMessage = '';
           this.nextStep(3);
+
+          if (this.autoPredictAfterImport && Number(response.imported || 0) > 0) {
+            this.runPredictClass(true);
+          } else if (this.autoPredictAfterImport) {
+            this.autoPredictResultMessage = 'Không có bản ghi điểm mới để gọi AI dự đoán tự động.';
+          }
         },
         error: (error: unknown) => {
           this.snackBar.open(this.resolveError(error), 'Đóng', {
@@ -663,9 +704,12 @@ export class GradeImportComponent implements OnInit {
       });
   }
 
-  runPredictClass(): void {
+  runPredictClass(triggeredByAuto = false): void {
     const classId = this.setupForm.controls.classId.value;
     if (!classId) {
+      if (triggeredByAuto) {
+        this.autoPredictResultMessage = 'Không thể chạy AI tự động vì chưa chọn lớp học phần.';
+      }
       return;
     }
 
@@ -685,11 +729,21 @@ export class GradeImportComponent implements OnInit {
         next: (response) => {
           const processed = Number(response.data?.processed || 0);
           const failed = Number(response.data?.failed || 0);
+          const message = `AI đã xử lý ${processed} bảng điểm, lỗi ${failed}.`;
+
+          if (triggeredByAuto) {
+            this.autoPredictResultMessage = `Tự động gọi AI hoàn tất: ${message}`;
+          }
+
           this.snackBar.open(`AI đã xử lý ${processed} bảng điểm, lỗi ${failed}.`, 'Đóng', {
             duration: 3000,
           });
         },
         error: (error: unknown) => {
+          if (triggeredByAuto) {
+            this.autoPredictResultMessage = 'Tự động gọi AI thất bại: ' + this.resolveError(error);
+          }
+
           this.snackBar.open(this.resolveError(error), 'Đóng', {
             duration: 3200,
           });
@@ -728,6 +782,7 @@ export class GradeImportComponent implements OnInit {
           this.schoolYears = schoolYears;
           this.classes = classes;
           this.onFilterChange();
+          this.applyImportPreset();
         },
         error: (error: unknown) => {
           this.snackBar.open(this.resolveError(error), 'Đóng', {
@@ -735,6 +790,62 @@ export class GradeImportComponent implements OnInit {
           });
         },
       });
+  }
+
+  private captureImportPresetFromQuery(): void {
+    const queryMap = this.route.snapshot.queryParamMap;
+
+    const schoolYearId = String(queryMap.get('schoolYearId') || '').trim();
+    const classId = String(queryMap.get('classId') || '').trim();
+    const semesterValue = Number(queryMap.get('semester'));
+
+    if (schoolYearId && classId && [1, 2, 3].includes(semesterValue)) {
+      this.importPreset = {
+        schoolYearId,
+        semester: semesterValue as 1 | 2 | 3,
+        classId,
+      };
+    }
+
+    const autoPredictValue = queryMap.get('autoPredict');
+    if (autoPredictValue !== null) {
+      const normalized = autoPredictValue.trim().toLowerCase();
+      this.autoPredictAfterImport = !['false', '0', 'no', 'off'].includes(normalized);
+    }
+  }
+
+  private applyImportPreset(): void {
+    if (!this.importPreset) {
+      return;
+    }
+
+    const preset = this.importPreset;
+    this.importPreset = null;
+
+    const hasSchoolYear = this.schoolYears.some((item) => item._id === preset.schoolYearId);
+    if (!hasSchoolYear) {
+      return;
+    }
+
+    this.setupForm.patchValue({
+      schoolYearId: preset.schoolYearId,
+      semester: preset.semester,
+    });
+    this.onFilterChange();
+
+    const hasClass = this.filteredClasses.some((item) => item._id === preset.classId);
+    if (!hasClass) {
+      this.snackBar.open(
+        'Lớp được truyền từ trang nhập điểm không nằm trong bộ lọc hiện tại.',
+        'Đóng',
+        {
+          duration: 3200,
+        },
+      );
+      return;
+    }
+
+    this.setupForm.controls.classId.setValue(preset.classId);
   }
 
   private setSelectedFile(file: File | null): void {

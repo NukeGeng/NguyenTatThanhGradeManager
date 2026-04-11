@@ -1,4 +1,5 @@
 const express = require("express");
+const mongoose = require("mongoose");
 const multer = require("multer");
 const XLSX = require("xlsx");
 const auth = require("../middleware/auth");
@@ -6,8 +7,9 @@ const Grade = require("../models/Grade");
 const Student = require("../models/Student");
 const Class = require("../models/Class");
 const SchoolYear = require("../models/SchoolYear");
+const Department = require("../models/Department");
 const {
-  getSubjectMap,
+  getTemplateOptionsByClassId,
   parseExcelFile,
   validateRows,
   importValidRows,
@@ -54,6 +56,35 @@ const getAdvisingStudentIds = (user) =>
   );
 
 const DASHBOARD_GRADE_LETTERS = ["A", "B", "C", "F"];
+const DASHBOARD_SEMESTERS = [1, 2, 3];
+
+const normalizeFilterValue = (value) => {
+  if (value === undefined || value === null) {
+    return null;
+  }
+
+  const normalized = String(value).trim();
+  if (!normalized || normalized.toLowerCase() === "all") {
+    return null;
+  }
+
+  return normalized;
+};
+
+const toDashboardClassOption = (classDoc) => ({
+  _id: String(classDoc._id),
+  code: classDoc.code,
+  name: classDoc.name || classDoc.code,
+  semester: Number(classDoc.semester || 1),
+  departmentId: String(classDoc.departmentId),
+});
+
+const toDashboardStudentOption = (studentDoc) => ({
+  _id: String(studentDoc._id),
+  studentCode: studentDoc.studentCode,
+  fullName: studentDoc.fullName,
+  classId: String(studentDoc.classId),
+});
 
 const normalizeScoreArray = (scores) => {
   if (!Array.isArray(scores)) {
@@ -79,6 +110,22 @@ const normalizeScore = (score) => {
   return Number.isNaN(numeric) ? null : numeric;
 };
 
+const resolveRefId = (value) => {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value === "string") {
+    return value;
+  }
+
+  if (value?._id) {
+    return String(value._id);
+  }
+
+  return null;
+};
+
 const populateGradeQuery = (query) =>
   query
     .populate("studentId", "studentCode fullName classId")
@@ -91,8 +138,31 @@ const populateGradeQuery = (query) =>
 
 router.get("/import/template", async (req, res, next) => {
   try {
-    const subjectMap = await getSubjectMap();
-    const workbook = generateTemplateWorkbook(subjectMap);
+    const classId = String(req.query.classId || "").trim();
+    const templateOptions = classId
+      ? await getTemplateOptionsByClassId(classId)
+      : null;
+
+    if (classId && !templateOptions) {
+      return res.status(404).json({
+        success: false,
+        message: "Không tìm thấy lớp học phần để tạo mẫu import",
+      });
+    }
+
+    if (classId && req.user.role !== "admin") {
+      const allowedDepartmentIds = getAllowedDepartmentIds(req.user);
+      if (
+        !allowedDepartmentIds.includes(String(templateOptions.departmentId))
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "Bạn không có quyền tải mẫu import của lớp này",
+        });
+      }
+    }
+
+    const workbook = generateTemplateWorkbook(templateOptions || undefined);
     const fileBuffer = XLSX.write(workbook, {
       bookType: "xlsx",
       type: "buffer",
@@ -132,14 +202,35 @@ router.post("/import/preview", async (req, res, next) => {
       });
     }
 
-    const subjectMap = await getSubjectMap();
-    const rows = parseExcelFile(req.file.buffer, subjectMap);
+    const classData = await Class.findById(classId)
+      .select(
+        "_id subjectId departmentId schoolYearId semester weights txCount",
+      )
+      .lean();
+
+    if (!classData) {
+      return res.status(404).json({
+        success: false,
+        message: "Class not found",
+      });
+    }
+
+    if (req.user.role !== "admin") {
+      const allowedDepartmentIds = getAllowedDepartmentIds(req.user);
+      if (!allowedDepartmentIds.includes(String(classData.departmentId))) {
+        return res.status(403).json({
+          success: false,
+          message: "Bạn không có quyền import điểm cho lớp này",
+        });
+      }
+    }
+
+    const rows = parseExcelFile(req.file.buffer);
     const { validRows, errorRows } = await validateRows(
       rows,
-      classId,
+      classData,
       semester,
       schoolYearId,
-      subjectMap,
     );
 
     return res.status(200).json({
@@ -187,14 +278,35 @@ router.post("/import/excel", async (req, res, next) => {
       });
     }
 
-    const subjectMap = await getSubjectMap();
-    const rows = parseExcelFile(req.file.buffer, subjectMap);
+    const classData = await Class.findById(classId)
+      .select(
+        "_id subjectId departmentId schoolYearId semester weights txCount",
+      )
+      .lean();
+
+    if (!classData) {
+      return res.status(404).json({
+        success: false,
+        message: "Class not found",
+      });
+    }
+
+    if (req.user.role !== "admin") {
+      const allowedDepartmentIds = getAllowedDepartmentIds(req.user);
+      if (!allowedDepartmentIds.includes(String(classData.departmentId))) {
+        return res.status(403).json({
+          success: false,
+          message: "Bạn không có quyền import điểm cho lớp này",
+        });
+      }
+    }
+
+    const rows = parseExcelFile(req.file.buffer);
     const { validRows, errorRows } = await validateRows(
       rows,
-      classId,
+      classData,
       semester,
       schoolYearId,
-      subjectMap,
     );
 
     const { importedCount, duplicateErrors } = await importValidRows(
@@ -450,75 +562,201 @@ router.put("/:id", async (req, res, next) => {
 
 router.get("/summary/dashboard", async (req, res, next) => {
   try {
-    const classQuery = {};
+    const classScopeQuery = {};
     const activeOnly =
       String(req.query.activeOnly || "true").toLowerCase() !== "false";
+    const normalizedDepartmentId = normalizeFilterValue(req.query.departmentId);
+    const normalizedSemester = normalizeFilterValue(req.query.semester);
+    const normalizedClassId = normalizeFilterValue(req.query.classId);
+    const normalizedStudentId = normalizeFilterValue(req.query.studentId);
 
-    if (req.user.role !== "admin") {
-      const allowedDepartmentIds = getAllowedDepartmentIds(req.user);
-      classQuery.departmentId = { $in: allowedDepartmentIds };
-    }
-
-    if (req.query.departmentId) {
-      const departmentId = String(req.query.departmentId);
-
-      if (req.user.role !== "admin") {
-        const allowedDepartmentIds = getAllowedDepartmentIds(req.user);
-        if (!allowedDepartmentIds.includes(departmentId)) {
-          return res.status(403).json({
-            success: false,
-            message: "Bạn không có quyền xem khoa này",
-          });
-        }
-      }
-
-      classQuery.departmentId = departmentId;
-    }
-
-    const classes = await Class.find(classQuery).select("_id").lean();
-    const classIds = classes.map((item) => item._id);
-
-    if (!classIds.length) {
-      return res.status(200).json({
-        success: true,
-        data: {
-          totalStudents: 0,
-          totalClasses: 0,
-          gradeCounts: {
-            A: 0,
-            B: 0,
-            C: 0,
-            F: 0,
-          },
-        },
-        message: "Get dashboard summary successfully",
+    if (
+      normalizedSemester !== null &&
+      !isValidSemester(Number(normalizedSemester))
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "semester phải thuộc [1,2,3] hoặc all",
       });
     }
 
-    const studentQuery = {
-      classId: { $in: classIds },
+    const allowedDepartmentIds =
+      req.user.role === "admin" ? [] : getAllowedDepartmentIds(req.user);
+
+    if (req.user.role !== "admin") {
+      classScopeQuery.departmentId = { $in: allowedDepartmentIds };
+    }
+
+    if (normalizedDepartmentId) {
+      if (
+        req.user.role !== "admin" &&
+        !allowedDepartmentIds.includes(normalizedDepartmentId)
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "Bạn không có quyền xem khoa này",
+        });
+      }
+
+      classScopeQuery.departmentId = normalizedDepartmentId;
+    }
+
+    if (normalizedSemester) {
+      classScopeQuery.semester = Number(normalizedSemester);
+    }
+
+    const [departmentDocs, classesInScope] = await Promise.all([
+      Department.find(
+        req.user.role === "admin" ? {} : { _id: { $in: allowedDepartmentIds } },
+      )
+        .select("_id code name")
+        .sort({ code: 1 })
+        .lean(),
+      Class.find(classScopeQuery)
+        .select("_id code name semester departmentId")
+        .sort({ semester: 1, code: 1, createdAt: -1 })
+        .lean(),
+    ]);
+
+    const classOptionRows = classesInScope.map(toDashboardClassOption);
+    const classIdSetInScope = new Set(classOptionRows.map((item) => item._id));
+
+    let metricClassIds = classOptionRows.map((item) => item._id);
+    if (normalizedClassId) {
+      if (!classIdSetInScope.has(normalizedClassId)) {
+        return res.status(403).json({
+          success: false,
+          message: "Bạn không có quyền xem học phần này",
+        });
+      }
+
+      metricClassIds = [normalizedClassId];
+    }
+
+    const studentScopeQuery = {
+      classId: { $in: metricClassIds },
     };
 
     if (activeOnly) {
-      studentQuery.status = "active";
+      studentScopeQuery.status = "active";
     }
 
-    const [totalStudents, gradeRows] = await Promise.all([
-      Student.countDocuments(studentQuery),
-      Grade.aggregate([
-        {
-          $match: {
-            classId: { $in: classIds },
-            letterGrade: { $in: DASHBOARD_GRADE_LETTERS },
-          },
+    if (normalizedStudentId) {
+      const scopedStudent = await Student.findOne({
+        _id: normalizedStudentId,
+        classId: { $in: metricClassIds },
+        ...(activeOnly ? { status: "active" } : {}),
+      })
+        .select("_id")
+        .lean();
+
+      if (!scopedStudent) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Sinh viên không thuộc phạm vi lọc hiện tại hoặc bạn không có quyền truy cập",
+        });
+      }
+
+      studentScopeQuery._id = normalizedStudentId;
+    }
+
+    const studentOptionRows = metricClassIds.length
+      ? await Student.find({
+          classId: { $in: metricClassIds },
+          ...(activeOnly ? { status: "active" } : {}),
+        })
+          .select("_id studentCode fullName classId")
+          .sort({ fullName: 1 })
+          .lean()
+      : [];
+
+    const zeroDataPayload = {
+      success: true,
+      data: {
+        totalStudents: 0,
+        totalClasses: metricClassIds.length,
+        gradeCounts: {
+          A: 0,
+          B: 0,
+          C: 0,
+          F: 0,
         },
-        {
-          $group: {
-            _id: "$letterGrade",
-            count: { $sum: 1 },
-          },
+        filterOptions: {
+          departments: departmentDocs.map((item) => ({
+            _id: String(item._id),
+            code: item.code,
+            name: item.name,
+          })),
+          semesters: DASHBOARD_SEMESTERS,
+          classes: classOptionRows,
+          students: studentOptionRows.map(toDashboardStudentOption),
         },
-      ]),
+        appliedFilters: {
+          departmentId: normalizedDepartmentId || "all",
+          semester: normalizedSemester || "all",
+          classId: normalizedClassId || "all",
+          studentId: normalizedStudentId || "all",
+          activeOnly,
+        },
+      },
+      message: "Get dashboard summary successfully",
+    };
+
+    if (!metricClassIds.length) {
+      return res.status(200).json(zeroDataPayload);
+    }
+
+    const scopedStudentIds = await Student.distinct("_id", studentScopeQuery);
+    const totalStudents = scopedStudentIds.length;
+
+    if (!scopedStudentIds.length) {
+      return res.status(200).json(zeroDataPayload);
+    }
+
+    const metricClassObjectIds = metricClassIds
+      .map((id) =>
+        mongoose.Types.ObjectId.isValid(id)
+          ? new mongoose.Types.ObjectId(id)
+          : null,
+      )
+      .filter(Boolean);
+
+    const scopedStudentObjectIds = scopedStudentIds
+      .map((id) =>
+        mongoose.Types.ObjectId.isValid(id)
+          ? new mongoose.Types.ObjectId(id)
+          : null,
+      )
+      .filter(Boolean);
+
+    const normalizedStudentObjectId =
+      normalizedStudentId &&
+      mongoose.Types.ObjectId.isValid(normalizedStudentId)
+        ? new mongoose.Types.ObjectId(normalizedStudentId)
+        : null;
+
+    if (!metricClassObjectIds.length || !scopedStudentObjectIds.length) {
+      return res.status(200).json(zeroDataPayload);
+    }
+
+    const gradeRows = await Grade.aggregate([
+      {
+        $match: {
+          classId: { $in: metricClassObjectIds },
+          studentId: { $in: scopedStudentObjectIds },
+          letterGrade: { $in: DASHBOARD_GRADE_LETTERS },
+          ...(normalizedStudentObjectId
+            ? { studentId: normalizedStudentObjectId }
+            : {}),
+        },
+      },
+      {
+        $group: {
+          _id: "$letterGrade",
+          count: { $sum: 1 },
+        },
+      },
     ]);
 
     const gradeCounts = {
@@ -538,8 +776,25 @@ router.get("/summary/dashboard", async (req, res, next) => {
       success: true,
       data: {
         totalStudents,
-        totalClasses: classes.length,
+        totalClasses: metricClassIds.length,
         gradeCounts,
+        filterOptions: {
+          departments: departmentDocs.map((item) => ({
+            _id: String(item._id),
+            code: item.code,
+            name: item.name,
+          })),
+          semesters: DASHBOARD_SEMESTERS,
+          classes: classOptionRows,
+          students: studentOptionRows.map(toDashboardStudentOption),
+        },
+        appliedFilters: {
+          departmentId: normalizedDepartmentId || "all",
+          semester: normalizedSemester || "all",
+          classId: normalizedClassId || "all",
+          studentId: normalizedStudentId || "all",
+          activeOnly,
+        },
       },
       message: "Get dashboard summary successfully",
     });
@@ -568,9 +823,50 @@ router.get("/student/:studentId", async (req, res, next) => {
       }),
     );
 
+    const classObjectIds = grades
+      .map((item) => resolveRefId(item.classId))
+      .filter((value) => mongoose.Types.ObjectId.isValid(value))
+      .map((value) => new mongoose.Types.ObjectId(value));
+
+    const classAverageRows = classObjectIds.length
+      ? await Grade.aggregate([
+          {
+            $match: {
+              classId: { $in: classObjectIds },
+              finalScore: { $ne: null },
+            },
+          },
+          {
+            $group: {
+              _id: "$classId",
+              avgFinalScore: { $avg: "$finalScore" },
+            },
+          },
+        ])
+      : [];
+
+    const classAverageMap = new Map(
+      classAverageRows.map((item) => [
+        String(item._id),
+        Number(Number(item.avgFinalScore || 0).toFixed(2)),
+      ]),
+    );
+
+    const gradePayload = grades.map((grade) => {
+      const classId = resolveRefId(grade.classId);
+      const gradeObject = grade?.toObject ? grade.toObject() : grade;
+
+      return {
+        ...gradeObject,
+        classAverageScore: classId
+          ? (classAverageMap.get(classId) ?? null)
+          : null,
+      };
+    });
+
     return res.status(200).json({
       success: true,
-      data: grades,
+      data: gradePayload,
       message: "Get student grades successfully",
     });
   } catch (error) {

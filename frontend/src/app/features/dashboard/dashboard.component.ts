@@ -9,14 +9,17 @@ import {
   ViewChild,
   inject,
 } from '@angular/core';
+import { FormsModule } from '@angular/forms';
 import { MatCardModule } from '@angular/material/card';
+import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatSelectModule } from '@angular/material/select';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
 import { LucideAngularModule } from 'lucide-angular';
 import { catchError, finalize, forkJoin, map, of, timeout } from 'rxjs';
 
 import { ApiService } from '../../core/services/api.service';
-import { ApiResponse, Class, Grade, Prediction, Student } from '../../shared/models/interfaces';
+import { ApiResponse, Prediction } from '../../shared/models/interfaces';
 
 Chart.register(...registerables);
 
@@ -40,11 +43,65 @@ interface DashboardSummaryResponse {
   totalStudents: number;
   totalClasses: number;
   gradeCounts: Partial<Record<GradeBucket, number>>;
+  filterOptions: {
+    departments: Array<{
+      _id: string;
+      code: string;
+      name: string;
+    }>;
+    semesters: number[];
+    classes: Array<{
+      _id: string;
+      code: string;
+      name: string;
+      semester: number;
+      departmentId: string;
+    }>;
+    students: Array<{
+      _id: string;
+      studentCode: string;
+      fullName: string;
+      classId: string;
+    }>;
+  };
+  appliedFilters: {
+    departmentId: string;
+    semester: string;
+    classId: string;
+    studentId: string;
+    activeOnly: boolean;
+  };
+}
+
+interface DashboardDepartmentOption {
+  id: string;
+  label: string;
+}
+
+interface DashboardClassOption {
+  id: string;
+  label: string;
+  semester: number;
+  departmentId: string;
+}
+
+interface DashboardStudentOption {
+  id: string;
+  label: string;
+  classId: string;
 }
 
 @Component({
   selector: 'app-dashboard',
-  imports: [CommonModule, MatCardModule, MatProgressSpinnerModule, LucideAngularModule],
+  imports: [
+    CommonModule,
+    FormsModule,
+    MatCardModule,
+    MatFormFieldModule,
+    MatProgressSpinnerModule,
+    MatSelectModule,
+    LucideAngularModule,
+  ],
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
 })
@@ -87,6 +144,15 @@ export class DashboardComponent implements OnInit, OnDestroy {
 
   alertRows: AlertRow[] = [];
 
+  selectedDepartmentId = 'all';
+  selectedSemester: 'all' | '1' | '2' | '3' = 'all';
+  selectedClassId = 'all';
+  selectedStudentId = 'all';
+
+  departmentOptions: DashboardDepartmentOption[] = [];
+  classOptions: DashboardClassOption[] = [];
+  studentOptions: DashboardStudentOption[] = [];
+
   private gradeChart?: Chart<'bar', number[], string>;
   ngOnInit(): void {
     this.loadDashboardData();
@@ -119,6 +185,10 @@ export class DashboardComponent implements OnInit, OnDestroy {
     const summaryRequest = this.apiService
       .get<ApiResponse<DashboardSummaryResponse>>('/grades/summary/dashboard', {
         activeOnly: true,
+        departmentId: this.selectedDepartmentId,
+        semester: this.selectedSemester,
+        classId: this.selectedClassId,
+        studentId: this.selectedStudentId,
       })
       .pipe(
         timeout(this.requestTimeoutMs),
@@ -128,6 +198,19 @@ export class DashboardComponent implements OnInit, OnDestroy {
               totalStudents: 0,
               totalClasses: 0,
               gradeCounts: { A: 0, B: 0, C: 0, F: 0 },
+              filterOptions: {
+                departments: [],
+                semesters: [1, 2, 3],
+                classes: [],
+                students: [],
+              },
+              appliedFilters: {
+                departmentId: 'all',
+                semester: 'all',
+                classId: 'all',
+                studentId: 'all',
+                activeOnly: true,
+              },
             },
         ),
         catchError(() =>
@@ -135,6 +218,19 @@ export class DashboardComponent implements OnInit, OnDestroy {
             totalStudents: 0,
             totalClasses: 0,
             gradeCounts: { A: 0, B: 0, C: 0, F: 0 },
+            filterOptions: {
+              departments: [],
+              semesters: [1, 2, 3],
+              classes: [],
+              students: [],
+            },
+            appliedFilters: {
+              departmentId: 'all',
+              semester: 'all',
+              classId: 'all',
+              studentId: 'all',
+              activeOnly: true,
+            },
           }),
         ),
       );
@@ -182,7 +278,25 @@ export class DashboardComponent implements OnInit, OnDestroy {
   }
 
   private applyDashboardData(summary: DashboardSummaryResponse, alerts: Prediction[]): void {
-    this.alertRows = this.mapAlertRows(alerts);
+    this.departmentOptions = (summary.filterOptions?.departments ?? []).map((item) => ({
+      id: item._id,
+      label: `${item.code} - ${item.name}`,
+    }));
+
+    this.classOptions = (summary.filterOptions?.classes ?? []).map((item) => ({
+      id: item._id,
+      label: `${item.code} - ${item.name}`,
+      semester: Number(item.semester || 1),
+      departmentId: item.departmentId,
+    }));
+
+    this.studentOptions = (summary.filterOptions?.students ?? []).map((item) => ({
+      id: item._id,
+      label: `${item.studentCode} - ${item.fullName}`,
+      classId: item.classId,
+    }));
+
+    this.alertRows = this.mapAlertRows(this.filterAlertsByScope(alerts));
 
     this.gradeCounts = {
       A: Number(summary.gradeCounts?.A || 0),
@@ -215,6 +329,73 @@ export class DashboardComponent implements OnInit, OnDestroy {
         predictedRank: alert.predictedRank ?? 'Không xác định',
         riskLevel: alert.riskLevel ?? 'high',
       };
+    });
+  }
+
+  onDepartmentChange(): void {
+    this.selectedClassId = 'all';
+    this.selectedStudentId = 'all';
+    this.loadDashboardData();
+  }
+
+  onSemesterChange(): void {
+    this.selectedClassId = 'all';
+    this.selectedStudentId = 'all';
+    this.loadDashboardData();
+  }
+
+  onClassChange(): void {
+    this.selectedStudentId = 'all';
+    this.loadDashboardData();
+  }
+
+  onStudentChange(): void {
+    this.loadDashboardData();
+  }
+
+  private filterAlertsByScope(alerts: Prediction[]): Prediction[] {
+    const availableClassIds = new Set(this.classOptions.map((item) => item.id));
+
+    return alerts.filter((alert) => {
+      const studentValue =
+        typeof alert.studentId === 'string' || !alert.studentId ? null : alert.studentId;
+      const studentId = studentValue?._id ? String(studentValue._id) : null;
+
+      const classValue = studentValue?.classId;
+      const classId =
+        typeof classValue === 'string'
+          ? classValue
+          : classValue?._id
+            ? String(classValue._id)
+            : null;
+      const departmentId =
+        typeof classValue !== 'string' && classValue?.departmentId
+          ? typeof classValue.departmentId === 'string'
+            ? classValue.departmentId
+            : String(classValue.departmentId._id)
+          : null;
+
+      if (this.selectedStudentId !== 'all' && studentId !== this.selectedStudentId) {
+        return false;
+      }
+
+      if (this.selectedClassId !== 'all' && classId !== this.selectedClassId) {
+        return false;
+      }
+
+      if (this.selectedClassId === 'all' && this.selectedDepartmentId !== 'all') {
+        if (departmentId !== this.selectedDepartmentId) {
+          return false;
+        }
+      }
+
+      if (this.selectedSemester !== 'all' && this.selectedClassId === 'all') {
+        if (!classId || !availableClassIds.has(classId)) {
+          return false;
+        }
+      }
+
+      return true;
     });
   }
 
@@ -267,7 +448,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
             },
             ticks: {
               font: {
-                family: 'Be Vietnam Pro',
+                family: 'Inter, sans-serif',
                 size: 12,
               },
             },
@@ -278,7 +459,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
               precision: 0,
               stepSize: 1,
               font: {
-                family: 'Be Vietnam Pro',
+                family: 'Inter, sans-serif',
                 size: 12,
               },
             },
@@ -295,7 +476,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
               usePointStyle: true,
               boxWidth: 8,
               font: {
-                family: 'Be Vietnam Pro',
+                family: 'Inter, sans-serif',
                 size: 12,
               },
             },

@@ -214,54 +214,52 @@ interface AdvisingStudentsDialogData {
         } @else {
           <div class="table-wrap">
             <table mat-table [dataSource]="filteredUsers" class="full-table nttu-table">
-              <ng-container matColumnDef="teacher">
-                <th mat-header-cell *matHeaderCellDef>Tài khoản</th>
-                <td mat-cell *matCellDef="let row">
-                  <div class="teacher-cell">
-                    <span class="user-avatar">{{ getInitials(row.name) }}</span>
-                    <div>
-                      <p class="teacher-name">{{ row.name }}</p>
-                      <p class="teacher-email">{{ row.email }}</p>
-                      <p class="teacher-code">MSGV: {{ formatTeacherCode(row) }}</p>
-                    </div>
-                  </div>
+              <ng-container matColumnDef="index">
+                <th mat-header-cell *matHeaderCellDef>STT</th>
+                <td mat-cell *matCellDef="let row; let index = index" class="cell-center">
+                  {{ index + 1 }}
                 </td>
+              </ng-container>
+
+              <ng-container matColumnDef="teacherCode">
+                <th mat-header-cell *matHeaderCellDef>Mã GV</th>
+                <td mat-cell *matCellDef="let row" class="cell-center">
+                  {{ formatTeacherCode(row) }}
+                </td>
+              </ng-container>
+
+              <ng-container matColumnDef="teacher">
+                <th mat-header-cell *matHeaderCellDef>Họ tên</th>
+                <td mat-cell *matCellDef="let row">{{ row.name }}</td>
               </ng-container>
 
               <ng-container matColumnDef="role">
                 <th mat-header-cell *matHeaderCellDef>Vai trò</th>
-                <td mat-cell *matCellDef="let row">
-                  <span class="role-badge" [class.role-badge--advisor]="row.role === 'advisor'">
-                    {{ row.role === 'advisor' ? 'Cố vấn học tập' : 'Giáo viên' }}
-                  </span>
+                <td mat-cell *matCellDef="let row" class="cell-center">
+                  {{ row.role === 'advisor' ? 'Cố vấn học tập' : 'Giáo viên' }}
                 </td>
               </ng-container>
 
               <ng-container matColumnDef="departments">
-                <th mat-header-cell *matHeaderCellDef>Khoa đang dạy</th>
-                <td mat-cell *matCellDef="let row">
-                  <mat-chip-set>
-                    @for (
-                      deptCode of getDepartmentCodes(row.departmentIds).slice(0, 3);
-                      track deptCode
-                    ) {
-                      <mat-chip>{{ deptCode }}</mat-chip>
-                    }
-                    @if (getDepartmentCodes(row.departmentIds).length > 3) {
-                      <mat-chip>+{{ getDepartmentCodes(row.departmentIds).length - 3 }}</mat-chip>
-                    }
-                  </mat-chip-set>
+                <th mat-header-cell *matHeaderCellDef>Khoa</th>
+                <td
+                  mat-cell
+                  *matCellDef="let row"
+                  class="department-cell"
+                  [title]="getDepartmentDisplay(row.departmentIds)"
+                >
+                  {{ getDepartmentDisplay(row.departmentIds) }}
                 </td>
               </ng-container>
 
               <ng-container matColumnDef="status">
                 <th mat-header-cell *matHeaderCellDef>Trạng thái</th>
-                <td mat-cell *matCellDef="let row">
-                  <span
-                    class="grade-badge"
-                    [class.grade-badge--a]="row.isActive !== false"
-                    [class.grade-badge--f]="row.isActive === false"
-                  >
+                <td mat-cell *matCellDef="let row" class="cell-center">
+                  <span class="status-chip" [class.status-chip--active]="row.isActive !== false">
+                    <span
+                      class="status-dot"
+                      [class.status-dot--active]="row.isActive !== false"
+                    ></span>
                     {{ row.isActive === false ? 'Đã khóa' : 'Hoạt động' }}
                   </span>
                 </td>
@@ -269,7 +267,7 @@ interface AdvisingStudentsDialogData {
 
               <ng-container matColumnDef="actions">
                 <th mat-header-cell *matHeaderCellDef>Thao tác</th>
-                <td mat-cell *matCellDef="let row" class="actions-cell">
+                <td mat-cell *matCellDef="let row" class="actions-cell cell-center">
                   <div class="actions-wrap">
                     <button
                       type="button"
@@ -343,6 +341,10 @@ interface AdvisingStudentsDialogData {
         gap: 1rem;
       }
 
+      .content-card {
+        padding: 1rem 1.1rem 1.1rem;
+      }
+
       .page-header {
         display: flex;
         justify-content: space-between;
@@ -385,10 +387,78 @@ interface AdvisingStudentsDialogData {
 
       .table-wrap {
         overflow-x: auto;
+        border: 1px solid #c8d0d8;
+        border-radius: 4px;
+        background: #fff;
       }
 
       .full-table {
         width: 100%;
+        border-collapse: collapse;
+      }
+
+      .full-table .mat-mdc-header-row {
+        height: 58px;
+        background: #d8e1e8;
+      }
+
+      .full-table .mat-mdc-header-cell {
+        color: #1da1f2;
+        font-weight: 700;
+        font-size: 0.9rem;
+        border-bottom: 1px solid #bcc8d2;
+        border-right: 1px solid #c7d1da;
+        text-align: center;
+      }
+
+      .full-table .mat-mdc-cell {
+        height: 52px;
+        color: #4f6679;
+        font-size: 0.9rem;
+        border-bottom: 1px solid #d1d8de;
+        border-right: 1px solid #d1d8de;
+      }
+
+      .full-table .mat-mdc-header-cell:first-child,
+      .full-table .mat-mdc-cell:first-child {
+        border-left: 1px solid #c7d1da;
+      }
+
+      .full-table .mat-mdc-row:last-child .mat-mdc-cell {
+        border-bottom: 0;
+      }
+
+      .cell-center {
+        text-align: center;
+        justify-content: center;
+      }
+
+      .full-table .mat-column-index {
+        width: 64px;
+      }
+
+      .full-table .mat-column-teacherCode {
+        width: 130px;
+      }
+
+      .full-table .mat-column-teacher {
+        width: 220px;
+      }
+
+      .full-table .mat-column-role {
+        width: 150px;
+      }
+
+      .full-table .mat-column-departments {
+        width: 220px;
+      }
+
+      .full-table .mat-column-status {
+        width: 130px;
+      }
+
+      .full-table .mat-column-actions {
+        width: 220px;
       }
 
       .actions-cell {
@@ -402,45 +472,35 @@ interface AdvisingStudentsDialogData {
         flex-wrap: nowrap;
       }
 
-      .teacher-cell {
-        display: flex;
-        align-items: center;
-        gap: 0.7rem;
+      .department-cell {
+        text-align: left;
+        white-space: nowrap;
+        overflow: hidden;
+        text-overflow: ellipsis;
       }
 
-      .teacher-name {
-        margin: 0;
-        font-weight: 600;
-        color: var(--text);
-      }
-
-      .teacher-email {
-        margin: 0.1rem 0 0;
-        color: var(--text-sub);
-        font-size: 0.8rem;
-      }
-
-      .teacher-code {
-        margin: 0.1rem 0 0;
-        color: #64748b;
-        font-size: 0.78rem;
-        letter-spacing: 0.03em;
-      }
-
-      .role-badge {
+      .status-chip {
         display: inline-flex;
         align-items: center;
+        gap: 0.35rem;
         border-radius: 999px;
-        padding: 0.15rem 0.5rem;
-        font-size: 0.74rem;
+        padding: 0.2rem 0.55rem;
+        font-size: 0.73rem;
         font-weight: 700;
-        color: #0f172a;
-        background: #e2e8f0;
+        background: #fee2e2;
+        color: #dc2626;
       }
 
-      .role-badge--advisor {
-        color: #92400e;
-        background: #fef3c7;
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+
+      .status-chip--active {
+        background: #dcfce7;
+        color: #16a34a;
       }
 
       @media (max-width: 768px) {
@@ -458,7 +518,15 @@ export class UserListComponent implements OnInit {
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
-  readonly displayedColumns = ['teacher', 'role', 'departments', 'status', 'actions'];
+  readonly displayedColumns = [
+    'index',
+    'teacherCode',
+    'teacher',
+    'departments',
+    'role',
+    'status',
+    'actions',
+  ];
 
   users: User[] = [];
   filteredUsers: User[] = [];
@@ -582,6 +650,11 @@ export class UserListComponent implements OnInit {
         return item.code;
       })
       .filter((code, index, list) => list.indexOf(code) === index);
+  }
+
+  getDepartmentDisplay(values: Array<string | Department>): string {
+    const codes = this.getDepartmentCodes(values);
+    return codes.length ? codes.join(', ') : '-';
   }
 
   formatTeacherCode(user: User): string {

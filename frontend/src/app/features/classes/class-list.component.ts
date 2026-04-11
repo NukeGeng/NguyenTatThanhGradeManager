@@ -159,12 +159,12 @@ interface ClassUpsertPayload {
             <table mat-table [dataSource]="filteredClasses" class="full-table nttu-table">
               <ng-container matColumnDef="index">
                 <th mat-header-cell *matHeaderCellDef>STT</th>
-                <td mat-cell *matCellDef="let row; index as i">{{ i + 1 }}</td>
+                <td mat-cell *matCellDef="let row; index as i" class="cell-center">{{ i + 1 }}</td>
               </ng-container>
 
               <ng-container matColumnDef="code">
                 <th mat-header-cell *matHeaderCellDef>Mã lớp</th>
-                <td mat-cell *matCellDef="let row">
+                <td mat-cell *matCellDef="let row" class="cell-center">
                   <button type="button" class="link-btn" (click)="openDetail(row)">
                     {{ row.code }}
                   </button>
@@ -178,17 +178,21 @@ interface ClassUpsertPayload {
 
               <ng-container matColumnDef="department">
                 <th mat-header-cell *matHeaderCellDef>Khoa</th>
-                <td mat-cell *matCellDef="let row">{{ getDepartmentCode(row.departmentId) }}</td>
+                <td mat-cell *matCellDef="let row" class="cell-center">
+                  {{ getDepartmentCode(row.departmentId) }}
+                </td>
               </ng-container>
 
               <ng-container matColumnDef="schoolYear">
                 <th mat-header-cell *matHeaderCellDef>Năm học</th>
-                <td mat-cell *matCellDef="let row">{{ getSchoolYearName(row.schoolYearId) }}</td>
+                <td mat-cell *matCellDef="let row" class="cell-center">
+                  {{ getSchoolYearName(row.schoolYearId) }}
+                </td>
               </ng-container>
 
               <ng-container matColumnDef="semester">
                 <th mat-header-cell *matHeaderCellDef>Học kỳ</th>
-                <td mat-cell *matCellDef="let row">
+                <td mat-cell *matCellDef="let row" class="cell-center">
                   <span class="sem-badge" [class.sem-badge--summer]="row.semester === 3">
                     HK{{ row.semester }}{{ row.semester === 3 ? ' - Hè' : '' }}
                   </span>
@@ -197,17 +201,19 @@ interface ClassUpsertPayload {
 
               <ng-container matColumnDef="credits">
                 <th mat-header-cell *matHeaderCellDef>Tín chỉ</th>
-                <td mat-cell *matCellDef="let row">{{ getSubjectCredits(row.subjectId) }}</td>
+                <td mat-cell *matCellDef="let row" class="cell-center">
+                  {{ getSubjectCredits(row.subjectId) }}
+                </td>
               </ng-container>
 
               <ng-container matColumnDef="studentCount">
                 <th mat-header-cell *matHeaderCellDef>Sĩ số</th>
-                <td mat-cell *matCellDef="let row">{{ row.studentCount }}</td>
+                <td mat-cell *matCellDef="let row" class="cell-center">{{ row.studentCount }}</td>
               </ng-container>
 
               <ng-container matColumnDef="weights">
                 <th mat-header-cell *matHeaderCellDef>Trọng số</th>
-                <td mat-cell *matCellDef="let row">
+                <td mat-cell *matCellDef="let row" class="cell-center">
                   <span class="weight-display">{{ getWeightDisplay(row) }}</span>
                 </td>
               </ng-container>
@@ -219,12 +225,8 @@ interface ClassUpsertPayload {
 
               <ng-container matColumnDef="status">
                 <th mat-header-cell *matHeaderCellDef>Trạng thái</th>
-                <td mat-cell *matCellDef="let row">
-                  <span
-                    class="grade-badge"
-                    [class.grade-badge--a]="row.isActive"
-                    [class.grade-badge--f]="!row.isActive"
-                  >
+                <td mat-cell *matCellDef="let row" class="cell-center">
+                  <span class="status-chip" [class.status-chip--active]="row.isActive">
                     {{ row.isActive ? 'Mở lớp' : 'Đã khóa' }}
                   </span>
                 </td>
@@ -232,7 +234,7 @@ interface ClassUpsertPayload {
 
               <ng-container matColumnDef="actions">
                 <th mat-header-cell *matHeaderCellDef>Thao tác</th>
-                <td mat-cell *matCellDef="let row" class="actions-cell">
+                <td mat-cell *matCellDef="let row" class="actions-cell cell-center">
                   <div class="actions-wrap">
                     <button
                       type="button"
@@ -278,12 +280,13 @@ interface ClassUpsertPayload {
   styles: [
     `
       .page-wrap {
+        padding-block: 1.5rem;
         display: grid;
         gap: 1rem;
       }
 
       .content-card {
-        padding: 0.95rem 1rem 1rem;
+        padding: 1rem 1.1rem 1.1rem;
       }
 
       .page-header {
@@ -324,20 +327,105 @@ interface ClassUpsertPayload {
 
       .table-wrap {
         overflow-x: auto;
+        border: 1px solid #c8d0d8;
+        border-radius: 4px;
+        background: #fff;
       }
 
       .full-table {
         width: 100%;
+        border-collapse: collapse;
+      }
+
+      .full-table .mat-mdc-header-row {
+        height: 58px;
+        background: #d8e1e8;
+      }
+
+      .full-table .mat-mdc-header-cell {
+        color: #1da1f2;
+        font-weight: 700;
+        font-size: 0.9rem;
+        border-bottom: 1px solid #bcc8d2;
+        border-right: 1px solid #c7d1da;
+        text-align: center;
+      }
+
+      .full-table .mat-mdc-cell {
+        height: 52px;
+        color: #4f6679;
+        font-size: 0.9rem;
+        border-bottom: 1px solid #d1d8de;
+        border-right: 1px solid #d1d8de;
+      }
+
+      .full-table .mat-mdc-header-cell:first-child,
+      .full-table .mat-mdc-cell:first-child {
+        border-left: 1px solid #c7d1da;
+      }
+
+      .full-table .mat-mdc-row:last-child .mat-mdc-cell {
+        border-bottom: 0;
+      }
+
+      .cell-center {
+        text-align: center;
+        justify-content: center;
+      }
+
+      .full-table .mat-column-index {
+        width: 64px;
+      }
+
+      .full-table .mat-column-code {
+        width: 120px;
+      }
+
+      .full-table .mat-column-department {
+        width: 130px;
+      }
+
+      .full-table .mat-column-schoolYear {
+        width: 130px;
+      }
+
+      .full-table .mat-column-semester {
+        width: 120px;
+      }
+
+      .full-table .mat-column-credits {
+        width: 90px;
+      }
+
+      .full-table .mat-column-studentCount {
+        width: 90px;
+      }
+
+      .full-table .mat-column-weights {
+        width: 180px;
+      }
+
+      .full-table .mat-column-teacher {
+        width: 180px;
+      }
+
+      .full-table .mat-column-status {
+        width: 130px;
+      }
+
+      .full-table .mat-column-actions {
+        width: 150px;
       }
 
       .link-btn {
         border: none;
         background: transparent;
         color: var(--blue);
-        text-decoration: underline;
+        text-decoration: none;
         cursor: pointer;
         font: inherit;
         padding: 0;
+        font-weight: 600;
       }
 
       .actions-cell {
@@ -365,6 +453,22 @@ interface ClassUpsertPayload {
         align-items: center;
         gap: 0.35rem;
         flex-wrap: nowrap;
+      }
+
+      .status-chip {
+        display: inline-flex;
+        align-items: center;
+        border-radius: 999px;
+        padding: 0.2rem 0.55rem;
+        font-size: 0.73rem;
+        font-weight: 700;
+        background: #fee2e2;
+        color: #dc2626;
+      }
+
+      .status-chip--active {
+        background: #dcfce7;
+        color: #16a34a;
       }
 
       @media (max-width: 768px) {

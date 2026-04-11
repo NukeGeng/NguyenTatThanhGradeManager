@@ -152,7 +152,10 @@ import {
         display: grid;
         grid-template-columns: 340px 1fr;
         gap: 1rem;
+        height: calc(100vh - 92px);
         min-height: calc(100vh - 92px);
+        max-height: calc(100vh - 92px);
+        overflow: hidden;
       }
 
       .rooms-panel,
@@ -327,6 +330,7 @@ import {
         display: grid;
         grid-template-rows: auto 1fr auto;
         min-height: 0;
+        overflow: hidden;
       }
 
       .chat-head {
@@ -353,6 +357,7 @@ import {
 
       .messages {
         overflow: auto;
+        min-height: 0;
         padding: 0.8rem 0.9rem;
         display: grid;
         gap: 0.6rem;
@@ -490,7 +495,9 @@ import {
       @media (max-width: 980px) {
         .chat-page {
           grid-template-columns: 1fr;
+          height: auto;
           min-height: auto;
+          max-height: none;
         }
 
         .rooms-panel {

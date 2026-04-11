@@ -8,10 +8,23 @@ const StudentCurriculum = require("../models/StudentCurriculum");
 const Department = require("../models/Department");
 const SchoolYear = require("../models/SchoolYear");
 const Subject = require("../models/Subject");
+const {
+  getRouteCacheEntry,
+  setRouteCacheEntry,
+  invalidateRouteCacheByPrefix,
+} = require("../utils/routeCache");
 
 const router = express.Router();
 
 const isValidSemester = (value) => [1, 2, 3].includes(Number(value));
+const CLASS_LIST_CACHE_PREFIX = "classes:list";
+const STUDENT_LIST_CACHE_PREFIX = "students:list";
+const CLASS_LIST_CACHE_TTL_MS = Number(
+  process.env.CLASS_LIST_CACHE_TTL_MS || 30000,
+);
+
+const buildClassesListCacheKey = (req, normalizedQuery) =>
+  `${CLASS_LIST_CACHE_PREFIX}:${String(req.user?._id || "anonymous")}:${JSON.stringify(normalizedQuery)}`;
 
 router.use(auth);
 
@@ -20,6 +33,15 @@ router.get("/", async (req, res, next) => {
     const { departmentId } = req.query;
     const hasStudentsOnly =
       String(req.query.hasStudents || "false").toLowerCase() === "true";
+    const cacheKey = buildClassesListCacheKey(req, {
+      departmentId: departmentId ? String(departmentId) : "",
+      hasStudentsOnly,
+    });
+    const cached = getRouteCacheEntry(cacheKey);
+    if (cached) {
+      return res.status(200).json(cached);
+    }
+
     const query = {};
 
     if (req.user.role !== "admin") {
@@ -80,11 +102,15 @@ router.get("/", async (req, res, next) => {
       .populate("teacherId", "name email")
       .sort({ semester: 1, code: 1, createdAt: -1 });
 
-    return res.status(200).json({
+    const payload = {
       success: true,
       data: classes,
       message: "Get classes successfully",
-    });
+    };
+
+    setRouteCacheEntry(cacheKey, payload, CLASS_LIST_CACHE_TTL_MS);
+
+    return res.status(200).json(payload);
   } catch (error) {
     return next(error);
   }
@@ -257,6 +283,9 @@ router.post("/", adminOnly, async (req, res, next) => {
       .populate("schoolYearId", "_id name isCurrent")
       .populate("teacherId", "name email");
 
+    invalidateRouteCacheByPrefix(CLASS_LIST_CACHE_PREFIX);
+    invalidateRouteCacheByPrefix(STUDENT_LIST_CACHE_PREFIX);
+
     return res.status(201).json({
       success: true,
       data: populatedClass,
@@ -381,6 +410,9 @@ router.put("/:id", async (req, res, next) => {
       });
     }
 
+    invalidateRouteCacheByPrefix(CLASS_LIST_CACHE_PREFIX);
+    invalidateRouteCacheByPrefix(STUDENT_LIST_CACHE_PREFIX);
+
     return res.status(200).json({
       success: true,
       data: updatedClass,
@@ -423,6 +455,9 @@ router.delete("/:id", async (req, res, next) => {
         message: "Class not found",
       });
     }
+
+    invalidateRouteCacheByPrefix(CLASS_LIST_CACHE_PREFIX);
+    invalidateRouteCacheByPrefix(STUDENT_LIST_CACHE_PREFIX);
 
     return res.status(200).json({
       success: true,

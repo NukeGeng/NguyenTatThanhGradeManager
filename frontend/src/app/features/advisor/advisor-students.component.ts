@@ -109,7 +109,7 @@ interface AdvisorStudentsOverviewPayload {
 
               <button
                 mat-flat-button
-                class="btn-primary"
+                class="btn-primary btn-detail"
                 type="button"
                 (click)="openDetail(student)"
               >
@@ -169,6 +169,7 @@ interface AdvisorStudentsOverviewPayload {
   styles: [
     `
       .page-wrap {
+        padding-block: 1.5rem;
         display: grid;
         gap: 1rem;
       }
@@ -250,6 +251,18 @@ interface AdvisorStudentsOverviewPayload {
         color: #fff !important;
       }
 
+      .btn-detail {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.4rem;
+      }
+
+      .btn-detail lucide-icon {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
       .pager {
         display: flex;
         align-items: center;
@@ -260,6 +273,11 @@ interface AdvisorStudentsOverviewPayload {
 
       .pager-size {
         width: 170px;
+      }
+
+      .pager-size .mat-mdc-form-field {
+        --mat-form-field-container-height: 44px;
+        --mat-form-field-container-vertical-padding: 10px;
       }
 
       .pager p {

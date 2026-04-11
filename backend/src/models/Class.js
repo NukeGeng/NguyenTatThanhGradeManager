@@ -125,5 +125,11 @@ classSchema.pre("validate", async function preValidate(next) {
 });
 
 classSchema.index({ code: 1, schoolYearId: 1, semester: 1 }, { unique: true });
+classSchema.index({
+  departmentId: 1,
+  schoolYearId: 1,
+  semester: 1,
+  isActive: 1,
+});
 
 module.exports = mongoose.model("Class", classSchema);

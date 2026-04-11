@@ -15,6 +15,50 @@
     </div>
   </header>
 
+  <mat-card class="content-card filter-card">
+    <div class="filter-grid">
+      <mat-form-field appearance="outline">
+        <mat-label>Khoa</mat-label>
+        <mat-select [(ngModel)]="selectedDepartmentId" (selectionChange)="onDepartmentChange()">
+          <mat-option value="all">Tất cả khoa</mat-option>
+          <mat-option *ngFor="let department of departmentOptions" [value]="department.id">
+            {{ department.label }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Học kỳ</mat-label>
+        <mat-select [(ngModel)]="selectedSemester" (selectionChange)="onSemesterChange()">
+          <mat-option value="all">Tất cả học kỳ</mat-option>
+          <mat-option value="1">HK 1</mat-option>
+          <mat-option value="2">HK 2</mat-option>
+          <mat-option value="3">HK 3</mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Học phần</mat-label>
+        <mat-select [(ngModel)]="selectedClassId" (selectionChange)="onClassChange()">
+          <mat-option value="all">Tất cả học phần</mat-option>
+          <mat-option *ngFor="let classItem of classOptions" [value]="classItem.id">
+            {{ classItem.label }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+
+      <mat-form-field appearance="outline">
+        <mat-label>Sinh viên</mat-label>
+        <mat-select [(ngModel)]="selectedStudentId" (selectionChange)="onStudentChange()">
+          <mat-option value="all">Tất cả sinh viên</mat-option>
+          <mat-option *ngFor="let student of studentOptions" [value]="student.id">
+            {{ student.label }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
+    </div>
+  </mat-card>
+
   <mat-card *ngIf="isLoading" class="content-card state-card">
     <mat-progress-spinner mode="indeterminate" diameter="34"></mat-progress-spinner>
     <span>Đang tải dữ liệu dashboard...</span>

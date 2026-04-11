@@ -9,7 +9,7 @@ import {
   ReactiveFormsModule,
   Validators,
 } from '@angular/forms';
-import { RouterLink } from '@angular/router';
+import { Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatCheckboxModule } from '@angular/material/checkbox';
@@ -79,6 +79,11 @@ interface DepartmentFilterOption {
   code: string;
   name: string;
   label: string;
+}
+
+interface PredictClassSummary {
+  processed: number;
+  failed: number;
 }
 
 @Component({
@@ -184,10 +189,27 @@ interface DepartmentFilterOption {
               </p>
             </div>
 
-            <button mat-stroked-button type="button" (click)="openWeightDialog()">
-              <lucide-icon name="pencil" [size]="16"></lucide-icon>
-              Chỉnh trọng số
-            </button>
+            <div class="class-meta__actions">
+              <button mat-stroked-button type="button" (click)="openBulkImportForSelectedClass()">
+                <lucide-icon name="arrow-right" [size]="16"></lucide-icon>
+                Nhập điểm hàng loạt lớp này
+              </button>
+
+              <button
+                mat-stroked-button
+                type="button"
+                [disabled]="isPredictingClass"
+                (click)="predictSelectedClass()"
+              >
+                <lucide-icon name="chart-column-increasing" [size]="16"></lucide-icon>
+                {{ isPredictingClass ? 'Đang chạy AI...' : 'Chạy AI dự đoán cả lớp' }}
+              </button>
+
+              <button mat-stroked-button type="button" (click)="openWeightDialog()">
+                <lucide-icon name="pencil" [size]="16"></lucide-icon>
+                Chỉnh trọng số
+              </button>
+            </div>
           </div>
         </ng-container>
       </mat-card>
@@ -635,6 +657,12 @@ interface DepartmentFilterOption {
         margin: 0.25rem 0;
       }
 
+      .class-meta__actions {
+        display: flex;
+        gap: 0.55rem;
+        flex-wrap: wrap;
+      }
+
       .state-block {
         min-height: 180px;
         display: grid;
@@ -812,6 +840,7 @@ export class GradeEntryComponent implements OnInit {
   private readonly fb = inject(FormBuilder);
   private readonly snackBar = inject(MatSnackBar);
   private readonly dialog = inject(MatDialog);
+  private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
 
   readonly selectionForm = this.fb.group({
@@ -861,6 +890,7 @@ export class GradeEntryComponent implements OnInit {
 
   isLoadingStudents = false;
   isSaving = false;
+  isPredictingClass = false;
   loadErrorMessage = '';
 
   ngOnInit(): void {
@@ -1108,6 +1138,63 @@ export class GradeEntryComponent implements OnInit {
         },
         error: (error: unknown) => {
           this.loadErrorMessage = this.resolveError(error);
+        },
+      });
+  }
+
+  openBulkImportForSelectedClass(): void {
+    if (!this.selectedClass) {
+      return;
+    }
+
+    const schoolYearId = this.resolveRefId(this.selectedClass.schoolYearId);
+    if (!schoolYearId) {
+      this.snackBar.open('Không tìm thấy năm học của lớp đã chọn.', 'Đóng', {
+        duration: 2800,
+      });
+      return;
+    }
+
+    this.router.navigate(['/grades/import'], {
+      queryParams: {
+        schoolYearId,
+        semester: this.selectedClass.semester,
+        classId: this.selectedClass._id,
+        autoPredict: 'true',
+      },
+    });
+  }
+
+  predictSelectedClass(): void {
+    if (!this.selectedClass || this.isPredictingClass) {
+      return;
+    }
+
+    this.isPredictingClass = true;
+
+    this.apiService
+      .post<ApiResponse<PredictClassSummary>, { classId: string }>('/predictions/predict-class', {
+        classId: this.selectedClass._id,
+      })
+      .pipe(
+        finalize(() => {
+          this.isPredictingClass = false;
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (response) => {
+          const processed = Number(response.data?.processed || 0);
+          const failed = Number(response.data?.failed || 0);
+
+          this.snackBar.open(`AI đã xử lý ${processed} bảng điểm, lỗi ${failed}.`, 'Đóng', {
+            duration: 3200,
+          });
+        },
+        error: (error: unknown) => {
+          this.snackBar.open(this.resolveError(error), 'Đóng', {
+            duration: 3200,
+          });
         },
       });
   }

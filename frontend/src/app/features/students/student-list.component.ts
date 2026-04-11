@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, DestroyRef, OnInit, ViewChild, inject } from '@angular/core';
+import { Component, DestroyRef, OnDestroy, OnInit, ViewChild, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { Router } from '@angular/router';
@@ -8,7 +8,7 @@ import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
 import { MatInputModule } from '@angular/material/input';
-import { MatPaginator, MatPaginatorModule } from '@angular/material/paginator';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
@@ -31,6 +31,18 @@ interface DepartmentOption {
   id: string;
   label: string;
   name: string;
+}
+
+interface StudentListPagination {
+  page: number;
+  limit: number;
+  total: number;
+  totalPages: number;
+}
+
+interface StudentListPayload {
+  items: Student[];
+  pagination: StudentListPagination;
 }
 
 @Component({
@@ -79,7 +91,7 @@ interface DepartmentOption {
             <input
               matInput
               [(ngModel)]="searchText"
-              (ngModelChange)="applyFilters()"
+              (ngModelChange)="onSearchChange()"
               placeholder="Nhập họ tên"
             />
           </mat-form-field>
@@ -108,7 +120,7 @@ interface DepartmentOption {
 
           <mat-form-field appearance="outline">
             <mat-label>Trạng thái</mat-label>
-            <mat-select [(ngModel)]="selectedStatus" (selectionChange)="applyFilters()">
+            <mat-select [(ngModel)]="selectedStatus" (selectionChange)="onStatusChange()">
               <mat-option value="all">Tất cả</mat-option>
               <mat-option value="active">Đang học</mat-option>
               <mat-option value="inactive">Tạm dừng</mat-option>
@@ -131,9 +143,18 @@ interface DepartmentOption {
         } @else {
           <div class="table-wrap">
             <table mat-table [dataSource]="dataSource" matSort class="full-table nttu-table">
+              <ng-container matColumnDef="index">
+                <th mat-header-cell *matHeaderCellDef>STT</th>
+                <td mat-cell *matCellDef="let row; let index = index" class="cell-center">
+                  {{ (currentPage - 1) * pageSize + index + 1 }}
+                </td>
+              </ng-container>
+
               <ng-container matColumnDef="studentCode">
                 <th mat-header-cell *matHeaderCellDef mat-sort-header>Mã HS</th>
-                <td mat-cell *matCellDef="let row">{{ formatStudentCode(row) }}</td>
+                <td mat-cell *matCellDef="let row" class="cell-center">
+                  {{ formatStudentCode(row) }}
+                </td>
               </ng-container>
 
               <ng-container matColumnDef="fullName">
@@ -148,17 +169,19 @@ interface DepartmentOption {
 
               <ng-container matColumnDef="gender">
                 <th mat-header-cell *matHeaderCellDef>Giới tính</th>
-                <td mat-cell *matCellDef="let row">{{ formatGender(row.gender) }}</td>
+                <td mat-cell *matCellDef="let row" class="cell-center">
+                  {{ formatGender(row.gender) }}
+                </td>
               </ng-container>
 
               <ng-container matColumnDef="status">
                 <th mat-header-cell *matHeaderCellDef>Trạng thái</th>
-                <td mat-cell *matCellDef="let row">
-                  <span
-                    class="badge"
-                    [class.badge-active]="row.status === 'active'"
-                    [class.badge-off]="row.status !== 'active'"
-                  >
+                <td mat-cell *matCellDef="let row" class="cell-center">
+                  <span class="status-chip" [class.status-chip--active]="row.status === 'active'">
+                    <span
+                      class="status-dot"
+                      [class.status-dot--active]="row.status === 'active'"
+                    ></span>
                     {{ formatStatus(row.status) }}
                   </span>
                 </td>
@@ -166,7 +189,7 @@ interface DepartmentOption {
 
               <ng-container matColumnDef="actions">
                 <th mat-header-cell *matHeaderCellDef>Thao tác</th>
-                <td mat-cell *matCellDef="let row" class="actions-cell">
+                <td mat-cell *matCellDef="let row" class="actions-cell cell-center">
                   <div class="actions-wrap">
                     <button
                       type="button"
@@ -207,8 +230,11 @@ interface DepartmentOption {
           </div>
 
           <mat-paginator
-            [pageSize]="10"
-            [pageSizeOptions]="[10, 20, 50]"
+            [length]="totalStudents"
+            [pageIndex]="currentPage - 1"
+            [pageSize]="pageSize"
+            [pageSizeOptions]="[10, 20, 50, 100]"
+            (page)="onPageChange($event)"
             showFirstLastButtons
           ></mat-paginator>
         }
@@ -218,12 +244,13 @@ interface DepartmentOption {
   styles: [
     `
       .page-wrap {
+        padding-block: 1.5rem;
         display: grid;
         gap: 1rem;
       }
 
       .content-card {
-        padding: 0.95rem 1rem 1rem;
+        padding: 1rem 1.1rem 1.1rem;
       }
 
       .page-header {
@@ -262,16 +289,75 @@ interface DepartmentOption {
         display: grid;
         grid-template-columns: 1.5fr 1fr 1fr 1fr;
         gap: 0.75rem;
-        padding: 0.3rem;
-        margin-bottom: 0.4rem;
+        margin-bottom: 0;
       }
 
       .table-wrap {
         overflow-x: auto;
+        border: 1px solid #c8d0d8;
+        border-radius: 4px;
+        background: #fff;
       }
 
       .full-table {
         width: 100%;
+        border-collapse: collapse;
+      }
+
+      .full-table .mat-mdc-header-row {
+        height: 58px;
+        background: #d8e1e8;
+      }
+
+      .full-table .mat-mdc-header-cell {
+        color: #1f8fe4;
+        font-weight: 700;
+        font-size: 0.92rem;
+        border-bottom: 1px solid #bcc8d2;
+        border-right: 1px solid #c7d1da;
+        text-align: center;
+      }
+
+      .full-table .mat-mdc-cell {
+        height: 52px;
+        color: #4f6679;
+        font-size: 0.95rem;
+        border-bottom: 1px solid #d1d8de;
+        border-right: 1px solid #d1d8de;
+      }
+
+      .full-table .mat-mdc-header-cell:first-child,
+      .full-table .mat-mdc-cell:first-child {
+        border-left: 1px solid #c7d1da;
+      }
+
+      .full-table .mat-mdc-row:last-child .mat-mdc-cell {
+        border-bottom: 0;
+      }
+
+      .cell-center {
+        text-align: center;
+        justify-content: center;
+      }
+
+      .full-table .mat-column-index {
+        width: 64px;
+      }
+
+      .full-table .mat-column-studentCode {
+        width: 140px;
+      }
+
+      .full-table .mat-column-gender {
+        width: 110px;
+      }
+
+      .full-table .mat-column-status {
+        width: 140px;
+      }
+
+      .full-table .mat-column-actions {
+        width: 156px;
       }
 
       .actions-cell {
@@ -285,23 +371,28 @@ interface DepartmentOption {
         flex-wrap: nowrap;
       }
 
-      .badge {
+      .status-chip {
         display: inline-flex;
         align-items: center;
+        gap: 0.35rem;
         border-radius: 999px;
-        padding: 0.2rem 0.55rem;
-        font-size: 0.73rem;
+        padding: 0.2rem 0.6rem;
+        font-size: 0.75rem;
         font-weight: 700;
-      }
-
-      .badge-active {
-        background: #f0fdf4;
-        color: #16a34a;
-      }
-
-      .badge-off {
-        background: #fef2f2;
+        background: #fee2e2;
         color: #dc2626;
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+
+      .status-chip--active {
+        background: #dcfce7;
+        color: #16a34a;
       }
 
       .state-block {
@@ -329,20 +420,14 @@ interface DepartmentOption {
     `,
   ],
 })
-export class StudentListComponent implements OnInit {
+export class StudentListComponent implements OnInit, OnDestroy {
   private readonly apiService = inject(ApiService);
   private readonly router = inject(Router);
   private readonly snackBar = inject(MatSnackBar);
   private readonly destroyRef = inject(DestroyRef);
+  private searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-  private paginator?: MatPaginator;
   private sort?: MatSort;
-
-  @ViewChild(MatPaginator)
-  set matPaginator(value: MatPaginator | undefined) {
-    this.paginator = value;
-    this.dataSource.paginator = value ?? null;
-  }
 
   @ViewChild(MatSort)
   set matSort(value: MatSort | undefined) {
@@ -350,26 +435,41 @@ export class StudentListComponent implements OnInit {
     this.dataSource.sort = value ?? null;
   }
 
-  readonly displayedColumns = ['studentCode', 'fullName', 'class', 'gender', 'status', 'actions'];
+  readonly displayedColumns = [
+    'index',
+    'studentCode',
+    'fullName',
+    'class',
+    'gender',
+    'status',
+    'actions',
+  ];
   readonly dataSource = new MatTableDataSource<Student>([]);
 
   students: Student[] = [];
-  allStudents: Student[] = [];
   classes: Class[] = [];
   departmentOptions: DepartmentOption[] = [];
-  classDepartmentMap = new Map<string, string>();
-  classScopedStudentsCache = new Map<string, Student[]>();
 
   searchText = '';
   selectedDepartmentId = 'all';
   selectedClassId = 'all';
   selectedStatus: StudentStatus | 'all' = 'all';
+  currentPage = 1;
+  pageSize = 20;
+  totalStudents = 0;
+  totalPages = 0;
 
   isLoading = true;
   errorMessage = '';
 
   ngOnInit(): void {
     this.loadData();
+  }
+
+  ngOnDestroy(): void {
+    if (this.searchDebounceTimer) {
+      clearTimeout(this.searchDebounceTimer);
+    }
   }
 
   get classOptions(): Class[] {
@@ -388,12 +488,10 @@ export class StudentListComponent implements OnInit {
     this.errorMessage = '';
 
     forkJoin({
-      students: this.apiService
-        .get<ApiResponse<Student[]>>('/students', { fromClasses: true })
-        .pipe(map((response) => response.data ?? [])),
       classes: this.apiService
         .get<ApiResponse<Class[]>>('/classes', { hasStudents: true })
         .pipe(map((response) => response.data ?? [])),
+      students: this.fetchStudentsRequest(),
     })
       .pipe(
         finalize(() => {
@@ -402,26 +500,10 @@ export class StudentListComponent implements OnInit {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe({
-        next: ({ students, classes }) => {
-          const allowedClassIds = new Set(classes.map((classItem) => classItem._id));
-          this.allStudents = students.filter((student) => {
-            const classId = this.resolveClassId(student.classId);
-            return allowedClassIds.has(classId);
-          });
-          this.students = this.allStudents;
+        next: ({ classes, students }) => {
           this.classes = classes;
           this.departmentOptions = this.buildDepartmentOptions(classes);
-          this.classScopedStudentsCache.clear();
-
-          this.classDepartmentMap.clear();
-          classes.forEach((classItem) => {
-            const departmentId = this.resolveDepartmentId(classItem.departmentId);
-            if (departmentId) {
-              this.classDepartmentMap.set(classItem._id, departmentId);
-            }
-          });
-
-          this.applyFilters();
+          this.applyStudentPayload(students);
         },
         error: (error: unknown) => {
           this.errorMessage = this.resolveErrorMessage(error);
@@ -429,89 +511,45 @@ export class StudentListComponent implements OnInit {
       });
   }
 
-  applyFilters(): void {
-    const normalizedKeyword = this.searchText.trim().toLowerCase();
-    const codeKeyword = normalizedKeyword.replace(/\D/g, '');
-
-    const filtered = this.students.filter((student) => {
-      const matchName = student.fullName.toLowerCase().includes(normalizedKeyword);
-      const matchCode =
-        codeKeyword.length > 0 && this.formatStudentCode(student).includes(codeKeyword);
-
-      const classId = this.resolveClassId(student.classId);
-      const classDepartmentId = this.classDepartmentMap.get(classId) || null;
-      const matchDepartment =
-        this.selectedClassId !== 'all'
-          ? true
-          : this.selectedDepartmentId === 'all' ||
-            classDepartmentId === this.selectedDepartmentId;
-
-      const status = student.status ?? 'active';
-      const matchStatus = this.selectedStatus === 'all' || status === this.selectedStatus;
-
-      return (
-        (matchName || matchCode || normalizedKeyword.length === 0) &&
-        matchDepartment &&
-        matchStatus
-      );
-    });
-
-    this.dataSource.data = filtered;
-
-    if (this.paginator) {
-      this.paginator.firstPage();
-    }
-  }
-
   onDepartmentChange(): void {
     if (!this.classOptions.some((classItem) => classItem._id === this.selectedClassId)) {
       this.selectedClassId = 'all';
     }
 
-    if (this.selectedClassId === 'all') {
-      this.students = this.allStudents;
-    }
-
-    this.applyFilters();
+    this.loadStudents(true);
   }
 
   onClassChange(): void {
-    if (this.selectedClassId === 'all') {
-      this.students = this.allStudents;
-      this.applyFilters();
+    this.loadStudents(true);
+  }
+
+  onStatusChange(): void {
+    this.loadStudents(true);
+  }
+
+  onSearchChange(): void {
+    if (this.searchDebounceTimer) {
+      clearTimeout(this.searchDebounceTimer);
+    }
+
+    this.searchDebounceTimer = setTimeout(() => {
+      this.loadStudents(true);
+    }, 300);
+  }
+
+  onPageChange(event: PageEvent): void {
+    const nextPage = Number(event.pageIndex) + 1;
+    const nextSize = Number(event.pageSize);
+    const pageChanged = nextPage !== this.currentPage;
+    const sizeChanged = nextSize !== this.pageSize;
+
+    if (!pageChanged && !sizeChanged) {
       return;
     }
 
-    const cached = this.classScopedStudentsCache.get(this.selectedClassId);
-    if (cached) {
-      this.students = cached;
-      this.applyFilters();
-      return;
-    }
-
-    this.dataSource.data = [];
-
-    this.apiService
-      .get<ApiResponse<Student[]>>('/students', {
-        fromClasses: true,
-        classId: this.selectedClassId,
-      })
-      .pipe(
-        map((response) => response.data ?? []),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe({
-        next: (students) => {
-          this.classScopedStudentsCache.set(this.selectedClassId, students);
-          this.students = students;
-          this.applyFilters();
-        },
-        error: (error: unknown) => {
-          this.students = [];
-          this.snackBar.open(this.resolveErrorMessage(error), 'Đóng', { duration: 2800 });
-          this.applyFilters();
-        },
-      });
+    this.currentPage = nextPage;
+    this.pageSize = nextSize;
+    this.loadStudents();
   }
 
   createStudent(): void {
@@ -538,7 +576,7 @@ export class StudentListComponent implements OnInit {
       .subscribe({
         next: () => {
           this.snackBar.open('Đã xóa học sinh', 'Đóng', { duration: 2200 });
-          this.loadData();
+          this.loadStudents(true);
         },
         error: (error: unknown) => {
           this.snackBar.open(this.resolveErrorMessage(error), 'Đóng', { duration: 2800 });
@@ -581,10 +619,6 @@ export class StudentListComponent implements OnInit {
 
   formatStudentCode(student: Student): string {
     return toTenDigitStudentCode(student.studentCode, student._id);
-  }
-
-  private resolveClassId(value: Student['classId']): string {
-    return typeof value === 'string' ? value : value._id;
   }
 
   private resolveDepartmentId(value: Class['departmentId']): string | null {
@@ -630,6 +664,89 @@ export class StudentListComponent implements OnInit {
     return Array.from(optionsMap.values()).sort((a, b) =>
       a.name.localeCompare(b.name, 'vi', { sensitivity: 'base' }),
     );
+  }
+
+  private loadStudents(resetToFirstPage = false): void {
+    if (resetToFirstPage) {
+      this.currentPage = 1;
+    }
+
+    this.isLoading = true;
+    this.errorMessage = '';
+
+    this.fetchStudentsRequest()
+      .pipe(
+        finalize(() => {
+          this.isLoading = false;
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (payload) => {
+          this.applyStudentPayload(payload);
+        },
+        error: (error: unknown) => {
+          this.students = [];
+          this.dataSource.data = [];
+          this.totalStudents = 0;
+          this.totalPages = 0;
+          this.errorMessage = this.resolveErrorMessage(error);
+        },
+      });
+  }
+
+  private fetchStudentsRequest() {
+    const query: Record<string, string | number | boolean> = {
+      fromClasses: true,
+      paged: true,
+      page: this.currentPage,
+      limit: this.pageSize,
+    };
+
+    const keyword = this.searchText.trim();
+    if (keyword) {
+      query['search'] = keyword;
+    }
+
+    if (this.selectedStatus !== 'all') {
+      query['status'] = this.selectedStatus;
+    }
+
+    if (this.selectedDepartmentId !== 'all') {
+      query['departmentId'] = this.selectedDepartmentId;
+    }
+
+    if (this.selectedClassId !== 'all') {
+      query['classId'] = this.selectedClassId;
+    }
+
+    return this.apiService
+      .get<ApiResponse<StudentListPayload>>('/students', query)
+      .pipe(map((response) => response.data ?? this.emptyStudentPayload()));
+  }
+
+  private applyStudentPayload(payload: StudentListPayload): void {
+    const items = Array.isArray(payload.items) ? payload.items : [];
+    const pagination = payload.pagination || this.emptyStudentPayload().pagination;
+
+    this.students = items;
+    this.dataSource.data = items;
+    this.totalStudents = Number(pagination.total || 0);
+    this.totalPages = Number(pagination.totalPages || 0);
+    this.currentPage = Number(pagination.page || this.currentPage);
+    this.pageSize = Number(pagination.limit || this.pageSize);
+  }
+
+  private emptyStudentPayload(): StudentListPayload {
+    return {
+      items: [],
+      pagination: {
+        page: this.currentPage,
+        limit: this.pageSize,
+        total: 0,
+        totalPages: 0,
+      },
+    };
   }
 
   private resolveErrorMessage(error: unknown): string {

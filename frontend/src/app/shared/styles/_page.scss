@@ -400,7 +400,7 @@
   border-radius: var(--radius-sm);
   background: #fff;
   color: var(--text);
-  font-family: 'Be Vietnam Pro', sans-serif;
+  font-family: Inter, sans-serif;
   font-size: 0.82rem;
   text-align: center;
   padding: 0.32rem 0.4rem;
@@ -473,7 +473,7 @@
   border-radius: var(--radius-sm);
   font-size: 0.875rem;
   text-align: center;
-  font-family: 'Be Vietnam Pro', sans-serif;
+  font-family: Inter, sans-serif;
   transition: border-color 0.15s;
 }
 
@@ -627,8 +627,137 @@
   cursor: not-allowed;
 }
 
+/* School portal theme for all routes except home and /grades. */
+.school-theme {
+  --radius: 4px;
+  --radius-sm: 4px;
+  --shadow: none;
+  --shadow-md: none;
+  --white: #ffffff;
+  --blue: #2d97e6;
+  --blue-light: #2d97e6;
+  --blue-pale: #f4f9fe;
+  --navy: #4d6a80;
+  --navy-dark: #465f74;
+  --text: #516678;
+  --text-sub: #647a8d;
+  --text-muted: #8294a3;
+  --gray-50: #f6f8fa;
+  --gray-100: #eef2f5;
+  --gray-200: #d1d9e0;
+  --gray-300: #c2ccd5;
+}
+
+.school-theme .page-wrap {
+  max-width: none;
+  margin-inline: 0;
+  padding-block: 1.5rem;
+  padding-inline: 0;
+  gap: 1rem;
+}
+
+.school-theme .page-wrap > mat-card,
+.school-theme .page-wrap > .card,
+.school-theme .page-wrap > .card-block,
+.school-theme .page-wrap > .hero-card,
+.school-theme .page-wrap > .state-card,
+.school-theme .page-header,
+.school-theme .content-card,
+.school-theme .filter-bar,
+.school-theme .score-sheet-wrap,
+.school-theme .table-wrap {
+  background: #ffffff;
+  border: 1px solid #d1d9e0;
+  border-radius: 4px;
+  box-shadow: none;
+}
+
+.school-theme .page-header {
+  padding: 1rem 1.1rem;
+}
+
+.school-theme .content-card__header {
+  padding: 1rem 1.1rem;
+  border-bottom: 1px solid #d7dfe6;
+}
+
+.school-theme .content-card__body {
+  padding: 1rem 1.1rem;
+}
+
+.school-theme .filter-bar {
+  padding: 0.75rem;
+  gap: 0.75rem;
+}
+
+.school-theme .page-title,
+.school-theme .page-header h1,
+.school-theme .content-card__title,
+.school-theme .section-title {
+  color: #5b7387;
+}
+
+.school-theme .section-title {
+  border-left-width: 2px;
+}
+
+.school-theme .mat-mdc-card,
+.school-theme .mat-mdc-outlined-card {
+  border-radius: 4px !important;
+  border-color: #d1d9e0 !important;
+  box-shadow: none !important;
+}
+
+.school-theme .mat-mdc-form-field {
+  --mat-form-field-container-height: 44px;
+  --mat-form-field-container-vertical-padding: 10px;
+}
+
+.school-theme .mat-mdc-text-field-wrapper,
+.school-theme .mat-mdc-select-panel,
+.school-theme .mat-mdc-menu-panel,
+.school-theme .mat-mdc-dialog-container .mat-mdc-dialog-surface {
+  border-radius: 4px !important;
+}
+
+.school-theme .mat-mdc-header-row {
+  background: #edf3f8 !important;
+  border-bottom: 1px solid #c8d2dc !important;
+}
+
+.school-theme .mat-mdc-header-cell {
+  color: #2d97e6 !important;
+  font-weight: 700 !important;
+  font-size: 0.77rem !important;
+}
+
+.school-theme .mat-mdc-row:hover {
+  background: #f6fafe !important;
+}
+
+.school-theme .mat-mdc-cell {
+  color: #586d7f !important;
+  font-size: 0.82rem !important;
+}
+
+.school-theme .mat-mdc-paginator {
+  background: #ffffff;
+  border-top: 1px solid #d7dfe6;
+}
+
+.school-theme .action-btn {
+  width: 30px;
+  height: 30px;
+  border-radius: 4px;
+}
+
 /* Responsive */
 @media (max-width: 768px) {
+  .school-theme .page-wrap {
+    padding-block: 1.5rem;
+    padding-inline: 0;
+  }
+
   .stats-grid {
     grid-template-columns: repeat(2, 1fr);
   }

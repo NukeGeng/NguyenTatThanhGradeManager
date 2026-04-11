@@ -153,9 +153,16 @@ interface SubjectUpsertPayload {
         } @else {
           <div class="table-wrap">
             <table mat-table [dataSource]="filteredSubjects" class="full-table nttu-table">
+              <ng-container matColumnDef="index">
+                <th mat-header-cell *matHeaderCellDef>STT</th>
+                <td mat-cell *matCellDef="let row; let index = index" class="cell-center">
+                  {{ index + 1 }}
+                </td>
+              </ng-container>
+
               <ng-container matColumnDef="code">
                 <th mat-header-cell *matHeaderCellDef>Mã môn</th>
-                <td mat-cell *matCellDef="let row">{{ row.code }}</td>
+                <td mat-cell *matCellDef="let row" class="cell-center">{{ row.code }}</td>
               </ng-container>
 
               <ng-container matColumnDef="name">
@@ -165,12 +172,14 @@ interface SubjectUpsertPayload {
 
               <ng-container matColumnDef="department">
                 <th mat-header-cell *matHeaderCellDef>Khoa</th>
-                <td mat-cell *matCellDef="let row">{{ getDepartmentCode(row.departmentId) }}</td>
+                <td mat-cell *matCellDef="let row" class="cell-center">
+                  {{ getDepartmentCode(row.departmentId) }}
+                </td>
               </ng-container>
 
               <ng-container matColumnDef="semester">
                 <th mat-header-cell *matHeaderCellDef>Học kỳ</th>
-                <td mat-cell *matCellDef="let row">
+                <td mat-cell *matCellDef="let row" class="cell-center">
                   <span class="sem-badge" [class.sem-badge--summer]="row.semester === 3">
                     {{ formatSemester(row.semester) }}
                   </span>
@@ -179,24 +188,22 @@ interface SubjectUpsertPayload {
 
               <ng-container matColumnDef="coefficient">
                 <th mat-header-cell *matHeaderCellDef>Hệ số</th>
-                <td mat-cell *matCellDef="let row">{{ row.coefficient ?? row.credits }}</td>
+                <td mat-cell *matCellDef="let row" class="cell-center">
+                  {{ row.coefficient ?? row.credits }}
+                </td>
               </ng-container>
 
               <ng-container matColumnDef="weights">
                 <th mat-header-cell *matHeaderCellDef>Trọng số</th>
-                <td mat-cell *matCellDef="let row">
+                <td mat-cell *matCellDef="let row" class="cell-center">
                   <span class="weight-display">{{ getWeightDisplay(row) }}</span>
                 </td>
               </ng-container>
 
               <ng-container matColumnDef="status">
                 <th mat-header-cell *matHeaderCellDef>Trạng thái</th>
-                <td mat-cell *matCellDef="let row">
-                  <span
-                    class="badge"
-                    [class.badge-active]="row.isActive"
-                    [class.badge-off]="!row.isActive"
-                  >
+                <td mat-cell *matCellDef="let row" class="cell-center">
+                  <span class="status-chip" [class.status-chip--active]="row.isActive">
                     {{ row.isActive ? 'Đang bật' : 'Đang tắt' }}
                   </span>
                 </td>
@@ -204,7 +211,7 @@ interface SubjectUpsertPayload {
 
               <ng-container matColumnDef="actions">
                 <th mat-header-cell *matHeaderCellDef>Thao tác</th>
-                <td mat-cell *matCellDef="let row" class="actions-cell">
+                <td mat-cell *matCellDef="let row" class="actions-cell cell-center">
                   <div class="actions-wrap">
                     <button
                       type="button"
@@ -254,12 +261,13 @@ interface SubjectUpsertPayload {
   styles: [
     `
       .page-wrap {
+        padding-block: 1.5rem;
         display: grid;
         gap: 1rem;
       }
 
       .content-card {
-        padding: 0.95rem 1rem 1rem;
+        padding: 1rem 1.1rem 1.1rem;
       }
 
       .page-header {
@@ -300,10 +308,78 @@ interface SubjectUpsertPayload {
 
       .table-wrap {
         overflow-x: auto;
+        border: 1px solid #c8d0d8;
+        border-radius: 4px;
+        background: #fff;
       }
 
       .full-table {
         width: 100%;
+        border-collapse: collapse;
+      }
+
+      .full-table .mat-mdc-header-row {
+        height: 58px;
+        background: #d8e1e8;
+      }
+
+      .full-table .mat-mdc-header-cell {
+        color: #1da1f2;
+        font-weight: 700;
+        font-size: 0.9rem;
+        border-bottom: 1px solid #bcc8d2;
+        border-right: 1px solid #c7d1da;
+        text-align: center;
+      }
+
+      .full-table .mat-mdc-cell {
+        height: 52px;
+        color: #4f6679;
+        font-size: 0.9rem;
+        border-bottom: 1px solid #d1d8de;
+        border-right: 1px solid #d1d8de;
+      }
+
+      .full-table .mat-mdc-header-cell:first-child,
+      .full-table .mat-mdc-cell:first-child {
+        border-left: 1px solid #c7d1da;
+      }
+
+      .full-table .mat-mdc-row:last-child .mat-mdc-cell {
+        border-bottom: 0;
+      }
+
+      .cell-center {
+        text-align: center;
+        justify-content: center;
+      }
+
+      .full-table .mat-column-index {
+        width: 64px;
+      }
+
+      .full-table .mat-column-code {
+        width: 120px;
+      }
+
+      .full-table .mat-column-department {
+        width: 130px;
+      }
+
+      .full-table .mat-column-semester {
+        width: 115px;
+      }
+
+      .full-table .mat-column-coefficient {
+        width: 100px;
+      }
+
+      .full-table .mat-column-status {
+        width: 130px;
+      }
+
+      .full-table .mat-column-actions {
+        width: 160px;
       }
 
       .actions-cell {
@@ -333,23 +409,20 @@ interface SubjectUpsertPayload {
         flex-wrap: nowrap;
       }
 
-      .badge {
+      .status-chip {
         display: inline-flex;
         align-items: center;
         border-radius: 999px;
         padding: 0.2rem 0.55rem;
         font-size: 0.73rem;
         font-weight: 700;
+        background: #fee2e2;
+        color: #dc2626;
       }
 
-      .badge-active {
+      .status-chip--active {
         background: #f0fdf4;
         color: #16a34a;
-      }
-
-      .badge-off {
-        background: #fef2f2;
-        color: #dc2626;
       }
 
       @media (max-width: 768px) {
@@ -367,6 +440,7 @@ export class SubjectListComponent implements OnInit {
   private readonly destroyRef = inject(DestroyRef);
 
   readonly displayedColumns = [
+    'index',
     'code',
     'name',
     'department',

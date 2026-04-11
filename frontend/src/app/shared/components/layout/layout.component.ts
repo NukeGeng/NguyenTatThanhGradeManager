@@ -196,7 +196,7 @@ interface LayoutNavItem {
         display: grid;
         grid-template-rows: 56px 1fr;
         overflow: hidden;
-        background: var(--gray-100);
+        background: rgb(231, 236, 240);
       }
 
       .topbar {
@@ -514,7 +514,7 @@ interface LayoutNavItem {
         overflow-y: auto;
         overflow-x: hidden;
         scrollbar-gutter: auto;
-        background: var(--gray-100);
+        background: rgb(231, 236, 240);
         display: flex;
         flex-direction: column;
         gap: 1rem;

@@ -4,6 +4,11 @@ const auth = require("../middleware/auth");
 const Student = require("../models/Student");
 const Class = require("../models/Class");
 const StudentCurriculum = require("../models/StudentCurriculum");
+const {
+  getRouteCacheEntry,
+  setRouteCacheEntry,
+  invalidateRouteCacheByPrefix,
+} = require("../utils/routeCache");
 
 const router = express.Router();
 
@@ -11,6 +16,45 @@ const getAdvisingStudentIds = (user) =>
   (user.advisingStudentIds || []).map((item) =>
     item?._id ? String(item._id) : String(item),
   );
+
+const STUDENT_LIST_CACHE_PREFIX = "students:list";
+const CLASS_LIST_CACHE_PREFIX = "classes:list";
+const STUDENT_LIST_CACHE_TTL_MS = Number(
+  process.env.STUDENT_LIST_CACHE_TTL_MS || 30000,
+);
+const MAX_PAGE_SIZE = 200;
+
+const parsePositiveInt = (value, fallback, maxValue = 1000) => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric <= 0) {
+    return fallback;
+  }
+
+  return Math.min(Math.floor(numeric), maxValue);
+};
+
+const escapeRegex = (value) =>
+  String(value || "").replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+
+const buildStudentsListCacheKey = (req, normalizedQuery) =>
+  `${STUDENT_LIST_CACHE_PREFIX}:${String(req.user?._id || "anonymous")}:${JSON.stringify(normalizedQuery)}`;
+
+const buildStudentsResponseData = ({ paged, items, page, limit, total }) => {
+  if (!paged) {
+    return items;
+  }
+
+  const totalNumber = Number(total || 0);
+  return {
+    items,
+    pagination: {
+      page,
+      limit,
+      total: totalNumber,
+      totalPages: totalNumber > 0 ? Math.ceil(totalNumber / limit) : 0,
+    },
+  };
+};
 
 router.use(auth);
 
@@ -41,9 +85,37 @@ const generateStudentCode = async () => {
 
 router.get("/", async (req, res, next) => {
   try {
-    const { classId, status } = req.query;
+    const { classId, status, search, departmentId } = req.query;
     const fromClasses =
       String(req.query.fromClasses || "false").toLowerCase() === "true";
+    const paged =
+      String(req.query.paged || "false").toLowerCase() === "true" ||
+      req.query.page !== undefined ||
+      req.query.limit !== undefined;
+    const page = parsePositiveInt(req.query.page, 1, 100000);
+    const limit = parsePositiveInt(req.query.limit, 20, MAX_PAGE_SIZE);
+    const skip = (page - 1) * limit;
+    const keyword = String(search || "").trim();
+    const normalizedDepartmentId = departmentId
+      ? String(departmentId)
+      : undefined;
+
+    const normalizedQueryForCache = {
+      classId: classId ? String(classId) : "",
+      status: status ? String(status) : "",
+      search: keyword,
+      departmentId: normalizedDepartmentId || "",
+      fromClasses,
+      paged,
+      page,
+      limit,
+    };
+    const cacheKey = buildStudentsListCacheKey(req, normalizedQueryForCache);
+    const cached = getRouteCacheEntry(cacheKey);
+    if (cached) {
+      return res.status(200).json(cached);
+    }
+
     const query = {};
 
     const allowedDepartmentIds = (req.user.departmentIds || []).map((item) =>
@@ -53,10 +125,25 @@ router.get("/", async (req, res, next) => {
     if (fromClasses) {
       let candidateClassIds = [];
 
+      if (
+        normalizedDepartmentId &&
+        req.user.role !== "admin" &&
+        !allowedDepartmentIds.includes(normalizedDepartmentId)
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "Bạn không có quyền xem khoa này",
+        });
+      }
+
       if (classId) {
         const classAccessQuery = { _id: classId };
         if (req.user.role !== "admin") {
           classAccessQuery.departmentId = { $in: allowedDepartmentIds };
+        }
+
+        if (normalizedDepartmentId) {
+          classAccessQuery.departmentId = normalizedDepartmentId;
         }
 
         const classData = await Class.findOne(classAccessQuery).select("_id");
@@ -70,7 +157,9 @@ router.get("/", async (req, res, next) => {
         candidateClassIds = [String(classData._id)];
       } else {
         const [directClassIds, curriculumClassIds] = await Promise.all([
-          Student.distinct("classId", { classId: { $exists: true, $ne: null } }),
+          Student.distinct("classId", {
+            classId: { $exists: true, $ne: null },
+          }),
           StudentCurriculum.distinct("registrations.classId", {
             "registrations.classId": { $exists: true, $ne: null },
           }),
@@ -82,24 +171,38 @@ router.get("/", async (req, res, next) => {
             .map((item) => String(item)),
         );
 
-        if (req.user.role !== "admin") {
-          const allowedClasses = await Class.find({
-            departmentId: { $in: allowedDepartmentIds },
-            _id: { $in: Array.from(usedClassIds) },
-          }).select("_id");
+        const classAccessQuery = {
+          _id: { $in: Array.from(usedClassIds) },
+        };
 
-          candidateClassIds = allowedClasses.map((item) => String(item._id));
-        } else {
-          candidateClassIds = Array.from(usedClassIds);
+        if (req.user.role !== "admin") {
+          classAccessQuery.departmentId = { $in: allowedDepartmentIds };
         }
+
+        if (normalizedDepartmentId) {
+          classAccessQuery.departmentId = normalizedDepartmentId;
+        }
+
+        const allowedClasses = await Class.find(classAccessQuery).select("_id");
+
+        candidateClassIds = allowedClasses.map((item) => String(item._id));
       }
 
       if (candidateClassIds.length === 0) {
-        return res.status(200).json({
+        const payload = {
           success: true,
-          data: [],
+          data: buildStudentsResponseData({
+            paged,
+            items: [],
+            page,
+            limit,
+            total: 0,
+          }),
           message: "Get students successfully",
-        });
+        };
+
+        setRouteCacheEntry(cacheKey, payload, STUDENT_LIST_CACHE_TTL_MS);
+        return res.status(200).json(payload);
       }
 
       const [directStudentIds, registeredStudentIds] = await Promise.all([
@@ -124,11 +227,20 @@ router.get("/", async (req, res, next) => {
       }
 
       if (!studentIds.length) {
-        return res.status(200).json({
+        const payload = {
           success: true,
-          data: [],
+          data: buildStudentsResponseData({
+            paged,
+            items: [],
+            page,
+            limit,
+            total: 0,
+          }),
           message: "Get students successfully",
-        });
+        };
+
+        setRouteCacheEntry(cacheKey, payload, STUDENT_LIST_CACHE_TTL_MS);
+        return res.status(200).json(payload);
       }
 
       query._id = { $in: studentIds };
@@ -137,16 +249,58 @@ router.get("/", async (req, res, next) => {
     if (!fromClasses && req.user.role === "advisor") {
       query._id = { $in: getAdvisingStudentIds(req.user) };
     } else if (!fromClasses && req.user.role !== "admin") {
-      const classes = await Class.find({
+      const classQuery = {
         departmentId: {
           $in: allowedDepartmentIds,
         },
+      };
+
+      if (normalizedDepartmentId) {
+        if (!allowedDepartmentIds.includes(normalizedDepartmentId)) {
+          return res.status(403).json({
+            success: false,
+            message: "Bạn không có quyền xem khoa này",
+          });
+        }
+
+        classQuery.departmentId = normalizedDepartmentId;
+      }
+
+      const classes = await Class.find(classQuery).select("_id");
+
+      query.classId = { $in: classes.map((item) => item._id) };
+    } else if (
+      !fromClasses &&
+      req.user.role === "admin" &&
+      normalizedDepartmentId
+    ) {
+      const classes = await Class.find({
+        departmentId: normalizedDepartmentId,
       }).select("_id");
 
       query.classId = { $in: classes.map((item) => item._id) };
     }
 
     if (!fromClasses && classId) {
+      if (req.user.role !== "admin") {
+        const classAccessQuery = {
+          _id: classId,
+          departmentId: { $in: allowedDepartmentIds },
+        };
+
+        if (normalizedDepartmentId) {
+          classAccessQuery.departmentId = normalizedDepartmentId;
+        }
+
+        const classData = await Class.findOne(classAccessQuery).select("_id");
+        if (!classData) {
+          return res.status(403).json({
+            success: false,
+            message: "Bạn không có quyền xem lớp này",
+          });
+        }
+      }
+
       query.classId = classId;
     }
 
@@ -154,15 +308,39 @@ router.get("/", async (req, res, next) => {
       query.status = status;
     }
 
-    const students = await Student.find(query)
-      .populate("classId", "name")
+    if (keyword) {
+      const regex = new RegExp(escapeRegex(keyword), "i");
+      query.$or = [{ fullName: regex }, { studentCode: regex }];
+    }
+
+    const baseFind = Student.find(query)
+      .populate("classId", "name code departmentId")
       .sort({ fullName: 1 });
 
-    return res.status(200).json({
-      success: true,
-      data: students,
-      message: "Get students successfully",
+    const [items, total] = paged
+      ? await Promise.all([
+          baseFind.clone().skip(skip).limit(limit),
+          Student.countDocuments(query),
+        ])
+      : [await baseFind, 0];
+
+    const responseData = buildStudentsResponseData({
+      paged,
+      items,
+      page,
+      limit,
+      total,
     });
+
+    const payload = {
+      success: true,
+      data: responseData,
+      message: "Get students successfully",
+    };
+
+    setRouteCacheEntry(cacheKey, payload, STUDENT_LIST_CACHE_TTL_MS);
+
+    return res.status(200).json(payload);
   } catch (error) {
     return next(error);
   }
@@ -289,6 +467,9 @@ router.post("/", async (req, res, next) => {
       const createdStudent = await Student.findById(createdStudents[0]._id)
         .populate("classId", "name departmentId gradeLevel schoolYearId")
         .session(session);
+
+      invalidateRouteCacheByPrefix(STUDENT_LIST_CACHE_PREFIX);
+      invalidateRouteCacheByPrefix(CLASS_LIST_CACHE_PREFIX);
 
       res.status(201).json({
         success: true,
@@ -422,6 +603,9 @@ router.put("/:id", async (req, res, next) => {
         .populate("classId", "name departmentId gradeLevel schoolYearId")
         .session(session);
 
+      invalidateRouteCacheByPrefix(STUDENT_LIST_CACHE_PREFIX);
+      invalidateRouteCacheByPrefix(CLASS_LIST_CACHE_PREFIX);
+
       res.status(200).json({
         success: true,
         data: updatedStudent,
@@ -484,6 +668,9 @@ router.delete("/:id", async (req, res, next) => {
         { $inc: { studentCount: -1 } },
         { session },
       );
+
+      invalidateRouteCacheByPrefix(STUDENT_LIST_CACHE_PREFIX);
+      invalidateRouteCacheByPrefix(CLASS_LIST_CACHE_PREFIX);
 
       res.status(200).json({
         success: true,

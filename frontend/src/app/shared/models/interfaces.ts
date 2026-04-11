@@ -329,6 +329,7 @@ export interface Grade {
   isDuThi?: boolean;
   isVangThi?: boolean;
   enteredBy?: string | User;
+  classAverageScore?: number | null;
   createdAt?: string;
   updatedAt?: string;
 }

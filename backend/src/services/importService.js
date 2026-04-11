@@ -1,9 +1,10 @@
 const XLSX = require("xlsx");
+const Class = require("../models/Class");
 const Student = require("../models/Student");
 const Grade = require("../models/Grade");
-const Subject = require("../models/Subject");
 
-const CONDUCT_VALUES = ["Tốt", "Khá", "Trung Bình", "Yếu"];
+const DEFAULT_TX_COUNT = 3;
+const DEFAULT_TH_COUNT = 3;
 
 const normalizeText = (value) =>
   String(value || "")
@@ -15,30 +16,131 @@ const normalizeText = (value) =>
     .replace(/\s+/g, " ")
     .trim();
 
-const getSubjectMap = async () => {
-  const subjects = await Subject.find({ isActive: true }).sort({ name: 1 });
-  return new Map(subjects.map((subject) => [subject.code, subject.name]));
-};
+const resolveRefId = (value) => {
+  if (!value) {
+    return null;
+  }
 
-const getHeaderKey = (rawHeader, subjectMap) => {
-  const header = normalizeText(rawHeader);
+  if (typeof value === "string") {
+    return value;
+  }
 
-  if (header === "ma hs" || header === "ma hoc sinh") return "studentCode";
-  if (header === "ho ten") return "studentName";
-  if (header === "so buoi vang") return "attendanceAbsent";
-  if (header === "hanh kiem") return "conductScore";
-
-  for (const [code, name] of subjectMap.entries()) {
-    const normalizedName = normalizeText(name);
-    if (header === normalizedName || header === normalizeText(code)) {
-      return code;
-    }
+  if (value?._id) {
+    return String(value._id);
   }
 
   return null;
 };
 
-const parseExcelFile = (buffer, subjectMap) => {
+const getHeaderKey = (rawHeader) => {
+  const header = normalizeText(rawHeader).replace(/[_\-.]/g, " ");
+
+  if (header === "ma hs" || header === "ma hoc sinh") return "studentCode";
+  if (header === "ho ten" || header === "ho va ten") return "studentName";
+
+  if (
+    header === "gk" ||
+    header === "diem gk" ||
+    header === "giua ky" ||
+    header === "diem giua ky"
+  ) {
+    return "gkScore";
+  }
+
+  if (
+    header === "tkt" ||
+    header === "diem tkt" ||
+    header === "ket thuc hp" ||
+    header === "diem ket thuc hp"
+  ) {
+    return "tktScore";
+  }
+
+  if (
+    header === "du thi" ||
+    header === "duoc du thi" ||
+    header === "duoc du thi hp" ||
+    header === "duoc du thi ket thuc hp"
+  ) {
+    return "isDuThi";
+  }
+
+  if (header === "vang thi" || header === "co vang thi") {
+    return "isVangThi";
+  }
+
+  const txMatch = header.match(/^(?:diem\s*)?tx\s*(\d+)$/);
+  if (txMatch) {
+    return { type: "txScores", index: Math.max(0, Number(txMatch[1]) - 1) };
+  }
+
+  const thMatch = header.match(/^(?:diem\s*)?th\s*(\d+)$/);
+  if (thMatch) {
+    return { type: "thScores", index: Math.max(0, Number(thMatch[1]) - 1) };
+  }
+
+  return null;
+};
+
+const parseBooleanValue = (rawValue, defaultValue) => {
+  if (rawValue === null || rawValue === undefined || rawValue === "") {
+    return defaultValue;
+  }
+
+  if (typeof rawValue === "boolean") {
+    return rawValue;
+  }
+
+  const normalized = normalizeText(rawValue);
+  if (["1", "true", "yes", "y", "co", "dat", "x"].includes(normalized)) {
+    return true;
+  }
+
+  if (
+    ["0", "false", "no", "n", "khong", "ko", "v", "vang"].includes(normalized)
+  ) {
+    return false;
+  }
+
+  return defaultValue;
+};
+
+const parseNullableScore = (rawValue) => {
+  if (
+    rawValue === null ||
+    rawValue === undefined ||
+    String(rawValue).trim() === ""
+  ) {
+    return { value: null, isValid: true };
+  }
+
+  const numeric = Number(rawValue);
+  if (Number.isNaN(numeric) || numeric < 0 || numeric > 10) {
+    return { value: null, isValid: false };
+  }
+
+  return { value: Number(numeric.toFixed(2)), isValid: true };
+};
+
+const normalizeClassConfig = (classData) => {
+  const txCount = Math.max(1, Number(classData?.txCount || DEFAULT_TX_COUNT));
+  const hasTh = Number(classData?.weights?.th || 0) > 0;
+  const thCount = hasTh ? DEFAULT_TH_COUNT : 0;
+
+  return {
+    txCount,
+    thCount,
+    hasTh,
+    weights: {
+      tx: Number(classData?.weights?.tx ?? 10),
+      gk: Number(classData?.weights?.gk ?? 30),
+      th: Number(classData?.weights?.th ?? 0),
+      tkt: Number(classData?.weights?.tkt ?? 60),
+    },
+  };
+};
+
+const parseExcelFile = (buffer) => {
   const workbook = XLSX.read(buffer, { type: "buffer" });
   const firstSheetName = workbook.SheetNames[0];
   const sheet = workbook.Sheets[firstSheetName];
@@ -53,53 +155,71 @@ const parseExcelFile = (buffer, subjectMap) => {
       row: index + 2,
       studentCode: null,
       studentName: null,
-      attendanceAbsent: 0,
-      conductScore: null,
-      subjects: {},
+      txScores: [],
+      gkScore: null,
+      thScores: [],
+      tktScore: null,
+      isDuThi: null,
+      isVangThi: null,
     };
 
     Object.entries(row).forEach(([header, value]) => {
-      const key = getHeaderKey(header, subjectMap);
+      const key = getHeaderKey(header);
       if (!key) return;
 
-      if (key === "studentCode") {
-        mappedRow.studentCode = String(value || "").trim();
+      if (typeof key === "string") {
+        if (key === "studentCode") {
+          mappedRow.studentCode = String(value || "").trim();
+          return;
+        }
+
+        if (key === "studentName") {
+          mappedRow.studentName = String(value || "").trim();
+          return;
+        }
+
+        if (key === "gkScore") {
+          mappedRow.gkScore = value;
+          return;
+        }
+
+        if (key === "tktScore") {
+          mappedRow.tktScore = value;
+          return;
+        }
+
+        if (key === "isDuThi") {
+          mappedRow.isDuThi = value;
+          return;
+        }
+
+        if (key === "isVangThi") {
+          mappedRow.isVangThi = value;
+        }
+
         return;
       }
 
-      if (key === "studentName") {
-        mappedRow.studentName = String(value || "").trim();
+      if (key.type === "txScores") {
+        mappedRow.txScores[key.index] = value;
         return;
       }
 
-      if (key === "attendanceAbsent") {
-        mappedRow.attendanceAbsent = value;
-        return;
+      if (key.type === "thScores") {
+        mappedRow.thScores[key.index] = value;
       }
-
-      if (key === "conductScore") {
-        mappedRow.conductScore = value;
-        return;
-      }
-
-      mappedRow.subjects[key] = value;
     });
 
     return mappedRow;
   });
 };
 
-const validateRows = async (
-  rows,
-  classId,
-  semester,
-  schoolYearId,
-  subjectMap,
-) => {
+const validateRows = async (rows, classData, semester, schoolYearId) => {
   const errors = [];
   const validRows = [];
 
   const normalizedSemester = Number(semester);
+  const classId = resolveRefId(classData?._id);
 
   if (!classId || !normalizedSemester || !schoolYearId) {
     return {
@@ -115,11 +235,24 @@ const validateRows = async (
     };
   }
 
-  const subjectCodes = [...subjectMap.keys()];
-  const subjects = await Subject.find({ code: { $in: subjectCodes } }).select(
-    "_id code",
-  );
-  const subjectEntityMap = new Map(subjects.map((item) => [item.code, item]));
+  if (
+    Number(classData.semester) !== normalizedSemester ||
+    String(resolveRefId(classData.schoolYearId)) !== String(schoolYearId)
+  ) {
+    return {
+      validRows: [],
+      errorRows: [
+        {
+          row: 0,
+          studentCode: "",
+          studentName: "",
+          error: "Dữ liệu lớp không khớp với học kỳ hoặc năm học đã chọn",
+        },
+      ],
+    };
+  }
+
+  const classConfig = normalizeClassConfig(classData);
 
   const studentCodes = rows
     .map((row) => String(row.studentCode || "").trim())
@@ -158,83 +291,90 @@ const validateRows = async (
       continue;
     }
 
-    const scores = [];
+    const txScores = Array.from({ length: classConfig.txCount }, () => null);
     let hasRowError = false;
 
-    for (const code of subjectCodes) {
-      const rawValue = row.subjects?.[code];
-      if (
-        rawValue === null ||
-        rawValue === undefined ||
-        String(rawValue).trim() === ""
-      ) {
-        continue;
-      }
-
-      const numericScore = Number(rawValue);
-      if (Number.isNaN(numericScore) || numericScore < 0 || numericScore > 10) {
+    for (let index = 0; index < classConfig.txCount; index += 1) {
+      const rawTx = row.txScores?.[index];
+      const parsed = parseNullableScore(rawTx);
+      if (!parsed.isValid) {
         hasRowError = true;
         errors.push({
           row: row.row,
           studentCode,
           studentName: student.fullName,
-          error: `Điểm môn ${subjectMap.get(code)} không hợp lệ: '${rawValue}'`,
+          error: `Điểm TX ${index + 1} không hợp lệ: '${rawTx}'`,
         });
         break;
       }
 
-      const subjectEntity = subjectEntityMap.get(code);
-      if (!subjectEntity) {
+      txScores[index] = parsed.value;
+    }
+
+    if (hasRowError) {
+      continue;
+    }
+
+    const gkParsed = parseNullableScore(row.gkScore);
+    if (!gkParsed.isValid) {
+      errors.push({
+        row: row.row,
+        studentCode,
+        studentName: student.fullName,
+        error: `Điểm GK không hợp lệ: '${row.gkScore}'`,
+      });
+      continue;
+    }
+
+    const thScores = Array.from({ length: classConfig.thCount }, () => null);
+    for (let index = 0; index < classConfig.thCount; index += 1) {
+      const rawTh = row.thScores?.[index];
+      const parsed = parseNullableScore(rawTh);
+      if (!parsed.isValid) {
         hasRowError = true;
         errors.push({
           row: row.row,
           studentCode,
           studentName: student.fullName,
-          error: `Môn học ${code} không tồn tại trong hệ thống`,
+          error: `Điểm TH ${index + 1} không hợp lệ: '${rawTh}'`,
         });
         break;
       }
 
-      scores.push({
-        subjectId: subjectEntity._id,
-        subjectCode: code,
-        score: numericScore,
-      });
+      thScores[index] = parsed.value;
     }
 
-    if (hasRowError) continue;
+    if (hasRowError) {
+      continue;
+    }
 
-    if (scores.length === 0) {
+    const tktParsed = parseNullableScore(row.tktScore);
+    if (!tktParsed.isValid) {
       errors.push({
         row: row.row,
         studentCode,
         studentName: student.fullName,
-        error: "Không có điểm môn học hợp lệ",
+        error: `Điểm TKT không hợp lệ: '${row.tktScore}'`,
       });
       continue;
     }
 
-    const attendanceAbsent = Number(row.attendanceAbsent ?? 0);
-    if (Number.isNaN(attendanceAbsent) || attendanceAbsent < 0) {
+    const isDuThi = parseBooleanValue(row.isDuThi, true);
+    const isVangThi = parseBooleanValue(row.isVangThi, false);
+    const tktScore = isVangThi || !isDuThi ? null : tktParsed.value;
+
+    const hasAnyScore =
+      txScores.some((value) => value !== null) ||
+      thScores.some((value) => value !== null) ||
+      gkParsed.value !== null ||
+      tktScore !== null;
+
+    if (!hasAnyScore) {
       errors.push({
         row: row.row,
         studentCode,
         studentName: student.fullName,
-        error: `Số buổi vắng không hợp lệ: '${row.attendanceAbsent}'`,
-      });
-      continue;
-    }
-
-    const conductScore = row.conductScore
-      ? String(row.conductScore).trim()
-      : null;
-
-    if (conductScore && !CONDUCT_VALUES.includes(conductScore)) {
-      errors.push({
-        row: row.row,
-        studentCode,
-        studentName: student.fullName,
-        error: `Hạnh kiểm không hợp lệ: '${row.conductScore}'`,
+        error: "Không có điểm hợp lệ để import",
       });
       continue;
     }
@@ -246,11 +386,17 @@ const validateRows = async (
       gradePayload: {
         studentId: student._id,
         classId,
+        subjectId: classData.subjectId,
+        departmentId: classData.departmentId,
         schoolYearId,
         semester: normalizedSemester,
-        scores,
-        attendanceAbsent,
-        conductScore,
+        weights: classConfig.weights,
+        txScores,
+        gkScore: gkParsed.value,
+        thScores,
+        tktScore,
+        isDuThi,
+        isVangThi,
       },
     });
   }
@@ -288,57 +434,110 @@ const importValidRows = async (validRows, enteredBy) => {
   }
 };
 
-const generateTemplateWorkbook = (subjectMap) => {
+const generateTemplateWorkbook = (templateOptions = {}) => {
   const workbook = XLSX.utils.book_new();
+  const txCount = Math.max(
+    1,
+    Number(templateOptions.txCount || DEFAULT_TX_COUNT),
+  );
+  const hasTh = templateOptions.hasTh !== false;
+  const thCount = hasTh
+    ? Math.max(1, Number(templateOptions.thCount || DEFAULT_TH_COUNT))
+    : 0;
+
   const headers = [
     "Mã HS",
     "Họ tên",
-    ...[...subjectMap.values()],
-    "Số buổi vắng",
-    "Hạnh kiểm",
+    ...Array.from({ length: txCount }, (_, index) => `TX${index + 1}`),
+    "GK",
+    ...Array.from({ length: thCount }, (_, index) => `TH${index + 1}`),
+    "TKT",
+    "Được dự thi HP",
+    "Vắng thi",
   ];
 
+  const buildSampleRow = (studentCode, studentName, baseScore) => {
+    const txPart = Array.from({ length: txCount }, (_, index) =>
+      Number((baseScore + index * 0.1).toFixed(1)),
+    );
+    const thPart = Array.from({ length: thCount }, (_, index) =>
+      Number((baseScore + 0.2 + index * 0.1).toFixed(1)),
+    );
+
+    return [
+      studentCode,
+      studentName,
+      ...txPart,
+      Number((baseScore + 0.3).toFixed(1)),
+      ...thPart,
+      Number((baseScore + 0.4).toFixed(1)),
+      1,
+      0,
+    ];
+  };
+
   const sampleRows = [
-    [
-      "HS0001",
-      "Nguyễn Văn A",
-      ...[...subjectMap.keys()].map(() => 7.5),
-      2,
-      "Khá",
-    ],
-    ["HS0002", "Trần Thị B", ...[...subjectMap.keys()].map(() => 8), 0, "Tốt"],
-    [
-      "HS0003",
-      "Lê Văn C",
-      ...[...subjectMap.keys()].map(() => 6.5),
-      4,
-      "Trung Bình",
-    ],
+    buildSampleRow("HS0001", "Nguyễn Văn A", 7.2),
+    buildSampleRow("HS0002", "Trần Thị B", 8.0),
+    buildSampleRow("HS0003", "Lê Văn C", 6.4),
   ];
 
   const templateSheet = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
   XLSX.utils.book_append_sheet(workbook, templateSheet, "Template");
 
   const guideRows = [
-    ["HƯỚNG DẪN IMPORT"],
+    ["HƯỚNG DẪN IMPORT ĐIỂM"],
+    [
+      templateOptions.classCode
+        ? `Lớp học phần: ${templateOptions.classCode}${
+            templateOptions.className ? ` - ${templateOptions.className}` : ""
+          }`
+        : "Lớp học phần: theo lựa chọn trên màn import",
+    ],
     ["- Điểm hợp lệ: 0 đến 10"],
-    ["- Hạnh kiểm hợp lệ: Tốt | Khá | Trung Bình | Yếu"],
-    ["- Mã HS phải đúng với lớp đã chọn"],
-    ["- Danh sách môn hợp lệ:"],
-    ...[...subjectMap.entries()].map(([code, name]) => [`${code}: ${name}`]),
+    ["- TX/GK/TH/TKT để trống nếu chưa có điểm"],
+    ["- Cột 'Được dự thi HP': 1/0, true/false, có/không"],
+    ["- Cột 'Vắng thi': 1/0, true/false, có/không"],
+    ["- Mã HS phải thuộc đúng lớp học phần đang chọn"],
+    ["- Cấu trúc cột phải giữ nguyên như sheet Template"],
   ];
+
   const guideSheet = XLSX.utils.aoa_to_sheet(guideRows);
   XLSX.utils.book_append_sheet(workbook, guideSheet, "Hướng dẫn");
 
   return workbook;
 };
 
+const getTemplateOptionsByClassId = async (classId) => {
+  if (!classId) {
+    return null;
+  }
+
+  const classData = await Class.findById(classId)
+    .select("_id code name txCount weights departmentId")
+    .lean();
+
+  if (!classData) {
+    return null;
+  }
+
+  const classConfig = normalizeClassConfig(classData);
+  return {
+    classCode: classData.code,
+    className: classData.name || classData.code,
+    departmentId: resolveRefId(classData.departmentId),
+    txCount: classConfig.txCount,
+    thCount: classConfig.thCount,
+    hasTh: classConfig.hasTh,
+  };
+};
+
 module.exports = {
-  getSubjectMap,
   normalizeText,
   getHeaderKey,
   parseExcelFile,
   validateRows,
   importValidRows,
   generateTemplateWorkbook,
+  getTemplateOptionsByClassId,
 };
