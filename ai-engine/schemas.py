@@ -3,9 +3,27 @@ from pydantic import BaseModel, Field
 
 class PredictRequest(BaseModel):
     scores: dict[str, float] = Field(default_factory=dict)
-    diem_hk_truoc: float = Field(ge=0, le=10)
-    so_buoi_vang: int = Field(ge=0)
-    hanh_kiem: int = Field(ge=0, le=3)
+    diem_hk_truoc: float = Field(default=0.0, ge=0, le=10)
+    so_buoi_vang: int = Field(default=0, ge=0)
+    hanh_kiem: int = Field(default=2, ge=0, le=3)
+    # Diem tong ket da tinh he so (tu Grade model)
+    finalScore: float | None = Field(default=None, ge=0, le=10)
+    # GPA he 4
+    gpa4: float | None = Field(default=None, ge=0, le=4)
+
+
+class SemesterData(BaseModel):
+    schoolYear: str = ""
+    semester: int = Field(ge=1, le=3)
+    finalScore: float = Field(ge=0, le=10)
+    gpa4: float = Field(ge=0, le=4)
+    attendanceAbsent: int = Field(default=0, ge=0)
+    letterGrade: str = ""
+
+
+class PredictAllRequest(BaseModel):
+    studentCode: str
+    semesters: list[SemesterData]
 
 
 class PredictResponse(BaseModel):
@@ -13,8 +31,11 @@ class PredictResponse(BaseModel):
     confidence: float
     risk_level: str
     weak_subjects: list[str]
+    improve_subjects: list[str] = Field(default_factory=list)
     suggestions: list[str]
     analysis: str
+    data_coverage: float = 0.0
+    is_low_data: bool = False
 
 
 class SubjectResult(BaseModel):

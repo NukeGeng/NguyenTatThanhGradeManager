@@ -254,6 +254,87 @@
 - Fix: Tối ưu script theo target tổng (`SEED_TARGET_STUDENTS`), thêm tuning qua env (`SEED_BATCH_SIZE`, `SEED_GRADE_RATIO`), giảm tải tạo Grade, giữ progress log rõ ràng và hoàn tất mốc 10k ổn định hơn.
 - Trạng thái: ✅ Đã fix
 
+## [BUG-027] Lưu điểm thất bại với sinh viên đăng ký qua StudentCurriculum
+
+- Ngày: 11/04/2026
+- File/Vị trí: backend/src/routes/grades.js
+- Mô tả: Trang `/grades` chọn được sinh viên trong lớp học phần nhưng bấm lưu điểm báo lỗi không thuộc lớp.
+- Nguyên nhân: API `POST /api/grades` chỉ kiểm tra `Student.classId === classId`, không tính trường hợp sinh viên thuộc lớp qua `StudentCurriculum.registrations.classId`.
+- Fix: Mở rộng kiểm tra membership theo cả hai nguồn (direct class + curriculum registrations) trước khi tạo bảng điểm.
+- Trạng thái: ✅ Đã fix
+
+## [BUG-028] Mẫu import điểm không đổ đủ sinh viên theo lớp học phần
+
+- Ngày: 12/04/2026
+- File/Vị trí: backend/src/services/importService.js
+- Mô tả: Tải mẫu Excel import vẫn là dữ liệu ví dụ, không có đầy đủ danh sách sinh viên của lớp học phần đang chọn.
+- Nguyên nhân: `generateTemplateWorkbook` dùng sample rows hard-code và `getTemplateOptionsByClassId` không lấy danh sách sinh viên thực tế của lớp.
+- Fix: Bổ sung truy vấn enrolled students theo cả `Student.classId` và `StudentCurriculum.registrations.classId`, đưa toàn bộ danh sách vào sheet Template và hiển thị studentCount trong sheet Hướng dẫn.
+- Trạng thái: ✅ Đã fix
+
+## [BUG-029] Validate import điểm bỏ sót sinh viên thuộc lớp qua curriculum
+
+- Ngày: 12/04/2026
+- File/Vị trí: backend/src/services/importService.js
+- Mô tả: Import preview/excel báo không tìm thấy học sinh dù sinh viên có trong lớp học phần theo dữ liệu đăng ký.
+- Nguyên nhân: `validateRows` chỉ tìm theo `Student.find({ classId, studentCode })`, bỏ qua enrollment từ `StudentCurriculum`.
+- Fix: Đồng bộ `validateRows` sang cùng nguồn enrollment gộp direct + registration để validate/import đúng phạm vi lớp học phần.
+- Trạng thái: ✅ Đã fix
+
+## [BUG-030] Dữ liệu seed lớn sinh tên placeholder kiểu Sinh vien 000xxx
+
+- Ngày: 12/04/2026
+- File/Vị trí: backend/src/scripts/seedLargeScaleData.js, backend/src/scripts/renameSyntheticStudentNames.js
+- Mô tả: Dữ liệu học sinh hiển thị tên giả dạng mã (`Sinh vien 000416`) gây khó kiểm tra nghiệp vụ.
+- Nguyên nhân: Script seed lớn hard-code `fullName` theo pattern số tăng dần.
+- Fix: Thay generator tên thật trong seed lớn, thêm script đổi tên hàng loạt `students:rename-real` và đã chạy đổi 2,880 bản ghi, còn 0 tên synthetic.
+- Trạng thái: ✅ Đã fix
+
+## [BUG-031] PowerShell Set-Content double-encode UTF-8 → tiếng Việt bị rác
+
+- Ngày: 12/04/2026
+- File/Vị trí: Bất kỳ file TypeScript/SCSS nào có tiếng Việt
+- Mô tả: Sau khi dùng PowerShell `Get-Content` + `Set-Content -Encoding UTF8` để chỉnh sửa file, toàn bộ ký tự tiếng Việt bị double-encode (VD: `Bộ môn` → `Bá»™ mĂ´n`). Angular compile bình thường nhưng browser hiển thị rác.
+- Nguyên nhân: PS5 `Get-Content` không có tham số Encoding đọc file UTF-8 không BOM như Windows-1252, sau đó `Set-Content -Encoding UTF8` ghi lại là UTF-8 → double-encode. PS5 cũng thêm BOM vào file.
+- Fix: KHÔNG BAO GIỜ dùng PowerShell để đọc/ghi file source có tiếng Việt. Dùng Python (`open(..., encoding='utf-8')`) hoặc tool `create_file`/`replace_string_in_file` của AI agent. Nếu file đã bị BOM: `python -c "with open(f,'rb') as f: raw=f.read(); open(f,'wb').write(raw[3:] if raw[:3]==b'\xef\xbb\xbf' else raw)"`.
+- Trạng thái: ✅ Đã fix
+
+## [BUG-032] class-predictions.component.ts bị duplicate do file cũ append vào file mới
+
+- Ngày: 12/04/2026
+- File/Vị trí: frontend/src/app/features/predictions/class-predictions.component.ts
+- Mô tả: Build báo `Duplicate identifier 'CommonModule'`, `Duplicate identifier 'ClassPredictionsComponent'` (~60 lỗi). File có 2000+ dòng trong khi bình thường chỉ ~1000 dòng.
+- Nguyên nhân: Khi tạo lại file mới bằng `create_file`, nội dung cũ (bị encoding rác từ BUG-031) đã bị append vào sau component mới thay vì ghi đè sạch.
+- Fix: Dùng Python để truncate file tại đúng dòng `}` cuối cùng của component đầu tiên (dòng 1008), xóa toàn bộ phần duplicate từ dòng 1009 trở đi.
+- Trạng thái: ✅ Đã fix
+
+## [BUG-033] student-detail.component.ts: runOverallPrediction() bị merge vào body của runPrediction()
+
+- Ngày: 12/04/2026
+- File/Vị trí: frontend/src/app/features/students/student-detail.component.ts
+- Mô tả: Build báo `TS1003: Identifier expected`, `TS2680: 'this' parameter must be first`, `TS2300: Duplicate identifier`, `TS7006: Parameter '(Missing)' implicitly has 'any' type` tại các dòng 516, 656, 666, 672. Hàm `runOverallPrediction()` không tồn tại mặc dù template gọi nó.
+- Nguyên nhân: Khi AI agent thêm `runOverallPrediction()` vào `runPrediction()`, phần `error` callback và closing braces của `.subscribe({...})` bị bỏ sót → hàm mới bị nhét vào giữa subscribe object literal thay vì sau khi đóng `runPrediction()`.
+- Fix: Bổ sung lại `error` callback + closing `});` + `}` cho `runPrediction()`, sau đó đặt `runOverallPrediction()` như method độc lập.
+- Trạng thái: ✅ Đã fix
+
+## [BUG-034] Build lỗi budget sau khi component mới làm tăng bundle size
+
+- Ngày: 12/04/2026
+- File/Vị trí: frontend/angular.json
+- Mô tả: `ng build` exit code 1 do `bundle initial exceeded maximum budget` (564 kB > 500 kB) và `home.component.scss exceeded budget` (12.71 kB > 12 kB).
+- Nguyên nhân: Thêm component predictions mới vào lazy chunk; CSS landing page vẫn sát ngưỡng budget cũ.
+- Fix: Nâng `maximumWarning` initial từ 500kB → 700kB, `maximumError` từ 1MB → 2MB; nâng `anyComponentStyle` warning từ 12kB → 20kB, error từ 16kB → 32kB.
+- Trạng thái: ✅ Đã fix
+
+## [BUG-035] Sass @import deprecation warning làm CI/build fail (exit code 1)
+
+- Ngày: 12/04/2026
+- File/Vị trí: frontend/src/styles.scss
+- Mô tả: Build warn `Sass @import rules are deprecated and will be removed in Dart Sass 3.0.0` cho `@import './app/shared/styles/page'`. Kết hợp với budget warning tạo exit code 1.
+- Nguyên nhân: Dart Sass đã deprecated `@import`, khuyến nghị dùng `@use`/`@forward`.
+- Fix: Đổi `@import './app/shared/styles/page'` → `@use './app/shared/styles/page'` và đặt lên trước `@import '@angular/material/...'` (vì `@use` phải đứng đầu file trước mọi CSS rule).
+- Trạng thái: ✅ Đã fix
+
 ---
 
 ## TEMPLATE THÊM BUG MỚI

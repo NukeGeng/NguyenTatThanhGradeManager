@@ -108,14 +108,14 @@
       <mat-card class="content-card">
         <div class="content-card__header">
           <h2 class="content-card__title">Danh sách học sinh rủi ro cao</h2>
-          <span class="chip chip-red">{{ alertRows.length }} cảnh báo</span>
+          <span class="chip chip-red">{{ alertTotal }} cảnh báo</span>
         </div>
 
-        <div class="content-card__body" *ngIf="!alertRows.length">
+        <div class="content-card__body" *ngIf="!alertTotal">
           <div class="empty-state">Chưa có học sinh rủi ro cao.</div>
         </div>
 
-        <div class="content-card__body alerts-table-wrap" *ngIf="alertRows.length">
+        <div class="content-card__body alerts-table-wrap" *ngIf="alertTotal">
           <table class="alerts-table">
             <thead>
               <tr>
@@ -152,6 +152,16 @@
             </tbody>
           </table>
         </div>
+
+        <mat-paginator
+          *ngIf="alertTotal > alertPageSize"
+          [length]="alertTotal"
+          [pageIndex]="alertPage - 1"
+          [pageSize]="alertPageSize"
+          [pageSizeOptions]="[20, 50, 100]"
+          (page)="onAlertPageChange($event)"
+          showFirstLastButtons
+        ></mat-paginator>
       </mat-card>
 
       <mat-card class="content-card">

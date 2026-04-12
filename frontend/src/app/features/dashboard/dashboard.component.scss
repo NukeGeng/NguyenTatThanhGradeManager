@@ -10,6 +10,7 @@
 
 .filter-card {
   padding: 0.9rem 1rem 0.15rem;
+  background: #ffffff !important;
 }
 
 .filter-grid {
@@ -32,47 +33,161 @@
   gap: 1rem;
 }
 
+/* Force white background on content cards & override MDC surface */
+.content-grid .content-card,
+.content-grid .mat-mdc-card,
+.stats-grid .stat-card {
+  background: #ffffff !important;
+}
+
+.content-card__header {
+  padding: 1rem 1.25rem;
+  border-bottom: 1px solid #e4eaf0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+  background: #ffffff;
+}
+
+.content-card__title {
+  font-size: 0.95rem;
+  font-weight: 700;
+  color: var(--navy);
+  margin: 0;
+}
+
+/* ---- Alerts table ---- */
 .alerts-table-wrap {
   overflow-x: auto;
+  overflow-y: auto;
+  max-height: 480px;
+  padding: 0;
 }
 
 .alerts-table {
   width: 100%;
   border-collapse: collapse;
-  min-width: 560px;
+  min-width: 540px;
 }
 
-.alerts-table th,
-.alerts-table td {
-  padding: 0.75rem;
-  border-bottom: 1px solid var(--gray-200);
-  text-align: left;
-  font-size: 0.9rem;
+.alerts-table thead tr {
+  background: #d8e1e8;
+  height: 52px;
 }
 
 .alerts-table th {
-  color: var(--text-sub);
-  font-size: 0.8rem;
-  font-weight: 600;
+  padding: 0 0.85rem;
+  color: #1f8fe4;
+  font-size: 0.82rem;
+  font-weight: 700;
   text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.04em;
+  border-bottom: 1px solid #bcc8d2;
+  border-right: 1px solid #c7d1da;
+  white-space: nowrap;
 }
 
-.empty-state {
-  padding: 0;
-  min-height: auto;
+.alerts-table th:last-child {
+  border-right: none;
+}
+
+.alerts-table tbody tr {
+  height: 48px;
+  transition: background 0.15s;
+}
+
+.alerts-table tbody tr:hover {
+  background: #f4f7fa;
+}
+
+.alerts-table td {
+  padding: 0 0.85rem;
+  border-bottom: 1px solid #e4eaf0;
+  font-size: 0.9rem;
+  color: #374151;
+}
+
+.alerts-table tbody tr:last-child td {
+  border-bottom: none;
+}
+
+/* ---- Chart ---- */
+.content-grid .content-card:last-child {
+  display: flex;
+  flex-direction: column;
+}
+
+.content-card__body {
+  padding: 1.1rem 1.25rem 1.25rem;
+  background: #ffffff;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
 }
 
 .chart-wrap {
   position: relative;
-  height: 300px;
+  flex: 1;
+  min-height: 220px;
 }
 
 .grade-legend {
-  margin-top: 0.85rem;
+  margin-top: 0.75rem;
   display: flex;
   flex-wrap: wrap;
-  gap: 0.55rem;
+  gap: 0.5rem;
+}
+
+/* ---- chip overrides ---- */
+.chip {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.2rem 0.55rem;
+  border-radius: 99px;
+  font-size: 0.78rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.chip-red {
+  background: #fee2e2;
+  color: #dc2626;
+}
+.chip-amber {
+  background: #fef3c7;
+  color: #d97706;
+}
+.chip-green {
+  background: #dcfce7;
+  color: #16a34a;
+}
+.grade-a {
+  color: #16a34a;
+}
+.grade-b {
+  color: #2563eb;
+}
+.grade-c {
+  color: #ca8a04;
+}
+.grade-f {
+  color: #dc2626;
+}
+
+.empty-state {
+  padding: 2rem 0;
+  text-align: center;
+  color: var(--text-sub);
+  font-size: 0.9rem;
+  min-height: auto;
+}
+
+/* ---- paginator ---- */
+mat-paginator {
+  background: #ffffff;
+  border-top: 1px solid #e4eaf0;
 }
 
 @media (max-width: 1024px) {

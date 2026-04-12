@@ -1194,6 +1194,117 @@ const toClassCode = (item, cohortCode) =>
 
 const generateStudentCode = (value) => `HS${String(value).padStart(6, "0")}`;
 
+const REAL_LAST_NAMES = [
+  "Nguyen",
+  "Tran",
+  "Le",
+  "Pham",
+  "Hoang",
+  "Phan",
+  "Vu",
+  "Vo",
+  "Dang",
+  "Bui",
+  "Do",
+  "Ho",
+  "Ngo",
+  "Duong",
+  "Ly",
+  "Dinh",
+  "Truong",
+  "Mai",
+  "Lam",
+  "Ta",
+];
+
+const REAL_MIDDLE_NAMES = [
+  "Van",
+  "Thi",
+  "Minh",
+  "Gia",
+  "Quoc",
+  "Thanh",
+  "Duc",
+  "Ngoc",
+  "Bao",
+  "Anh",
+  "Hai",
+  "Khanh",
+  "Thuy",
+  "Bich",
+  "Hoang",
+  "Quynh",
+  "Tu",
+  "Huu",
+  "Phuong",
+  "Tien",
+];
+
+const REAL_FIRST_NAMES = [
+  "An",
+  "Binh",
+  "Cuong",
+  "Dung",
+  "Duc",
+  "Ha",
+  "Huy",
+  "Khanh",
+  "Long",
+  "Mai",
+  "Nam",
+  "Oanh",
+  "Phuc",
+  "Quyen",
+  "Son",
+  "Tam",
+  "Tung",
+  "Uyen",
+  "Viet",
+  "Yen",
+  "Bao",
+  "Chi",
+  "Duy",
+  "Giang",
+  "Hung",
+  "Linh",
+  "Phat",
+  "Quynh",
+  "Sang",
+  "Tram",
+  "Trang",
+  "Hanh",
+  "Nhi",
+  "Kiet",
+  "Hieu",
+  "Thao",
+  "My",
+  "Ngan",
+  "Phuong",
+  "Thien",
+];
+
+const buildRealFullName = (seed) => {
+  const normalized = Math.max(1, Number(seed || 1));
+  const last = REAL_LAST_NAMES[(normalized * 17 + 3) % REAL_LAST_NAMES.length];
+  const middle =
+    REAL_MIDDLE_NAMES[(normalized * 19 + 5) % REAL_MIDDLE_NAMES.length];
+  const first =
+    REAL_FIRST_NAMES[(normalized * 23 + 7) % REAL_FIRST_NAMES.length];
+
+  return `${last} ${middle} ${first}`;
+};
+
+const buildParentName = (seed) => {
+  const normalized = Math.max(1, Number(seed || 1));
+  const last = REAL_LAST_NAMES[(normalized * 29 + 11) % REAL_LAST_NAMES.length];
+  const middle =
+    REAL_MIDDLE_NAMES[(normalized * 31 + 13) % REAL_MIDDLE_NAMES.length];
+  const first =
+    REAL_FIRST_NAMES[(normalized * 37 + 17) % REAL_FIRST_NAMES.length];
+
+  return `${last} ${middle} ${first}`;
+};
+
 const getMaxStudentCodeNumber = async () => {
   const docs = await Student.find({ studentCode: { $exists: true, $ne: null } })
     .sort({ createdAt: -1 })
@@ -1926,6 +2037,8 @@ const run = async () => {
       globalCodeCounter += 1;
 
       const studentCode = generateStudentCode(globalCodeCounter);
+      const studentName = buildRealFullName(globalCodeCounter);
+      const parentName = buildParentName(globalCodeCounter);
       const profile = pickProfile();
       const advisor = plan.advisors[index % plan.advisors.length];
       const cohortIndex = index % plan.cohortCodes.length;
@@ -2029,7 +2142,7 @@ const run = async () => {
       batchStudents.push({
         _id: studentObjectId,
         studentCode,
-        fullName: `Sinh vien ${String(globalCodeCounter).padStart(6, "0")}`,
+        fullName: studentName,
         dateOfBirth: new Date(
           2003,
           Math.floor(Math.random() * 12),
@@ -2040,7 +2153,7 @@ const run = async () => {
         majorId: plan.major._id,
         enrolledYear: ENROLLED_YEAR,
         address: "TP HCM",
-        parentName: `Phu huynh ${String(globalCodeCounter).padStart(6, "0")}`,
+        parentName,
         parentPhone: `09${String(10000000 + (globalCodeCounter % 90000000)).padStart(8, "0")}`,
         status: "active",
       });

@@ -32,8 +32,13 @@ const mapPredictionFromAI = (payload) => ({
   weakSubjects: Array.isArray(payload?.weak_subjects)
     ? payload.weak_subjects
     : [],
+  improveSubjects: Array.isArray(payload?.improve_subjects)
+    ? payload.improve_subjects
+    : [],
   suggestions: Array.isArray(payload?.suggestions) ? payload.suggestions : [],
   analysis: payload?.analysis || "",
+  dataCoverage: Number(payload?.data_coverage ?? 0),
+  isLowData: Boolean(payload?.is_low_data ?? false),
 });
 
 const toObjectId = (value) => {
@@ -87,6 +92,79 @@ const resolveGradeScoreForAI = (gradeDoc) => {
   return null;
 };
 
+/**
+ * Build the AI predict input for a specific (studentId, schoolYearId, semester).
+ * - scores  = grades of THAT semester only (matches training data structure)
+ * - diem_hk_truoc = weighted average of ALL other (older) semester grades
+ * - so_buoi_vang / hanh_kiem default to 0 / 2 when not stored on Grade docs
+ */
+const buildSemesterPredictInput = async (studentId, schoolYearId, semester) => {
+  const [currentGrades, prevGrades] = await Promise.all([
+    Grade.find({ studentId, schoolYearId, semester })
+      .populate("subjectId", "code")
+      .select("subjectId finalScore tktScore gkScore txAvg"),
+    Grade.find({ studentId, $nor: [{ schoolYearId, semester }] }).select(
+      "finalScore tktScore gkScore txAvg",
+    ),
+  ]);
+
+  const scores = {};
+  for (const item of currentGrades) {
+    const code = String(item?.subjectId?.code || "").trim();
+    if (!code) continue;
+    const score = resolveGradeScoreForAI(item);
+    if (score !== null) scores[code] = score;
+  }
+
+  const prevScores = prevGrades
+    .map((g) => resolveGradeScoreForAI(g))
+    .filter((v) => v !== null);
+
+  const diemHkTruoc =
+    prevScores.length > 0
+      ? Number(
+          (prevScores.reduce((s, v) => s + v, 0) / prevScores.length).toFixed(
+            2,
+          ),
+        )
+      : Object.values(scores).length > 0
+        ? Number(
+            (
+              Object.values(scores).reduce((s, v) => s + v, 0) /
+              Object.values(scores).length
+            ).toFixed(2),
+          )
+        : 5;
+
+  // finalScore = diem tong ket hoc ky nay (trung binh cac mon)
+  const currentScoresArr = Object.values(scores);
+  const finalScore =
+    currentScoresArr.length > 0
+      ? Number(
+          (
+            currentScoresArr.reduce((s, v) => s + v, 0) /
+            currentScoresArr.length
+          ).toFixed(2),
+        )
+      : diemHkTruoc;
+
+  // gpa4: quy doi tu thang 10 (don gian)
+  const gpa4 = Number(Math.min((finalScore / 10) * 4, 4).toFixed(2));
+
+  return {
+    scores,
+    diem_hk_truoc: diemHkTruoc,
+    so_buoi_vang: 0,
+    hanh_kiem: 2,
+    finalScore,
+    gpa4,
+  };
+};
+
+/**
+ * Legacy helper used by /predict (gradeId) and /predict-class — now delegates to
+ * buildSemesterPredictInput so both paths use the same correct logic.
+ */
 const buildRealtimePredictInput = async (baseGrade) => {
   const studentId = toObjectId(baseGrade?.studentId);
   const schoolYearId = toObjectId(baseGrade?.schoolYearId);
@@ -96,40 +174,11 @@ const buildRealtimePredictInput = async (baseGrade) => {
     return baseGrade;
   }
 
-  const siblingGrades = await Grade.find({
+  const semesterInput = await buildSemesterPredictInput(
     studentId,
     schoolYearId,
     semester,
-  })
-    .populate("subjectId", "code")
-    .select("subjectId finalScore tktScore gkScore txAvg");
-
-  const scores = {};
-
-  for (const item of siblingGrades) {
-    const subjectCode = String(item?.subjectId?.code || "").trim();
-    if (!subjectCode) {
-      continue;
-    }
-
-    const score = resolveGradeScoreForAI(item);
-    if (score === null) {
-      continue;
-    }
-
-    scores[subjectCode] = score;
-  }
-
-  const scoreValues = Object.values(scores).map((value) => Number(value));
-  const avgCurrentScore =
-    scoreValues.length > 0
-      ? Number(
-          (
-            scoreValues.reduce((sum, value) => sum + value, 0) /
-            scoreValues.length
-          ).toFixed(2),
-        )
-      : null;
+  );
 
   const plainBase =
     typeof baseGrade?.toObject === "function"
@@ -138,11 +187,8 @@ const buildRealtimePredictInput = async (baseGrade) => {
 
   return {
     ...plainBase,
-    scores,
-    diem_hk_truoc:
-      plainBase?.diem_hk_truoc ??
-      plainBase?.previousSemesterScore ??
-      avgCurrentScore,
+    scores: semesterInput.scores,
+    diem_hk_truoc: semesterInput.diem_hk_truoc,
   };
 };
 
@@ -367,6 +413,259 @@ router.post("/predict-class", async (req, res, next) => {
   }
 });
 
+/**
+ * Build the AI predict input using ALL grades from every semester the student has taken.
+ * Calculates per-subject averages across all semesters for maximum data coverage.
+ */
+const buildOverallPredictInput = async (studentId) => {
+  const allGrades = await Grade.find({ studentId })
+    .populate("subjectId", "code")
+    .select("subjectId finalScore tktScore gkScore txAvg");
+
+  const scoresBySubject = {};
+  for (const grade of allGrades) {
+    const code = String(grade?.subjectId?.code || "").trim();
+    if (!code) continue;
+    const score = resolveGradeScoreForAI(grade);
+    if (score === null) continue;
+    if (!scoresBySubject[code]) scoresBySubject[code] = [];
+    scoresBySubject[code].push(score);
+  }
+
+  const scores = {};
+  for (const [code, vals] of Object.entries(scoresBySubject)) {
+    scores[code] = Number(
+      (vals.reduce((s, v) => s + v, 0) / vals.length).toFixed(2),
+    );
+  }
+
+  const allScores = Object.values(scores);
+  const overallGpa =
+    allScores.length > 0
+      ? Number(
+          (allScores.reduce((s, v) => s + v, 0) / allScores.length).toFixed(2),
+        )
+      : 5;
+
+  const gpa4 = Number(Math.min((overallGpa / 10) * 4, 4).toFixed(2));
+
+  return {
+    scores,
+    diem_hk_truoc: overallGpa,
+    so_buoi_vang: 0,
+    hanh_kiem: 2,
+    finalScore: overallGpa,
+    gpa4,
+  };
+};
+
+/**
+ * POST /predictions/predict-student
+ * Trigger an AI prediction from the student detail page.
+ * Body: { studentId, schoolYearId, semester }
+ * Uses the selected semester's grade scores + previous semester GPA as input.
+ */
+router.post("/predict-student", async (req, res, next) => {
+  try {
+    if (req.user.role === "advisor") {
+      return res.status(403).json({
+        success: false,
+        message: "Advisor không có quyền chạy dự đoán",
+      });
+    }
+
+    const { studentId, schoolYearId, semester } = req.body;
+
+    if (!studentId || !schoolYearId || !semester) {
+      return res.status(400).json({
+        success: false,
+        message: "studentId, schoolYearId và semester là bắt buộc",
+      });
+    }
+
+    const student = await Student.findById(studentId)
+      .populate("classId", "departmentId")
+      .select("_id classId");
+
+    if (!student) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Student not found" });
+    }
+
+    if (req.user.role !== "admin") {
+      const allowedDepartmentIds = getAllowedDepartmentIds(req.user);
+      if (
+        !allowedDepartmentIds.includes(String(student.classId?.departmentId))
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "Bạn không có quyền dự đoán cho học sinh này",
+        });
+      }
+    }
+
+    const semesterInput = await buildSemesterPredictInput(
+      String(student._id),
+      schoolYearId,
+      Number(semester),
+    );
+
+    if (Object.keys(semesterInput.scores).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Học kỳ này chưa có điểm môn học nào để dự đoán",
+      });
+    }
+
+    const aiResult = await predictStudent(semesterInput);
+    const mappedPrediction = mapPredictionFromAI(aiResult);
+
+    const prediction = await Prediction.create({
+      studentId: student._id,
+      ...mappedPrediction,
+    });
+
+    const populatedPrediction = await populatePredictionQuery(
+      Prediction.findById(prediction._id),
+    );
+
+    return res.status(201).json({
+      success: true,
+      data: populatedPrediction,
+      message: "Dự đoán học lực thành công",
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+/**
+ * POST /predictions/predict-student-overall
+ * Predict using ALL semesters' grades (maximum data coverage).
+ * Body: { studentId }
+ */
+router.post("/predict-student-overall", async (req, res, next) => {
+  try {
+    if (req.user.role === "advisor") {
+      return res.status(403).json({
+        success: false,
+        message: "Advisor không có quyền chạy dự đoán",
+      });
+    }
+
+    const { studentId } = req.body;
+    if (!studentId) {
+      return res.status(400).json({
+        success: false,
+        message: "studentId là bắt buộc",
+      });
+    }
+
+    const student = await Student.findById(studentId)
+      .populate("classId", "departmentId")
+      .select("_id classId");
+
+    if (!student) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Student not found" });
+    }
+
+    if (req.user.role !== "admin") {
+      const allowedDepartmentIds = getAllowedDepartmentIds(req.user);
+      if (
+        !allowedDepartmentIds.includes(String(student.classId?.departmentId))
+      ) {
+        return res.status(403).json({
+          success: false,
+          message: "Bạn không có quyền dự đoán cho học sinh này",
+        });
+      }
+    }
+
+    const overallInput = await buildOverallPredictInput(String(student._id));
+
+    if (Object.keys(overallInput.scores).length === 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Học sinh chưa có điểm môn học nào",
+      });
+    }
+
+    const aiResult = await predictStudent(overallInput);
+    const mappedPrediction = mapPredictionFromAI(aiResult);
+
+    const prediction = await Prediction.create({
+      studentId: student._id,
+      ...mappedPrediction,
+    });
+
+    const populatedPrediction = await populatePredictionQuery(
+      Prediction.findById(prediction._id),
+    );
+
+    return res.status(201).json({
+      success: true,
+      data: populatedPrediction,
+      message: "Dự đoán toàn khóa học thành công",
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// GET /predictions/latest-summary?studentIds=id1,id2,...
+// Returns { studentId, createdAt, predictedRank, riskLevel }[] for the latest prediction of each student
+router.get("/latest-summary", async (req, res, next) => {
+  try {
+    const rawIds = req.query.studentIds;
+    if (!rawIds) {
+      return res
+        .status(400)
+        .json({ success: false, message: "studentIds is required" });
+    }
+    const ids = String(rawIds).split(",").filter(Boolean);
+    if (ids.length === 0) {
+      return res.status(200).json({ success: true, data: [] });
+    }
+
+    // Aggregate: for each studentId pick the most recent prediction
+    const results = await Prediction.aggregate([
+      {
+        $match: {
+          studentId: {
+            $in: ids.map((id) =>
+              require("mongoose").Types.ObjectId.createFromHexString(id),
+            ),
+          },
+        },
+      },
+      { $sort: { createdAt: -1 } },
+      {
+        $group: {
+          _id: "$studentId",
+          createdAt: { $first: "$createdAt" },
+          predictedRank: { $first: "$predictedRank" },
+          riskLevel: { $first: "$riskLevel" },
+        },
+      },
+    ]);
+
+    return res.status(200).json({
+      success: true,
+      data: results.map((r) => ({
+        studentId: String(r._id),
+        createdAt: r.createdAt,
+        predictedRank: r.predictedRank,
+        riskLevel: r.riskLevel,
+      })),
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.get("/student/:studentId", async (req, res, next) => {
   try {
     const student = await Student.findById(req.params.studentId)
@@ -480,43 +779,62 @@ router.get("/class/:classId", async (req, res, next) => {
 
 router.get("/alerts", async (req, res, next) => {
   try {
-    const predictions = await populatePredictionQuery(
-      Prediction.find({}).sort({ createdAt: -1 }),
+    const page = Math.max(1, parseInt(req.query.page, 10) || 1);
+    const limit = Math.min(
+      200,
+      Math.max(1, parseInt(req.query.limit, 10) || 50),
     );
 
-    const latestMap = new Map();
-    for (const prediction of predictions) {
-      const studentId = String(
-        prediction.studentId?._id || prediction.studentId,
-      );
-      if (!latestMap.has(studentId)) {
-        latestMap.set(studentId, prediction);
-      }
+    // Use DB-side aggregation to find the latest prediction per student,
+    // then keep only those whose most-recent prediction is "high" risk.
+    // This avoids loading thousands of prediction records into memory.
+    const latestHighRisk = await Prediction.aggregate([
+      { $sort: { createdAt: -1 } },
+      {
+        $group: {
+          _id: "$studentId",
+          latestId: { $first: "$_id" },
+          riskLevel: { $first: "$riskLevel" },
+        },
+      },
+      { $match: { riskLevel: "high" } },
+    ]);
+
+    const latestIds = latestHighRisk.map((r) => r.latestId);
+
+    // Populate the matched prediction documents
+    let allPopulated = await populatePredictionQuery(
+      Prediction.find({ _id: { $in: latestIds } }).sort({ createdAt: -1 }),
+    );
+
+    // Role-based access filter
+    if (req.user.role !== "admin") {
+      allPopulated = allPopulated.filter((item) => {
+        if (req.user.role === "advisor") {
+          const advisingStudentIds = getAdvisingStudentIds(req.user);
+          return advisingStudentIds.includes(
+            String(item.studentId?._id || item.studentId),
+          );
+        }
+
+        const allowedDepartmentIds = getAllowedDepartmentIds(req.user);
+        return allowedDepartmentIds.includes(
+          String(item.studentId?.classId?.departmentId),
+        );
+      });
     }
 
-    const latestPredictions = Array.from(latestMap.values());
-    const highRiskPredictions = latestPredictions.filter(
-      (item) => item.riskLevel === "high",
-    );
-
-    const filteredData =
-      req.user.role === "admin"
-        ? highRiskPredictions
-        : highRiskPredictions.filter((item) => {
-            if (req.user.role === "advisor") {
-              const advisingStudentIds = getAdvisingStudentIds(req.user);
-              return advisingStudentIds.includes(String(item.studentId?._id));
-            }
-
-            const allowedDepartmentIds = getAllowedDepartmentIds(req.user);
-            return allowedDepartmentIds.includes(
-              String(item.studentId?.classId?.departmentId),
-            );
-          });
+    const total = allPopulated.length;
+    const pageData = allPopulated.slice((page - 1) * limit, page * limit);
 
     return res.status(200).json({
       success: true,
-      data: filteredData,
+      data: {
+        items: pageData,
+        total,
+        page,
+        limit,
+      },
       message: "Get high risk alerts successfully",
     });
   } catch (error) {

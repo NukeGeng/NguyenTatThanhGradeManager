@@ -128,10 +128,15 @@ interface PredictClassSummary {
             Xem điểm cả lớp
           </a>
 
-          <a mat-flat-button class="btn-primary" [routerLink]="['/grades/import']">
-            <lucide-icon name="arrow-right" [size]="16"></lucide-icon>
-            Đi đến Import Excel/CSV
-          </a>
+          <button
+            mat-flat-button
+            class="btn-primary"
+            type="button"
+            (click)="openBulkImportAllClasses()"
+          >
+            <lucide-icon name="layers" [size]="16"></lucide-icon>
+            Nhập điểm hàng loạt
+          </button>
         </div>
       </header>
 
@@ -1140,6 +1145,15 @@ export class GradeEntryComponent implements OnInit {
           this.loadErrorMessage = this.resolveError(error);
         },
       });
+  }
+
+  openBulkImportAllClasses(): void {
+    const schoolYearId = this.selectionForm.get('schoolYearId')?.value || null;
+    const semester = this.selectionForm.get('semester')?.value ?? null;
+    const queryParams: Record<string, string | number> = {};
+    if (schoolYearId) queryParams['schoolYearId'] = schoolYearId;
+    if (semester) queryParams['semester'] = semester;
+    this.router.navigate(['/grades/import'], { queryParams });
   }
 
   openBulkImportForSelectedClass(): void {

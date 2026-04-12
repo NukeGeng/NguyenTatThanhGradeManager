@@ -350,8 +350,32 @@
 - File đã tạo/sửa: backend/src/scripts/seedLargeScaleData.js, backend/src/scripts/checkSeedSummary.js, backend/src/scripts/checkRoadmapSmoke.js, backend/package.json, ai-engine/data/generate_data.py, ai-engine/train.py, ai-engine/main.py, ai-engine/risk_logic.py, ai-engine/data/predict_input_template.json, BUGS.md, DONE.md
 - Ghi chú: Hoàn thiện CTĐT KTPM 140 tín với 56 học phần phủ đủ 12 học kỳ (1-1 đến 4-3), seed và backfill đạt tổng 10,000 sinh viên + 10,000 StudentCurriculum; tạo dataset train từ DB thật đạt 20,898 mẫu và retrain model mới (27 features); hiệu chỉnh confidence/risk để nhóm yếu/trung bình không còn confidence ảo cao và roadmap đã sinh kế hoạch học tập thành công cho sinh viên có dữ liệu CTĐT.
 
+## [DONE-053] Tinh chỉnh Advisor UI + xử lý lỗi lưu điểm theo lớp học phần
+
+- Ngày: 11/04/2026
+- File đã tạo/sửa: frontend/src/app/features/advisor/advisor-student-detail.component.ts, backend/src/routes/grades.js, frontend/src/app/shared/models/interfaces.ts, DONE.md, BUGS.md
+- Ghi chú: Chuẩn hóa layout `panel-head` ở tab Tổng quan (title + dropdown thẳng hàng), css lại block dropdown của tab Lộ trình AI theo kiểu hàng bảng và đảm bảo các nhóm hiển thị theo từng dòng; đồng thời fix backend lưu điểm để chấp nhận sinh viên thuộc lớp học phần qua cả nguồn `Student.classId` và `StudentCurriculum.registrations.classId`.
+
+## [DONE-054] Mẫu import lấy đủ sinh viên lớp + đổi tên dữ liệu sinh viên thật
+
+- Ngày: 12/04/2026
+- File đã tạo/sửa: backend/src/services/importService.js, backend/src/scripts/seedLargeScaleData.js, backend/src/scripts/renameSyntheticStudentNames.js, backend/package.json, DONE.md, BUGS.md
+- Ghi chú: Nâng cấp template import Excel để tự đổ toàn bộ sinh viên của lớp học phần (gộp cả lớp trực tiếp và đăng ký curriculum), đồng bộ validate import theo cùng logic; cập nhật seed lớn sinh tên người thật thay cho mẫu `Sinh vien ######`; bổ sung script `npm run students:rename-real` và đã chạy thành công đổi tên 2,880 sinh viên, còn 0 bản ghi tên synthetic.
+
+## [DONE-055] Redesign trang Login — logo NTTU, split layout, animations
+
+- Ngày: 12/04/2026
+- File đã tạo/sửa: frontend/src/app/features/auth/login/login.component.html, frontend/src/app/features/auth/login/login.component.scss
+- Ghi chú: Thay toàn bộ lucide-icon bằng `<img src="assets/images/LogoNTTU.svg">` ở cả brand panel và form card; logo brand panel 200px màu gốc SVG; brand panel dùng gradient navy (`#0c1e3f → #14336a → #1a4080`), logo xếp dọc trên h2 "Grade Manager"; form card xóa logo, chỉ giữ h1 "Đăng nhập" + mô tả nhỏ căn trái; icon mail chuyển sang `mat-icon-button matSuffix` để đều kích thước với icon con mắt; dùng `::ng-deep` fix padding prefix/suffix MDC; thêm animation `fadeInLeft` (trái) + `slideInRight` (form card); error message thêm background đỏ nhạt; responsive ẩn brand panel dưới 900px.
+
+## [DONE-056] Dashboard — biểu đồ cột fill chiều cao card
+
+- Ngày: 12/04/2026
+- File đã tạo/sửa: frontend/src/app/features/dashboard/dashboard.component.scss
+- Ghi chú: Card biểu đồ cột dùng flex column, `.content-card__body` dùng `flex: 1`, `.chart-wrap` dùng `flex: 1` + `min-height: 220px` thay vì `height: 280px` cứng → Chart.js (`maintainAspectRatio: false`) tự co giãn lấp đầy card, không còn khoảng trống phía dưới.
+
 ```
-## [DONE-001]
+## [DONE-XXX]
 - Ngày:
 - File:
 - Ghi chú:

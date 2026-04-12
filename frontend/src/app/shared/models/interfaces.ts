@@ -355,8 +355,11 @@ export interface Prediction {
   riskLevel: PredictionRiskLevel;
   atRiskSubjects?: PredictionAtRiskSubject[];
   weakSubjects: string[];
+  improveSubjects?: string[];
   suggestions: string[];
   analysis: string;
+  dataCoverage?: number;
+  isLowData?: boolean;
   isRead?: boolean;
   createdAt?: string;
 }

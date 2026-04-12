@@ -10,8 +10,10 @@ import {
   inject,
 } from '@angular/core';
 import { FormsModule } from '@angular/forms';
+import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { Chart, ChartConfiguration, registerables } from 'chart.js';
@@ -91,13 +93,22 @@ interface DashboardStudentOption {
   classId: string;
 }
 
+interface AlertsPagePayload {
+  items: Prediction[];
+  total: number;
+  page: number;
+  limit: number;
+}
+
 @Component({
   selector: 'app-dashboard',
   imports: [
     CommonModule,
     FormsModule,
+    MatButtonModule,
     MatCardModule,
     MatFormFieldModule,
+    MatPaginatorModule,
     MatProgressSpinnerModule,
     MatSelectModule,
     LucideAngularModule,
@@ -143,6 +154,9 @@ export class DashboardComponent implements OnInit, OnDestroy {
   };
 
   alertRows: AlertRow[] = [];
+  alertPage = 1;
+  alertPageSize = 20;
+  alertTotal = 0;
 
   selectedDepartmentId = 'all';
   selectedSemester: 'all' | '1' | '2' | '3' = 'all';
@@ -236,11 +250,19 @@ export class DashboardComponent implements OnInit, OnDestroy {
       );
 
     const alertsRequest = this.apiService
-      .get<ApiResponse<Prediction[]>>('/predictions/alerts')
+      .get<ApiResponse<AlertsPagePayload>>('/predictions/alerts', {
+        page: this.alertPage,
+        limit: this.alertPageSize,
+      })
       .pipe(
         timeout(this.requestTimeoutMs),
-        map((response) => response.data ?? []),
-        catchError(() => of([] as Prediction[])),
+        map(
+          (response) =>
+            response.data ?? { items: [], total: 0, page: 1, limit: this.alertPageSize },
+        ),
+        catchError(() =>
+          of({ items: [] as Prediction[], total: 0, page: 1, limit: this.alertPageSize }),
+        ),
       );
 
     forkJoin({
@@ -261,7 +283,8 @@ export class DashboardComponent implements OnInit, OnDestroy {
       .subscribe({
         next: ({ summary, alerts }) => {
           try {
-            this.applyDashboardData(summary, alerts);
+            this.applyDashboardData(summary, alerts.items ?? []);
+            this.alertTotal = Number(alerts.total || 0);
             this.syncView();
           } catch (error: unknown) {
             this.errorMessage = this.resolveErrorMessage(error);
@@ -310,7 +333,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.stats = {
       totalStudents: Number(summary.totalStudents || 0),
       totalClasses: Number(summary.totalClasses || 0),
-      totalAlerts: this.alertRows.length,
+      totalAlerts: this.alertTotal,
       excellentRate:
         totalGraded > 0 ? Number(((this.gradeCounts.A / totalGraded) * 100).toFixed(1)) : 0,
     };
@@ -335,21 +358,40 @@ export class DashboardComponent implements OnInit, OnDestroy {
   onDepartmentChange(): void {
     this.selectedClassId = 'all';
     this.selectedStudentId = 'all';
+    this.alertPage = 1;
     this.loadDashboardData();
   }
 
   onSemesterChange(): void {
     this.selectedClassId = 'all';
     this.selectedStudentId = 'all';
+    this.alertPage = 1;
     this.loadDashboardData();
   }
 
   onClassChange(): void {
     this.selectedStudentId = 'all';
+    this.alertPage = 1;
     this.loadDashboardData();
   }
 
   onStudentChange(): void {
+    this.alertPage = 1;
+    this.loadDashboardData();
+  }
+
+  onAlertPageChange(event: PageEvent): void {
+    const nextPage = Number(event.pageIndex) + 1;
+    const nextSize = Number(event.pageSize);
+    const pageChanged = nextPage !== this.alertPage;
+    const sizeChanged = nextSize !== this.alertPageSize;
+
+    if (!pageChanged && !sizeChanged) {
+      return;
+    }
+
+    this.alertPage = nextPage;
+    this.alertPageSize = nextSize;
     this.loadDashboardData();
   }
 
@@ -457,7 +499,7 @@ export class DashboardComponent implements OnInit, OnDestroy {
             beginAtZero: true,
             ticks: {
               precision: 0,
-              stepSize: 1,
+              maxTicksLimit: 8,
               font: {
                 family: 'Inter, sans-serif',
                 size: 12,

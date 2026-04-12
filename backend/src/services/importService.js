@@ -1,6 +1,7 @@
 const XLSX = require("xlsx");
 const Class = require("../models/Class");
 const Student = require("../models/Student");
+const StudentCurriculum = require("../models/StudentCurriculum");
 const Grade = require("../models/Grade");
 
 const DEFAULT_TX_COUNT = 3;
@@ -140,6 +141,40 @@ const normalizeClassConfig = (classData) => {
   };
 };
 
+const getEnrolledStudentsByClassId = async (classId, studentCodes = []) => {
+  const [directStudentIds, registeredStudentIds] = await Promise.all([
+    Student.distinct("_id", { classId }),
+    StudentCurriculum.distinct("studentId", {
+      "registrations.classId": classId,
+    }),
+  ]);
+
+  const studentIds = Array.from(
+    new Set(
+      [...directStudentIds, ...registeredStudentIds]
+        .filter(Boolean)
+        .map((item) => String(item)),
+    ),
+  );
+
+  if (!studentIds.length) {
+    return [];
+  }
+
+  const query = {
+    _id: { $in: studentIds },
+  };
+
+  if (Array.isArray(studentCodes) && studentCodes.length) {
+    query.studentCode = { $in: studentCodes };
+  }
+
+  return Student.find(query)
+    .select("_id studentCode fullName classId")
+    .sort({ fullName: 1 })
+    .lean();
+};
+
 const parseExcelFile = (buffer) => {
   const workbook = XLSX.read(buffer, { type: "buffer" });
   const firstSheetName = workbook.SheetNames[0];
@@ -258,10 +293,7 @@ const validateRows = async (rows, classData, semester, schoolYearId) => {
     .map((row) => String(row.studentCode || "").trim())
     .filter(Boolean);
 
-  const students = await Student.find({
-    classId,
-    studentCode: { $in: studentCodes },
-  }).select("_id studentCode fullName classId");
+  const students = await getEnrolledStudentsByClassId(classId, studentCodes);
 
   const studentMap = new Map(
     students.map((student) => [student.studentCode, student]),
@@ -456,31 +488,30 @@ const generateTemplateWorkbook = (templateOptions = {}) => {
     "Vắng thi",
   ];
 
-  const buildSampleRow = (studentCode, studentName, baseScore) => {
-    const txPart = Array.from({ length: txCount }, (_, index) =>
-      Number((baseScore + index * 0.1).toFixed(1)),
-    );
-    const thPart = Array.from({ length: thCount }, (_, index) =>
-      Number((baseScore + 0.2 + index * 0.1).toFixed(1)),
-    );
+  const enrolledStudents = Array.isArray(templateOptions.students)
+    ? templateOptions.students
+    : [];
 
-    return [
-      studentCode,
-      studentName,
-      ...txPart,
-      Number((baseScore + 0.3).toFixed(1)),
-      ...thPart,
-      Number((baseScore + 0.4).toFixed(1)),
-      1,
-      0,
-    ];
-  };
-
-  const sampleRows = [
-    buildSampleRow("HS0001", "Nguyễn Văn A", 7.2),
-    buildSampleRow("HS0002", "Trần Thị B", 8.0),
-    buildSampleRow("HS0003", "Lê Văn C", 6.4),
+  const makeBlankScoreRow = (studentCode, studentName) => [
+    studentCode,
+    studentName,
+    ...Array.from({ length: txCount }, () => ""),
+    "",
+    ...Array.from({ length: thCount }, () => ""),
+    "",
+    1,
+    0,
   ];
+
+  const sampleRows = enrolledStudents.length
+    ? enrolledStudents.map((student) =>
+        makeBlankScoreRow(student.studentCode || "", student.fullName || ""),
+      )
+    : [
+        makeBlankScoreRow("HS0001", "Nguyen Van A"),
+        makeBlankScoreRow("HS0002", "Tran Thi B"),
+        makeBlankScoreRow("HS0003", "Le Van C"),
+      ];
 
   const templateSheet = XLSX.utils.aoa_to_sheet([headers, ...sampleRows]);
   XLSX.utils.book_append_sheet(workbook, templateSheet, "Template");
@@ -493,6 +524,11 @@ const generateTemplateWorkbook = (templateOptions = {}) => {
             templateOptions.className ? ` - ${templateOptions.className}` : ""
           }`
         : "Lớp học phần: theo lựa chọn trên màn import",
+    ],
+    [
+      templateOptions.classCode
+        ? `So sinh vien trong mau: ${Number(templateOptions.studentCount || 0)}`
+        : "Mau chung: chua gan danh sach sinh vien",
     ],
     ["- Điểm hợp lệ: 0 đến 10"],
     ["- TX/GK/TH/TKT để trống nếu chưa có điểm"],
@@ -522,6 +558,8 @@ const getTemplateOptionsByClassId = async (classId) => {
   }
 
   const classConfig = normalizeClassConfig(classData);
+  const students = await getEnrolledStudentsByClassId(classData._id);
+
   return {
     classCode: classData.code,
     className: classData.name || classData.code,
@@ -529,6 +567,12 @@ const getTemplateOptionsByClassId = async (classId) => {
     txCount: classConfig.txCount,
     thCount: classConfig.thCount,
     hasTh: classConfig.hasTh,
+    students: students.map((student) => ({
+      _id: String(student._id),
+      studentCode: String(student.studentCode || ""),
+      fullName: String(student.fullName || ""),
+    })),
+    studentCount: students.length,
   };
 };
 

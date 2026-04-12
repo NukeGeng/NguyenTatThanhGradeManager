@@ -131,6 +131,17 @@ import {
                 </div>
               </div>
 
+              @if (prediction.isLowData) {
+                <div class="low-data-notice">
+                  <lucide-icon name="triangle-alert" [size]="14"></lucide-icon>
+                  <span
+                    >Dữ liệu môn học còn ít (phạm vi:
+                    {{ formatCoverage(prediction.dataCoverage) }}). Độ tin cậy sẽ tăng khi nhập đủ
+                    điểm các môn trong học kỳ.</span
+                  >
+                </div>
+              }
+
               <div class="result-row">
                 <span class="label">Mức rủi ro</span>
                 <span class="badge" [ngClass]="riskClass(prediction.riskLevel)">
@@ -297,6 +308,19 @@ import {
 
       .result-row:last-child {
         border-bottom: none;
+      }
+
+      .low-data-notice {
+        display: flex;
+        align-items: flex-start;
+        gap: 0.4rem;
+        padding: 0.45rem 0.65rem;
+        background: #fffbeb;
+        border: 1px solid #fde68a;
+        border-radius: 4px;
+        color: #92400e;
+        font-size: 0.8rem;
+        margin-top: 0.25rem;
       }
 
       .label {
@@ -586,6 +610,11 @@ export class PredictionReportComponent implements OnInit {
     }
 
     return Math.max(0, Math.min(100, confidence));
+  }
+
+  formatCoverage(value?: number): string {
+    if (value == null || Number.isNaN(value)) return '-';
+    return `${Math.round(value * 100)}%`;
   }
 
   getStudentName(value: Grade['studentId']): string {

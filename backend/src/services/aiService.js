@@ -101,6 +101,17 @@ const buildPredictRequest = (gradeData) => {
     gradeData?.previousSemesterScore ??
     representativeCurrentScore;
 
+  // finalScore: diem tong ket da tinh he so (neu co), fallback ve trung binh scores
+  const finalScoreRaw = gradeData?.finalScore ?? meanScoreFromMap(scores);
+  const finalScore = clampScore(finalScoreRaw, representativeCurrentScore);
+
+  // gpa4 tu grade doc (neu co), fallback quy doi tu finalScore
+  const gpa4Raw = gradeData?.gpa4 ?? null;
+  const gpa4 =
+    gpa4Raw !== null
+      ? Math.min(Number(Number(gpa4Raw).toFixed(2)), 4)
+      : Number(Math.min((finalScore / 10) * 4, 4).toFixed(2));
+
   return {
     scores,
     diem_hk_truoc: clampScore(previousSemesterScore, 5),
@@ -108,6 +119,8 @@ const buildPredictRequest = (gradeData) => {
       gradeData?.so_buoi_vang ?? gradeData?.attendanceAbsent,
     ),
     hanh_kiem: mapConductScore(gradeData?.conductScore ?? gradeData?.hanhKiem),
+    finalScore,
+    gpa4,
   };
 };
 
@@ -308,25 +321,25 @@ const parseAiError = (error) => {
   }
 
   if (!serverMessage && errorCode === "ECONNREFUSED") {
-    serverMessage = "AI Engine chua chay hoac khong lang nghe cong 5000";
+    serverMessage = "AI Engine chưa chạy hoặc không lắng nghe cổng 5000";
   }
 
   if (!serverMessage && errorCode === "ECONNABORTED") {
-    serverMessage = "AI Engine phan hoi qua cham (timeout 10s)";
+    serverMessage = "AI Engine phản hồi quá chậm (timeout 10s)";
   }
 
   if (!serverMessage && statusCode === 422) {
-    serverMessage = "Du lieu gui sang AI Engine khong hop le";
+    serverMessage = "Dữ liệu gửi sang AI Engine không hợp lệ";
   }
 
   if (!serverMessage && statusCode >= 500) {
-    serverMessage = "AI Engine gap loi noi bo";
+    serverMessage = "AI Engine gặp lỗi nội bộ";
   }
 
   const fallbackMessage =
     typeof error?.message === "string" && error.message.trim()
       ? error.message
-      : "Loi khong xac dinh tu AI Engine";
+      : "Lỗi không xác định từ AI Engine";
 
   return serverMessage || fallbackMessage;
 };
@@ -341,12 +354,12 @@ const postToAiEngine = async (path, payload) => {
     });
 
     if (!response?.data) {
-      throw new Error("AI Engine tra ve du lieu rong");
+      throw new Error("AI Engine trả về dữ liệu rỗng");
     }
 
     return response.data;
   } catch (error) {
-    throw new Error(`Khong the goi AI Engine: ${parseAiError(error)}`);
+    throw new Error(`Không thể gọi AI Engine: ${parseAiError(error)}`);
   }
 };
 
@@ -376,7 +389,9 @@ const predictStudent = async (gradeData) => {
     throw new Error("Thiếu dữ liệu grade để dự đoán");
   }
 
-  if (!gradeData.subjectId?.code) {
+  const hasScores =
+    gradeData.scores && Object.keys(gradeData.scores).length > 0;
+  if (!gradeData.subjectId?.code && !hasScores) {
     throw new Error("Thiếu subject code trong dữ liệu grade");
   }
 
@@ -405,7 +420,7 @@ const getGpaRoadmap = async (studentId, targetGpa = 3.2) => {
       requiredGpaRemaining: 0,
       subjectPlans: [],
       summary:
-        "Sinh vien chua duoc gan chuong trinh khung. Vui long gan CTDT de tao lo trinh GPA.",
+        "Sinh viên chưa được gắn chương trình khung. Vui lòng gắn CTĐT để tạo lộ trình GPA.",
       semesterBreakdown: [],
     };
 
@@ -436,7 +451,7 @@ const getRetakeRoadmap = async (studentId) => {
       urgentRetakes: [],
       recommendedRetakes: [],
       retakePlan: [],
-      note: "Sinh vien chua duoc gan chuong trinh khung nen chua the tao lo trinh hoc lai.",
+      note: "Sinh viên chưa được gắn chương trình khung nên chưa thể tạo lộ trình học lại.",
     };
   }
 
@@ -469,8 +484,8 @@ const getSemesterPlan = async (
       predictedSemesterGpa: 0,
       requiredAverage: Number(targetGpa || 3.2),
       subjectTargets: [],
-      warnings: ["Sinh vien chua duoc gan chuong trinh khung."],
-      summary: "Can gan CTDT truoc khi lap ke hoach hoc ky.",
+      warnings: ["Sinh viên chưa được gắn chương trình khung."],
+      summary: "Cần gắn CTĐT trước khi lập kế hoạch học kỳ.",
     };
   }
 

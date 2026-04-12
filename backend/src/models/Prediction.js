@@ -11,7 +11,8 @@ const predictionSchema = new mongoose.Schema(
     gradeId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "Grade",
-      required: [true, "gradeId is required"],
+      required: false,
+      default: null,
       index: true,
     },
     predictedRank: {
@@ -35,6 +36,10 @@ const predictionSchema = new mongoose.Schema(
       type: [String],
       default: [],
     },
+    improveSubjects: {
+      type: [String],
+      default: [],
+    },
     suggestions: {
       type: [String],
       default: [],
@@ -43,6 +48,16 @@ const predictionSchema = new mongoose.Schema(
       type: String,
       default: "",
       trim: true,
+    },
+    dataCoverage: {
+      type: Number,
+      default: null,
+      min: 0,
+      max: 1,
+    },
+    isLowData: {
+      type: Boolean,
+      default: false,
     },
   },
   {

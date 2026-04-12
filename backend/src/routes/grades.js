@@ -6,6 +6,7 @@ const auth = require("../middleware/auth");
 const Grade = require("../models/Grade");
 const Student = require("../models/Student");
 const Class = require("../models/Class");
+const StudentCurriculum = require("../models/StudentCurriculum");
 const SchoolYear = require("../models/SchoolYear");
 const Department = require("../models/Department");
 const {
@@ -402,10 +403,27 @@ router.post("/", async (req, res, next) => {
       });
     }
 
-    if (String(student.classId) !== String(classData._id)) {
+    const isDirectMember =
+      String(resolveRefId(student.classId)) === String(classData._id);
+
+    let isRegisteredMember = false;
+    if (!isDirectMember) {
+      isRegisteredMember = Boolean(
+        await StudentCurriculum.exists({
+          studentId: student._id,
+          registrations: {
+            $elemMatch: {
+              classId: classData._id,
+            },
+          },
+        }),
+      );
+    }
+
+    if (!isDirectMember && !isRegisteredMember) {
       return res.status(400).json({
         success: false,
-        message: "Học sinh không thuộc lớp đã chọn",
+        message: "Sinh viên chưa đăng ký lớp học phần đã chọn",
       });
     }
 
@@ -633,43 +651,78 @@ router.get("/summary/dashboard", async (req, res, next) => {
       metricClassIds = [normalizedClassId];
     }
 
-    const studentScopeQuery = {
-      classId: { $in: metricClassIds },
-    };
+    // Build ObjectIds for both class-scope queries and curriculum lookup
+    const metricClassObjectIds = metricClassIds
+      .map((id) =>
+        mongoose.Types.ObjectId.isValid(id)
+          ? new mongoose.Types.ObjectId(id)
+          : null,
+      )
+      .filter(Boolean);
 
-    if (activeOnly) {
-      studentScopeQuery.status = "active";
-    }
-
+    // Validate normalizedStudentId against expanded scope:
+    // student must belong via direct classId OR via curriculum registration
     if (normalizedStudentId) {
-      const scopedStudent = await Student.findOne({
-        _id: normalizedStudentId,
-        classId: { $in: metricClassIds },
-        ...(activeOnly ? { status: "active" } : {}),
-      })
-        .select("_id")
-        .lean();
+      const [studentInDirectClass, studentInCurriculum] = await Promise.all([
+        Student.findOne({
+          _id: normalizedStudentId,
+          classId: { $in: metricClassIds },
+          ...(activeOnly ? { status: "active" } : {}),
+        })
+          .select("_id")
+          .lean(),
+        metricClassObjectIds.length
+          ? StudentCurriculum.findOne({
+              studentId: normalizedStudentId,
+              "registrations.classId": { $in: metricClassObjectIds },
+            })
+              .select("studentId")
+              .lean()
+          : Promise.resolve(null),
+      ]);
 
-      if (!scopedStudent) {
+      if (!studentInDirectClass && !studentInCurriculum) {
         return res.status(400).json({
           success: false,
           message:
             "Sinh viên không thuộc phạm vi lọc hiện tại hoặc bạn không có quyền truy cập",
         });
       }
-
-      studentScopeQuery._id = normalizedStudentId;
     }
 
-    const studentOptionRows = metricClassIds.length
-      ? await Student.find({
-          classId: { $in: metricClassIds },
-          ...(activeOnly ? { status: "active" } : {}),
-        })
-          .select("_id studentCode fullName classId")
-          .sort({ fullName: 1 })
-          .lean()
-      : [];
+    // Find students via both paths: direct Student.classId AND StudentCurriculum registrations
+    // This ensures semester 2/3 classes (học phần) count students registered via curriculum
+    const [directClassStudentIds, curriculumStudentIds] = await Promise.all([
+      metricClassIds.length
+        ? Student.distinct("_id", { classId: { $in: metricClassIds } })
+        : Promise.resolve([]),
+      metricClassObjectIds.length
+        ? StudentCurriculum.distinct("studentId", {
+            "registrations.classId": { $in: metricClassObjectIds },
+          })
+        : Promise.resolve([]),
+    ]);
+
+    const unionStudentIdStrings = [
+      ...new Set([
+        ...directClassStudentIds.map(String),
+        ...curriculumStudentIds.map(String),
+      ]),
+    ];
+
+    // Only populate students dropdown when a specific class is selected,
+    // to avoid returning thousands of students in the response payload.
+    const studentOptionRows =
+      normalizedClassId && unionStudentIdStrings.length
+        ? await Student.find({
+            _id: { $in: unionStudentIdStrings },
+            ...(activeOnly ? { status: "active" } : {}),
+          })
+            .select("_id studentCode fullName classId")
+            .sort({ fullName: 1 })
+            .limit(200)
+            .lean()
+        : [];
 
     const zeroDataPayload = {
       success: true,
@@ -707,20 +760,28 @@ router.get("/summary/dashboard", async (req, res, next) => {
       return res.status(200).json(zeroDataPayload);
     }
 
-    const scopedStudentIds = await Student.distinct("_id", studentScopeQuery);
+    // Compute scoped student IDs for metrics (counts + grade aggregation).
+    // studentOptionRows is intentionally empty when no class filter is set (payload size),
+    // so total-student count must be derived directly from unionStudentIdStrings instead.
+    const rawScopedIds =
+      activeOnly && unionStudentIdStrings.length
+        ? await Student.distinct("_id", {
+            _id: { $in: unionStudentIdStrings },
+            status: "active",
+          })
+        : unionStudentIdStrings;
+
+    const scopedStudentIds = normalizedStudentId
+      ? rawScopedIds.filter((id) => String(id) === normalizedStudentId)
+      : rawScopedIds;
+
     const totalStudents = scopedStudentIds.length;
 
     if (!scopedStudentIds.length) {
       return res.status(200).json(zeroDataPayload);
     }
 
-    const metricClassObjectIds = metricClassIds
-      .map((id) =>
-        mongoose.Types.ObjectId.isValid(id)
-          ? new mongoose.Types.ObjectId(id)
-          : null,
-      )
-      .filter(Boolean);
+    // metricClassObjectIds already built above
 
     const scopedStudentObjectIds = scopedStudentIds
       .map((id) =>

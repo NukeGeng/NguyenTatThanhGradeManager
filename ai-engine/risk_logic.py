@@ -1,120 +1,92 @@
 from __future__ import annotations
 
-import math
 import unicodedata
+
+
+GRADE_THRESHOLDS = [
+    ("Giỏi",       8.5),
+    ("Khá",        7.0),
+    ("Trung Bình", 5.0),
+    ("Yếu",        0.0),
+]
 
 
 def _normalize_rank(value: str) -> str:
     text = str(value or "").strip().lower()
     text = unicodedata.normalize("NFD", text)
-    text = "".join(char for char in text if unicodedata.category(char) != "Mn")
+    text = "".join(c for c in text if unicodedata.category(c) != "Mn")
     return text.replace("đ", "d")
 
 
-def infer_risk_level(
-    predicted_rank: str,
-    confidence: float,
-    so_buoi_vang: int,
-    weak_subject_count: int,
-) -> str:
-    rank = _normalize_rank(predicted_rank)
-    confidence_value = float(confidence or 0)
-    attendance = max(int(so_buoi_vang or 0), 0)
-    weak_count = max(int(weak_subject_count or 0), 0)
-
-    if rank == "yeu":
-        return "high"
-
-    if rank == "trung binh":
-        if confidence_value < 60 or attendance >= 8 or weak_count >= 2:
-            return "high"
-        return "medium"
-
-    if rank == "kha":
-        if confidence_value < 55 or attendance >= 10 or weak_count >= 3:
-            return "medium"
-        return "low"
-
-    if rank == "gioi":
-        if confidence_value < 55 or attendance >= 12 or weak_count >= 4:
-            return "medium"
-        return "low"
-
-    if confidence_value < 60:
-        return "high"
-    if confidence_value < 75:
-        return "medium"
-    return "low"
+def score_to_rank(final_score: float) -> str:
+    """Ground truth rank from actual score."""
+    if final_score >= 8.5:
+        return "Giỏi"
+    if final_score >= 7.0:
+        return "Khá"
+    if final_score >= 5.0:
+        return "Trung Bình"
+    return "Yếu"
 
 
 def calibrate_confidence(
+    final_score: float,
     predicted_rank: str,
-    probabilities: list[float],
-    provided_subject_count: int,
-    total_subject_feature_count: int,
-    so_buoi_vang: int,
-    weak_subject_count: int,
+    **kwargs,
 ) -> float:
-    probs = [max(float(value), 0.0) for value in probabilities]
-    if not probs:
-        return 50.0
+    """
+    Confidence = khoảng cách từ điểm đến ngưỡng gần nhất.
+    Càng gần ngưỡng chuyển loại → càng không chắc.
 
-    total_prob = sum(probs)
-    if total_prob <= 0:
-        return 50.0
+    Điểm 7.0 (đúng ngưỡng Khá/TB) → 50%
+    Điểm 7.8 (giữa Khá)            → 68%
+    Điểm 9.0 (sâu trong Giỏi)      → 81.25%
+    Điểm 4.0 (sâu trong Yếu)       → 90%
+    """
+    distances = [abs(final_score - threshold) for _, threshold in GRADE_THRESHOLDS]
+    min_dist = min(distances)
+    # 0 cách ngưỡng = 50%, 2.0 điểm cách ngưỡng = 95%
+    confidence = 50.0 + (min(min_dist, 2.0) / 2.0) * 45.0
+    return round(min(confidence, 95.0), 2)
 
-    normalized = [value / total_prob for value in probs]
-    sorted_probs = sorted(normalized, reverse=True)
-    top1 = sorted_probs[0]
-    top2 = sorted_probs[1] if len(sorted_probs) > 1 else 0.0
 
-    margin = max(top1 - top2, 0.0)
-    margin_factor = 0.65 + 0.35 * min(margin / 0.45, 1.0)
+def infer_risk_level(
+    final_score: float,
+    gpa4: float,
+    so_buoi_vang: int,
+    **kwargs,
+) -> str:
+    """
+    Risk level dựa hoàn toàn vào CHỈ SỐ HỌC TẬP THỰC TẾ.
 
-    entropy = 0.0
-    for value in normalized:
-        if value > 0:
-            entropy += -(value * math.log(value))
+    LOW:    Giỏi (>= 8.5) VÀ vắng <= 5
+    MEDIUM: Khá  (>= 7.0) hoặc Giỏi nhưng vắng nhiều
+    HIGH:   Trung Bình / Yếu hoặc các trường hợp nguy hiểm
+    """
+    score = float(final_score or 0.0)
+    g4 = float(gpa4 or 0.0)
+    absent = int(so_buoi_vang or 0)
 
-    if len(normalized) > 1:
-        max_entropy = math.log(len(normalized))
-        entropy_ratio = min(max(entropy / max_entropy, 0.0), 1.0)
-    else:
-        entropy_ratio = 0.0
+    # Các trường hợp rủi ro cao rõ ràng
+    if score < 5.0 or g4 == 0.0 or absent > 15:
+        return "high"
+    if score < 6.0 and absent > 10:
+        return "high"
+    if score < 7.0 or g4 < 2.5 or absent > 8:
+        return "high"
 
-    entropy_factor = 1.0 - 0.28 * entropy_ratio
+    # Giỏi và vắng ít → low; còn lại (Khá hoặc Giỏi nhưng vắng vừa) → medium
+    if score >= 8.5 and absent <= 5:
+        return "low"
 
-    total_features = max(int(total_subject_feature_count or 0), 1)
-    provided = max(int(provided_subject_count or 0), 0)
-    coverage_ratio = min(provided / total_features, 1.0)
-    coverage_factor = 0.72 + 0.28 * coverage_ratio
-
-    calibrated = float(top1 * 100.0 * margin_factor * entropy_factor * coverage_factor)
-
-    attendance = max(int(so_buoi_vang or 0), 0)
-    weak_count = max(int(weak_subject_count or 0), 0)
-    if attendance >= 8:
-        calibrated *= 0.92
-    if weak_count >= 2:
-        calibrated *= 0.90
-
-    rank = _normalize_rank(predicted_rank)
-    if rank == "yeu":
-        calibrated = min(calibrated, 78.0)
-    elif rank == "trung binh":
-        calibrated = min(calibrated, 86.0)
-
-    return round(min(max(calibrated, 35.0), 99.0), 2)
+    return "medium"
 
 
 def has_risk_paradox(predicted_rank: str, risk_level: str) -> bool:
     rank = _normalize_rank(predicted_rank)
     risk = str(risk_level or "").strip().lower()
-
     if rank == "gioi" and risk == "high":
         return True
-
     if rank == "yeu" and risk == "low":
         return True
-
     return False

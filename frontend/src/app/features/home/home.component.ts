@@ -1,4 +1,4 @@
-import { Component, OnInit, inject } from '@angular/core';
+import { AfterViewInit, Component, OnDestroy, OnInit, inject } from '@angular/core';
 import { Router, RouterLink } from '@angular/router';
 import { AuthService } from '../../core/services/auth.service';
 import { LucideAngularModule } from 'lucide-angular';
@@ -10,12 +10,14 @@ import { LucideAngularModule } from 'lucide-angular';
   templateUrl: './home.component.html',
   styleUrl: './home.component.scss',
 })
-export class HomeComponent implements OnInit {
+export class HomeComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly stickyNavbarOffset = 86;
   private readonly scrollDurationMs = 520;
 
   private readonly router = inject(Router);
   private readonly authService = inject(AuthService);
+
+  private revealObserver?: IntersectionObserver;
 
   ngOnInit(): void {
     try {
@@ -23,9 +25,30 @@ export class HomeComponent implements OnInit {
         void this.router.navigate(['/dashboard']);
       }
     } catch (error) {
-      // Chặn lỗi runtime để homepage luôn render được.
       console.error('Không thể kiểm tra trạng thái đăng nhập', error);
     }
+  }
+
+  ngAfterViewInit(): void {
+    this.revealObserver = new IntersectionObserver(
+      (entries) => {
+        entries.forEach((entry) => {
+          if (entry.isIntersecting) {
+            entry.target.classList.add('is-visible');
+            this.revealObserver?.unobserve(entry.target);
+          }
+        });
+      },
+      { threshold: 0.1, rootMargin: '0px 0px -40px 0px' },
+    );
+
+    document.querySelectorAll('.reveal').forEach((el) => {
+      this.revealObserver?.observe(el);
+    });
+  }
+
+  ngOnDestroy(): void {
+    this.revealObserver?.disconnect();
   }
 
   scrollToSection(event: Event, sectionId: string): void {

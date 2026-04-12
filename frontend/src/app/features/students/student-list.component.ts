@@ -203,6 +203,16 @@ interface StudentListPayload {
 
                     <button
                       type="button"
+                      class="action-btn action-btn--predict"
+                      aria-label="Dự đoán học lực"
+                      title="Dự đoán AI"
+                      (click)="predictStudent(row)"
+                    >
+                      <lucide-icon name="brain-circuit" [size]="15"></lucide-icon>
+                    </button>
+
+                    <button
+                      type="button"
                       class="action-btn"
                       aria-label="Sửa học sinh"
                       title="Sửa"
@@ -357,7 +367,7 @@ interface StudentListPayload {
       }
 
       .full-table .mat-column-actions {
-        width: 156px;
+        width: 196px;
       }
 
       .actions-cell {
@@ -369,6 +379,14 @@ interface StudentListPayload {
         align-items: center;
         gap: 0.35rem;
         flex-wrap: nowrap;
+      }
+
+      .action-btn--predict {
+        color: var(--navy, #1e3a5f) !important;
+      }
+
+      .action-btn--predict:hover {
+        background: rgba(30, 58, 95, 0.08);
       }
 
       .status-chip {
@@ -562,6 +580,12 @@ export class StudentListComponent implements OnInit, OnDestroy {
 
   viewStudent(student: Student): void {
     this.router.navigate(['/students', student._id]);
+  }
+
+  predictStudent(student: Student): void {
+    this.router.navigate(['/students', student._id], {
+      fragment: 'predict',
+    });
   }
 
   deleteStudent(student: Student): void {

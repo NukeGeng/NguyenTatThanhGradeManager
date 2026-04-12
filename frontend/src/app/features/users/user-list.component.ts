@@ -568,15 +568,15 @@ export class UserListComponent implements OnInit {
     this.isLoading = true;
     this.errorMessage = '';
 
+    // Load users + departments first so the page (and create-dialog) is usable immediately.
+    // Students are only needed for the advisor-assignment section — load them independently
+    // to avoid blocking the page while fetching all 2911+ students.
     forkJoin({
       users: this.apiService
         .get<ApiResponse<User[]>>('/users')
         .pipe(map((response) => response.data ?? [])),
       departments: this.apiService
         .get<ApiResponse<Department[]>>('/departments')
-        .pipe(map((response) => response.data ?? [])),
-      students: this.apiService
-        .get<ApiResponse<Student[]>>('/students')
         .pipe(map((response) => response.data ?? [])),
     })
       .pipe(
@@ -586,15 +586,27 @@ export class UserListComponent implements OnInit {
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe({
-        next: ({ users, departments, students }) => {
+        next: ({ users, departments }) => {
           this.users = users.filter((item) => item.role === 'teacher' || item.role === 'advisor');
           this.departments = departments;
-          this.students = students;
           this.applyFilters();
         },
         error: (error: unknown) => {
           this.errorMessage = this.resolveErrorMessage(error);
           this.filteredUsers = [];
+        },
+      });
+
+    // Load students separately — non-blocking, only needed for advisor checkbox list.
+    this.apiService
+      .get<ApiResponse<Student[]>>('/students', { paged: 'false' })
+      .pipe(
+        map((response) => (Array.isArray(response.data) ? response.data : [])),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (students) => {
+          this.students = students;
         },
       });
   }

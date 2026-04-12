@@ -2,28 +2,47 @@ import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import { Component, DestroyRef, OnInit, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
+import { FormsModule } from '@angular/forms';
 import { ActivatedRoute, Router, RouterLink } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
-import { MatSnackBarModule } from '@angular/material/snack-bar';
+import { MatSelectModule } from '@angular/material/select';
+import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { LucideAngularModule } from 'lucide-angular';
 import { finalize, forkJoin, map } from 'rxjs';
 
 import { ApiService } from '../../core/services/api.service';
-import { ApiResponse, Grade, Prediction, Student } from '../../shared/models/interfaces';
+import {
+  ApiResponse,
+  Grade,
+  Prediction,
+  SchoolYear,
+  Student,
+} from '../../shared/models/interfaces';
 import { toTenDigitStudentCode } from '../../shared/utils/code-format.util';
+
+interface SemesterOption {
+  label: string;
+  key: string;
+  schoolYearId: string;
+  semester: number;
+}
 
 @Component({
   selector: 'app-student-detail',
   standalone: true,
   imports: [
     CommonModule,
+    FormsModule,
     RouterLink,
     MatButtonModule,
     MatCardModule,
+    MatFormFieldModule,
     MatProgressSpinnerModule,
+    MatSelectModule,
     MatSnackBarModule,
     MatTableModule,
     LucideAngularModule,
@@ -131,8 +150,82 @@ import { toTenDigitStudentCode } from '../../shared/utils/code-format.util';
             </div>
           </mat-card>
 
-          <mat-card class="content-card">
+          <mat-card class="content-card" id="predict-section">
             <h2 class="section-title">Timeline dự đoán AI</h2>
+
+            @if (semesterOptions.length > 0) {
+              <div class="predict-form">
+                <div class="predict-mode-tabs">
+                  <button
+                    type="button"
+                    class="mode-tab"
+                    [class.mode-tab--active]="predictMode === 'semester'"
+                    (click)="predictMode = 'semester'"
+                  >
+                    <lucide-icon name="book-open" [size]="13"></lucide-icon>
+                    1 học kỳ
+                  </button>
+                  <button
+                    type="button"
+                    class="mode-tab"
+                    [class.mode-tab--active]="predictMode === 'overall'"
+                    (click)="predictMode = 'overall'"
+                  >
+                    <lucide-icon name="layers" [size]="13"></lucide-icon>
+                    Toàn khóa
+                  </button>
+                </div>
+
+                @if (predictMode === 'semester') {
+                  <mat-form-field
+                    appearance="outline"
+                    class="semester-select"
+                    subscriptSizing="dynamic"
+                  >
+                    <mat-label>Chọn học kỳ để dự đoán</mat-label>
+                    <mat-select [(ngModel)]="selectedSemesterKey">
+                      @for (opt of semesterOptions; track opt.key) {
+                        <mat-option [value]="opt.key">{{ opt.label }}</mat-option>
+                      }
+                    </mat-select>
+                  </mat-form-field>
+
+                  <button
+                    mat-flat-button
+                    class="btn-predict"
+                    [disabled]="isPredicting || !selectedSemesterKey"
+                    (click)="runPrediction()"
+                  >
+                    @if (isPredicting) {
+                      <mat-spinner [diameter]="16"></mat-spinner>
+                    } @else {
+                      <lucide-icon name="brain-circuit" [size]="15"></lucide-icon>
+                    }
+                    Dự đoán học lực
+                  </button>
+                } @else {
+                  <p class="mode-desc">
+                    Tổng hợp <strong>toàn bộ điểm</strong> các kỳ đã học để cho kết quả chính xác
+                    nhất.
+                  </p>
+
+                  <button
+                    mat-flat-button
+                    class="btn-predict btn-predict--overall"
+                    [disabled]="isOverallPredicting"
+                    (click)="runOverallPrediction()"
+                  >
+                    @if (isOverallPredicting) {
+                      <mat-spinner [diameter]="16"></mat-spinner>
+                    } @else {
+                      <lucide-icon name="brain-circuit" [size]="15"></lucide-icon>
+                    }
+                    Dự đoán toàn khóa
+                  </button>
+                }
+              </div>
+            }
+
             @if (predictions.length === 0) {
               <div class="empty-state">
                 <lucide-icon name="info" [size]="18"></lucide-icon>
@@ -159,6 +252,20 @@ import { toTenDigitStudentCode } from '../../shared/utils/code-format.util';
                     </p>
 
                     <p>{{ item.analysis || 'Không có phân tích chi tiết.' }}</p>
+
+                    @if (item.weakSubjects.length) {
+                      <p class="subject-list subject-list--weak">
+                        <strong>Môn yếu (F):</strong>
+                        {{ item.weakSubjects.join(', ') }}
+                      </p>
+                    }
+
+                    @if (item.improveSubjects?.length) {
+                      <p class="subject-list subject-list--improve">
+                        <strong>Cần cải thiện (C):</strong>
+                        {{ item.improveSubjects!.join(', ') }}
+                      </p>
+                    }
                   </article>
                 }
               </div>
@@ -177,6 +284,7 @@ import { toTenDigitStudentCode } from '../../shared/utils/code-format.util';
 
       .content-card {
         padding: 1rem 1.1rem 1.1rem;
+        background: #ffffff !important;
       }
 
       .top-actions {
@@ -294,7 +402,21 @@ import { toTenDigitStudentCode } from '../../shared/utils/code-format.util';
 
       .timeline {
         display: grid;
-        gap: 0.75rem;
+        gap: 0.6rem;
+        max-height: 480px;
+        overflow-y: auto;
+        padding-right: 4px;
+      }
+      .timeline::-webkit-scrollbar {
+        width: 4px;
+      }
+      .timeline::-webkit-scrollbar-track {
+        background: var(--gray-100);
+        border-radius: 2px;
+      }
+      .timeline::-webkit-scrollbar-thumb {
+        background: var(--gray-300);
+        border-radius: 2px;
       }
 
       .timeline-item {
@@ -326,6 +448,98 @@ import { toTenDigitStudentCode } from '../../shared/utils/code-format.util';
         color: #16a34a;
       }
 
+      .subject-list {
+        margin: 0.25rem 0 0;
+        font-size: 0.85rem;
+      }
+
+      .subject-list--weak {
+        color: #dc2626;
+      }
+
+      .subject-list--improve {
+        color: #d97706;
+      }
+
+      .predict-form {
+        display: flex;
+        align-items: center;
+        gap: 0.6rem;
+        flex-wrap: wrap;
+        margin-bottom: 1rem;
+        padding: 0.75rem;
+        border: 1px solid var(--gray-200);
+        border-radius: var(--radius);
+        background: #ffffff;
+      }
+
+      .predict-mode-tabs {
+        display: flex;
+        border: 1px solid #c8d4e0;
+        border-radius: 6px;
+        overflow: hidden;
+        flex-shrink: 0;
+        height: 40px;
+      }
+
+      .mode-tab {
+        display: flex;
+        align-items: center;
+        gap: 0.3rem;
+        padding: 0 0.85rem;
+        font-size: 0.8rem;
+        font-weight: 600;
+        border: none;
+        background: #f0f4f8;
+        color: var(--text-sub);
+        cursor: pointer;
+        height: 100%;
+        transition:
+          background 0.15s,
+          color 0.15s;
+      }
+
+      .mode-tab + .mode-tab {
+        border-left: 1px solid #c8d4e0;
+      }
+
+      .mode-tab--active {
+        background: var(--navy, #1e3a5f);
+        color: #fff;
+      }
+
+      .mode-desc {
+        margin: 0;
+        font-size: 0.85rem;
+        color: var(--text-sub);
+        flex: 1;
+        min-width: 160px;
+      }
+
+      .semester-select {
+        flex: 1;
+        min-width: 180px;
+        max-width: 320px;
+        --mdc-outlined-text-field-container-height: 40px;
+        --mat-form-field-container-height: 40px;
+        --mat-form-field-container-vertical-padding: 8px;
+      }
+
+      .btn-predict {
+        background: var(--navy) !important;
+        color: #fff !important;
+        display: flex;
+        align-items: center;
+        gap: 0.4rem;
+        height: 40px;
+        white-space: nowrap;
+        flex-shrink: 0;
+      }
+
+      .btn-predict--overall {
+        background: #0d6e5f !important;
+      }
+
       @media (max-width: 1024px) {
         .grid-2 {
           grid-template-columns: 1fr;
@@ -343,19 +557,30 @@ export class StudentDetailComponent implements OnInit {
   private readonly route = inject(ActivatedRoute);
   private readonly router = inject(Router);
   private readonly destroyRef = inject(DestroyRef);
+  private readonly snackBar = inject(MatSnackBar);
 
   readonly gradeColumns = ['subject', 'semester', 'finalScore', 'letterGrade'];
 
   student: Student | null = null;
   grades: Grade[] = [];
   predictions: Prediction[] = [];
+  semesterOptions: SemesterOption[] = [];
+  selectedSemesterKey = '';
+  isPredicting = false;
+  isOverallPredicting = false;
+  predictMode: 'semester' | 'overall' = 'semester';
 
   isLoading = true;
   errorMessage = '';
 
   private studentId = '';
+  private scrollToPredictOnLoad = false;
 
   ngOnInit(): void {
+    this.route.fragment.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((frag) => {
+      if (frag === 'predict') this.scrollToPredictOnLoad = true;
+    });
+
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       this.studentId = params.get('id') ?? '';
       if (!this.studentId) {
@@ -394,6 +619,18 @@ export class StudentDetailComponent implements OnInit {
           this.student = student;
           this.grades = grades;
           this.predictions = predictions;
+          this.semesterOptions = this.computeSemesterOptions(grades);
+          if (this.semesterOptions.length > 0) {
+            this.selectedSemesterKey = this.semesterOptions[this.semesterOptions.length - 1].key;
+          }
+          if (this.scrollToPredictOnLoad) {
+            this.scrollToPredictOnLoad = false;
+            setTimeout(() => {
+              document
+                .getElementById('predict-section')
+                ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 100);
+          }
         },
         error: (error: unknown) => {
           this.errorMessage = this.resolveErrorMessage(error);
@@ -403,6 +640,95 @@ export class StudentDetailComponent implements OnInit {
 
   goBack(): void {
     this.router.navigate(['/students']);
+  }
+
+  computeSemesterOptions(grades: Grade[]): SemesterOption[] {
+    const seen = new Map<string, SemesterOption>();
+    for (const g of grades) {
+      const syId =
+        typeof g.schoolYearId === 'string' ? g.schoolYearId : (g.schoolYearId as SchoolYear)._id;
+      const syName =
+        typeof g.schoolYearId === 'string' ? g.schoolYearId : (g.schoolYearId as SchoolYear).name;
+      const key = `${syId}-${g.semester}`;
+      if (!seen.has(key)) {
+        seen.set(key, {
+          key,
+          label: `${syName} - HK${g.semester}`,
+          schoolYearId: syId,
+          semester: g.semester,
+        });
+      }
+    }
+    return Array.from(seen.values());
+  }
+
+  runPrediction(): void {
+    const opt = this.semesterOptions.find((o) => o.key === this.selectedSemesterKey);
+    if (!opt || !this.student || this.isPredicting) return;
+
+    this.isPredicting = true;
+    this.apiService
+      .post<ApiResponse<Prediction>, { studentId: string; schoolYearId: string; semester: number }>(
+        '/predictions/predict-student',
+        {
+          studentId: this.student._id,
+          schoolYearId: opt.schoolYearId,
+          semester: opt.semester,
+        },
+      )
+      .pipe(
+        finalize(() => {
+          this.isPredicting = false;
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (res) => {
+          if (res.data) {
+            this.predictions = [res.data, ...this.predictions];
+          }
+          this.snackBar.open('Dự đoán học lực thành công!', 'Xem chi tiết', { duration: 4000 });
+          this.router.navigate(['/predictions'], {
+            queryParams: { studentId: this.student!._id },
+          });
+        },
+        error: (err: unknown) => {
+          const message = this.resolveErrorMessage(err);
+          this.snackBar.open(`Lỗi dự đoán: ${message}`, 'Đóng', { duration: 5000 });
+        },
+      });
+  }
+
+  runOverallPrediction(): void {
+    if (!this.student || this.isOverallPredicting) return;
+
+    this.isOverallPredicting = true;
+    this.apiService
+      .post<ApiResponse<Prediction>, { studentId: string }>(
+        '/predictions/predict-student-overall',
+        { studentId: this.student._id },
+      )
+      .pipe(
+        finalize(() => {
+          this.isOverallPredicting = false;
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (res) => {
+          if (res.data) {
+            this.predictions = [res.data, ...this.predictions];
+          }
+          this.snackBar.open('Dự đoán toàn khóa thành công!', 'Xem chi tiết', { duration: 4000 });
+          this.router.navigate(['/predictions'], {
+            queryParams: { studentId: this.student!._id },
+          });
+        },
+        error: (err: unknown) => {
+          const message = this.resolveErrorMessage(err);
+          this.snackBar.open(`Lỗi dự đoán: ${message}`, 'Đóng', { duration: 5000 });
+        },
+      });
   }
 
   getClassName(value: Student['classId']): string {

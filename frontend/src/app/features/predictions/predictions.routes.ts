@@ -6,9 +6,4 @@ export const PREDICTIONS_ROUTES: Routes = [
     loadComponent: () =>
       import('./class-predictions.component').then((m) => m.ClassPredictionsComponent),
   },
-  {
-    path: 'report/:gradeId',
-    loadComponent: () =>
-      import('./prediction-report.component').then((m) => m.PredictionReportComponent),
-  },
 ];

@@ -1,69 +1,81 @@
+// ── Entrance animations ──────────────────────────────────────
+@keyframes fadeInLeft {
+  from { opacity: 0; transform: translateX(-32px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(48px); }
+  to   { opacity: 1; transform: translateX(0); }
+}
+
+// ── Page shell ───────────────────────────────────────────────
 .login-page {
   min-height: 100dvh;
-  background: linear-gradient(120deg, #f8fbff 0%, #ffffff 58%, #f1f7ff 100%);
+  background: #f0f4f8;
 }
 
 .login-layout {
   min-height: 100dvh;
   display: grid;
-  grid-template-columns: 40% 60%;
+  grid-template-columns: 42% 58%;
 }
 
+// ── Left brand panel ─────────────────────────────────────────
 .brand-panel {
-  background: #0f2144;
+  background: linear-gradient(160deg, #0c1e3f 0%, #14336a 60%, #1a4080 100%);
   color: #e2e8f0;
   display: flex;
   align-items: center;
   justify-content: center;
-  padding: clamp(1.5rem, 3vw, 2.8rem);
+  padding: clamp(2rem, 4vw, 3.5rem);
+  animation: fadeInLeft 0.65s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .brand-panel-content {
-  max-width: 460px;
+  max-width: 420px;
+  display: grid;
+  gap: 1.5rem;
 }
 
 .brand-header {
   display: flex;
-  align-items: center;
-  gap: 14px;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 0.6rem;
+}
+
+.brand-logo {
+  width: 200px;
+  height: auto;
+  object-fit: contain;
+  margin-bottom: 0.5rem;
 }
 
 .brand-name {
   margin: 0;
   font-size: 0.8rem;
   text-transform: uppercase;
-  letter-spacing: 0.12em;
+  letter-spacing: 0.08em;
   color: #93c5fd;
+  font-weight: 500;
 }
 
 .brand-header h2 {
-  margin: 2px 0 0;
-  font-size: clamp(1.4rem, 2.2vw, 2rem);
+  margin: 0;
+  font-size: clamp(1.6rem, 2.4vw, 2.1rem);
+  font-weight: 800;
   color: #ffffff;
-}
-
-.logo-circle {
-  width: 46px;
-  height: 46px;
-  border-radius: 999px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  background: rgba(255, 255, 255, 0.16);
-  border: 1px solid rgba(255, 255, 255, 0.25);
-}
-
-.logo-circle-light {
-  background: #e8f1ff;
-  color: #1f3b72;
-  border: 1px solid #cdddf8;
+  letter-spacing: -0.01em;
 }
 
 .tagline {
-  margin: 22px 0 20px;
+  margin: 0;
   font-size: 1rem;
   font-weight: 600;
-  color: #dbeafe;
+  color: #bfdbfe;
+  padding-top: 0.25rem;
+  border-top: 1px solid rgba(255,255,255,0.12);
 }
 
 .feature-list {
@@ -71,56 +83,86 @@
   padding: 0;
   list-style: none;
   display: grid;
-  gap: 14px;
-}
-
-.feature-list li {
-  display: grid;
-  grid-template-columns: auto 1fr;
-  align-items: start;
   gap: 10px;
-  padding: 10px 12px;
-  border-radius: 10px;
-  background: rgba(255, 255, 255, 0.08);
+
+  li {
+    display: grid;
+    grid-template-columns: auto 1fr;
+    align-items: start;
+    gap: 10px;
+    padding: 10px 14px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.07);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    font-size: 0.88rem;
+    line-height: 1.5;
+    color: #cbd5e1;
+
+    lucide-icon {
+      margin-top: 2px;
+      color: #60a5fa;
+    }
+  }
 }
 
+.brand-footer {
+  font-size: 0.75rem;
+  color: rgba(255,255,255,0.35);
+  padding-top: 0.5rem;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+
+// ── Right form panel ─────────────────────────────────────────
 .form-panel {
   display: flex;
   align-items: center;
   justify-content: center;
   padding: clamp(1.25rem, 4vw, 3rem);
+  background: #f0f4f8;
 }
 
 .login-card {
-  width: min(100%, 480px);
-  padding: clamp(1.1rem, 2vw, 1.8rem);
-  border-radius: 16px;
-  border: 1px solid #dbe7f8;
-  box-shadow: var(--shadow-md);
+  width: min(100%, 460px);
+  padding: clamp(1.5rem, 2.5vw, 2rem);
+  border-radius: 16px !important;
+  background: #ffffff !important;
+  border: 1px solid #dde6f0 !important;
+  box-shadow: 0 4px 24px rgba(10, 30, 70, 0.08), 0 1px 4px rgba(10, 30, 70, 0.05) !important;
+  animation: slideInRight 0.65s cubic-bezier(0.22, 1, 0.36, 1) both 0.1s;
 }
 
+// ── Form header ───────────────────────────────────────────────
 .form-header {
   display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
+  flex-direction: column;
+  align-items: flex-start;
+  text-align: left;
+  gap: 0.25rem;
+  margin-bottom: 1.5rem;
+  padding-bottom: 1.25rem;
+  border-bottom: 1px solid #eaf0f8;
 }
 
 .small-brand {
   margin: 0;
-  color: var(--text-sub);
-  font-size: 0.82rem;
+  color: #64748b;
+  font-size: 0.78rem;
+  font-weight: 500;
+  letter-spacing: 0.03em;
 }
 
 h1 {
-  margin: 4px 0 0;
-  font-size: 1.55rem;
-  color: var(--navy-dark);
+  margin: 0;
+  font-size: 1.65rem;
+  font-weight: 800;
+  color: #0c1e3f;
+  letter-spacing: -0.02em;
 }
 
+// ── Form fields ───────────────────────────────────────────────
 form {
   display: grid;
-  gap: 12px;
+  gap: 10px;
 }
 
 .full-width {
@@ -128,31 +170,69 @@ form {
 }
 
 .field-icon {
-  color: #3b4f78;
+  color: #4a6fa5;
+  display: flex;
+  align-items: center;
+}
+
+// Fix Angular Material MDC prefix/suffix icon vertical alignment
+::ng-deep .login-card {
+  .mat-mdc-form-field-text-prefix {
+    padding-left: 8px;
+    padding-right: 4px;
+    display: flex;
+    align-items: center;
+  }
+
+  .mat-mdc-form-field-text-suffix {
+    padding-right: 4px;
+    display: flex;
+    align-items: center;
+  }
+
+  .mat-mdc-text-field-wrapper {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
 }
 
 .remember-check {
-  color: var(--text-sub);
+  color: #64748b;
+  font-size: 0.9rem;
 }
 
 .error-message {
   margin: 0;
-  color: #b42318;
-  font-size: 0.88rem;
+  padding: 0.6rem 0.85rem;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  color: #b91c1c;
+  font-size: 0.85rem;
   font-weight: 500;
 }
 
+// ── Submit button ─────────────────────────────────────────────
 .submit-button {
   width: 100%;
-  min-height: 46px;
-  border-radius: 10px;
-  background: var(--navy-dark) !important;
+  min-height: 48px;
+  border-radius: 10px !important;
+  background: #0c1e3f !important;
   color: #ffffff !important;
   display: inline-flex !important;
   align-items: center !important;
   justify-content: center;
   gap: 8px;
-  font-weight: 600;
+  font-size: 0.97rem;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+  margin-top: 4px;
+  transition: background 0.2s, box-shadow 0.2s;
+
+  &:hover:not([disabled]) {
+    background: #14336a !important;
+    box-shadow: 0 4px 16px rgba(12, 30, 63, 0.28);
+  }
 }
 
 .button-loading {
@@ -162,23 +242,26 @@ form {
   gap: 10px;
 }
 
+// ── Register hint ─────────────────────────────────────────────
 .register-hint {
-  margin: 14px 0 0;
-  font-size: 0.92rem;
-  color: var(--text-sub);
+  margin: 1rem 0 0;
+  text-align: center;
+  font-size: 0.9rem;
+  color: #64748b;
+
+  a {
+    color: #1d4ed8;
+    font-weight: 700;
+    text-decoration: none;
+
+    &:hover {
+      text-decoration: underline;
+    }
+  }
 }
 
-.register-hint a {
-  color: var(--navy);
-  font-weight: 600;
-  text-decoration: none;
-}
-
-.register-hint a:hover {
-  text-decoration: underline;
-}
-
-@media (max-width: 992px) {
+// ── Responsive ────────────────────────────────────────────────
+@media (max-width: 900px) {
   .login-layout {
     grid-template-columns: 1fr;
   }
@@ -189,5 +272,6 @@ form {
 
   .form-panel {
     min-height: 100dvh;
+    background: #f0f4f8;
   }
 }

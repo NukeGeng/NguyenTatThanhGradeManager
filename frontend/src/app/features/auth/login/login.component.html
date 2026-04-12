@@ -3,51 +3,48 @@
     <aside class="brand-panel">
       <div class="brand-panel-content">
         <div class="brand-header">
-          <div class="logo-circle">
-            <lucide-icon name="graduation-cap" [size]="22"></lucide-icon>
-          </div>
-          <div>
-            <p class="brand-name">NTTU</p>
-            <h2>Grade Manager</h2>
-          </div>
+          <img src="assets/images/LogoNTTU.svg" alt="Logo NTTU" class="brand-logo" />
+          <h2>Grade Manager</h2>
+          <p class="brand-name">Khoa Công nghệ Thông tin &mdash; NTTU</p>
         </div>
 
-        <p class="tagline">Quản lý học tập thông minh</p>
+        <p class="tagline">Nền tảng quản lý học tập thông minh</p>
 
         <ul class="feature-list">
           <li>
-            <lucide-icon name="shield-check" [size]="18"></lucide-icon>
+            <lucide-icon name="shield-check" [size]="17"></lucide-icon>
             <span>Bảo mật tài khoản với xác thực JWT theo vai trò.</span>
           </li>
           <li>
-            <lucide-icon name="chart-column-increasing" [size]="18"></lucide-icon>
+            <lucide-icon name="chart-column-increasing" [size]="17"></lucide-icon>
             <span>Theo dõi điểm số và phân tích xu hướng học tập theo lớp.</span>
           </li>
           <li>
-            <lucide-icon name="bell-ring" [size]="18"></lucide-icon>
-            <span>Cảnh báo sớm học sinh rủi ro để giáo viên can thiệp kịp thời.</span>
+            <lucide-icon name="brain-circuit" [size]="17"></lucide-icon>
+            <span>AI Random Forest dự đoán học lực và cảnh báo rủi ro sớm.</span>
           </li>
         </ul>
+
+        <div class="brand-footer">
+          <span>Trường ĐH Nguyễn Tất Thành &mdash; 2026</span>
+        </div>
       </div>
     </aside>
 
     <section class="form-panel">
       <mat-card class="login-card" appearance="outlined">
         <div class="form-header">
-          <div class="logo-circle logo-circle-light">
-            <lucide-icon name="book-open-check" [size]="18"></lucide-icon>
-          </div>
-          <div>
-            <p class="small-brand">NTTU Grade Manager</p>
-            <h1>Đăng nhập</h1>
-          </div>
+          <h1>Đăng nhập</h1>
+          <p class="small-brand">Hệ thống Quản lý Điểm &mdash; NTTU</p>
         </div>
 
         <form [formGroup]="loginForm" (ngSubmit)="onSubmit()" novalidate>
           <mat-form-field appearance="outline" class="full-width">
             <mat-label>Email</mat-label>
-            <lucide-icon matPrefix name="mail" [size]="18" class="field-icon"></lucide-icon>
             <input matInput type="email" formControlName="email" placeholder="admin@nttu.edu.vn" />
+            <button mat-icon-button matSuffix type="button" tabindex="-1" aria-label="Email">
+              <lucide-icon name="mail" [size]="18" class="field-icon"></lucide-icon>
+            </button>
             <mat-error *ngIf="hasControlError('email', 'required')">Email là bắt buộc.</mat-error>
             <mat-error *ngIf="hasControlError('email', 'email')"
               >Email không đúng định dạng.</mat-error

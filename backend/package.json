@@ -7,7 +7,12 @@
     "start": "node src/index.js",
     "dev": "nodemon src/index.js",
     "seed": "node src/scripts/seedData.js",
-    "seed:large": "node src/scripts/seedLargeScaleData.js"
+    "seed:large": "node src/scripts/seedLargeScaleData.js",
+    "students:rename-real": "node src/scripts/renameSyntheticStudentNames.js",
+    "grades:prefill-all": "node src/scripts/prefillAllClassGrades.js",
+    "predict:batch-all": "node src/scripts/batchPredictAll.js",
+    "predict:batch-dry": "node src/scripts/batchPredictAll.js --dry-run",
+    "predict:batch-overall": "node src/scripts/batchPredictAll.js --overall-only"
   },
   "keywords": [
     "express",

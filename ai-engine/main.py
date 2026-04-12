@@ -14,6 +14,7 @@ from risk_logic import calibrate_confidence, infer_risk_level
 from schemas import (
     GpaRoadmapRequest,
     GpaRoadmapResponse,
+    PredictAllRequest,
     PredictRequest,
     PredictResponse,
     RetakeRoadmapRequest,
@@ -106,19 +107,17 @@ def _safe_label(predicted_id: Any) -> str:
 
 
 def _build_input_vector(request_data: PredictRequest) -> np.ndarray:
-    valid_scores = [
-        float(score)
-        for score in request_data.scores.values()
-        if score is not None
-    ]
-
-    if valid_scores:
-        fallback_subject_score = float(np.mean(valid_scores))
+    """
+    Uu tien dung finalScore neu co (chinh xac hon).
+    Fallback ve trung binh scores neu khong co finalScore.
+    """
+    if request_data.finalScore is not None:
+        fallback = float(request_data.finalScore)
     else:
-        fallback_subject_score = float(request_data.diem_hk_truoc)
+        valid = [float(s) for s in request_data.scores.values() if s is not None]
+        fallback = float(np.mean(valid)) if valid else float(request_data.diem_hk_truoc)
 
     values: list[float] = []
-
     for feature in feature_names:
         if feature == "diem_hk_truoc":
             values.append(float(request_data.diem_hk_truoc))
@@ -127,7 +126,7 @@ def _build_input_vector(request_data: PredictRequest) -> np.ndarray:
         elif feature == "hanh_kiem":
             values.append(float(request_data.hanh_kiem))
         else:
-            values.append(float(request_data.scores.get(feature, fallback_subject_score)))
+            values.append(float(request_data.scores.get(feature, fallback)))
 
     return np.array(values, dtype=np.float64).reshape(1, -1)
 
@@ -137,24 +136,24 @@ def _build_suggestions(weak_subjects: list[str], so_buoi_vang: int, risk_level: 
 
     if weak_subjects:
         suggestions.append(
-            "Can tap trung phu dao cac mon yeu: " + ", ".join(weak_subjects),
+            "Cần tập trung phụ đạo các môn yếu: " + ", ".join(weak_subjects),
         )
-        suggestions.append("De xuat lap ke hoach on tap theo tung mon moi ngay")
+        suggestions.append("Đề xuất lập kế hoạch ôn tập theo từng môn mỗi ngày")
     else:
-        suggestions.append("Nen duy tri nhip hoc on dinh va tiep tuc luyen de")
+        suggestions.append("Nên duy trì nhịp học ổn định và tiếp tục luyện đề")
 
     if so_buoi_vang >= 8:
-        suggestions.append("So buoi vang cao, can tang ty le chuyen can ngay")
+        suggestions.append("Số buổi vắng cao, cần tăng tỷ lệ chuyên cần ngay")
     elif so_buoi_vang >= 4:
-        suggestions.append("Can theo doi chuyen can de tranh anh huong ket qua")
+        suggestions.append("Cần theo dõi chuyên cần để tránh ảnh hưởng kết quả")
 
     if risk_level == "high":
-        suggestions.append("Can can thiep som voi GVCN va phu huynh")
+        suggestions.append("Cần can thiệp sớm với GVCN và phụ huynh")
     elif risk_level == "medium":
-        suggestions.append("Nen tang cuong bai tap va kiem tra dinh ky")
+        suggestions.append("Nên tăng cường bài tập và kiểm tra định kỳ")
 
     if not suggestions:
-        suggestions.append("Tiep tuc duy tri tien do hoc tap hien tai")
+        suggestions.append("Tiếp tục duy trì tiến độ học tập hiện tại")
 
     return suggestions[:5]
 
@@ -167,18 +166,18 @@ def _build_analysis(
     risk_level: str,
 ) -> str:
     sentence_1 = (
-        f"AI du doan hoc luc: {predicted_rank} voi do tin cay {confidence:.2f}%"
+        f"AI dự đoán học lực: {predicted_rank} với độ tin cậy {confidence:.2f}%"
     )
 
     if weak_subjects:
         sentence_2 = (
-            "Cac mon dang yeu gom " + ", ".join(weak_subjects) + ", can uu tien bo sung"
+            "Các môn đang yếu gồm " + ", ".join(weak_subjects) + ", cần ưu tiên bổ sung"
         )
     else:
-        sentence_2 = "Chua ghi nhan mon yeu ro rang trong bo diem dau vao"
+        sentence_2 = "Chưa ghi nhận môn yếu rõ ràng trong bộ điểm đầu vào"
 
     sentence_3 = (
-        f"So buoi vang hien tai la {so_buoi_vang}, muc rui ro tong the o nguong {risk_level}"
+        f"Số buổi vắng hiện tại là {so_buoi_vang}, mức rủi ro tổng thể ở ngưỡng {risk_level}"
     )
 
     return ". ".join([sentence_1, sentence_2, sentence_3]) + "."
@@ -192,40 +191,39 @@ def _predict_single(request_data: PredictRequest) -> PredictResponse:
         )
 
     input_vector = _build_input_vector(request_data)
-
     predicted_class = model.predict(input_vector)[0]
-    probabilities = model.predict_proba(input_vector)[0]
     predicted_rank = _safe_label(predicted_class)
 
+    # Dung finalScore neu co, fallback ve trung binh scores
+    if request_data.finalScore is not None:
+        final_score = float(request_data.finalScore)
+    else:
+        valid = [float(s) for s in request_data.scores.values() if s is not None]
+        final_score = float(np.mean(valid)) if valid else float(request_data.diem_hk_truoc)
+
+    gpa4_value = float(request_data.gpa4) if request_data.gpa4 is not None else 0.0
+
+    # Mon yeu: diem < 5.0 (tinh tren scores dict)
     weak_subjects = [
-        code
-        for code, score in request_data.scores.items()
+        code for code, score in request_data.scores.items()
         if float(score) < 5.0
     ]
 
-    subject_feature_count = len([name for name in feature_names if name not in SPECIAL_FEATURES])
-    provided_subject_count = len(
-        [
-            code
-            for code in request_data.scores.keys()
-            if code in feature_names and code not in SPECIAL_FEATURES
-        ],
-    )
+    # Mon can cai thien: diem 5.0 <= score < 6.5 (tuong duong C)
+    improve_subjects = [
+        code for code, score in request_data.scores.items()
+        if 5.0 <= float(score) < 6.5
+    ]
 
     confidence = calibrate_confidence(
+        final_score=final_score,
         predicted_rank=predicted_rank,
-        probabilities=list(probabilities),
-        provided_subject_count=provided_subject_count,
-        total_subject_feature_count=subject_feature_count,
-        so_buoi_vang=request_data.so_buoi_vang,
-        weak_subject_count=len(weak_subjects),
     )
 
     risk_level = infer_risk_level(
-        predicted_rank=predicted_rank,
-        confidence=confidence,
+        final_score=final_score,
+        gpa4=gpa4_value,
         so_buoi_vang=request_data.so_buoi_vang,
-        weak_subject_count=len(weak_subjects),
     )
 
     suggestions = _build_suggestions(
@@ -242,13 +240,20 @@ def _predict_single(request_data: PredictRequest) -> PredictResponse:
         risk_level=risk_level,
     )
 
+    subject_feature_count = len([n for n in feature_names if n not in SPECIAL_FEATURES])
+    matched = len([k for k in request_data.scores if k in feature_names and k not in SPECIAL_FEATURES])
+    data_coverage = round(min(matched / max(subject_feature_count, 1), 1.0), 2)
+
     return PredictResponse(
         predicted_rank=predicted_rank,
         confidence=round(confidence, 2),
         risk_level=risk_level,
         weak_subjects=weak_subjects,
+        improve_subjects=improve_subjects,
         suggestions=suggestions,
         analysis=analysis,
+        data_coverage=data_coverage,
+        is_low_data=len(request_data.scores) < 2,
     )
 
 
@@ -292,13 +297,13 @@ def _target_grade(required_remaining: float, priority: str) -> tuple[str, float]
 def _build_subject_reason(subject: SubjectResult, priority: str, target_grade: str) -> str:
     if priority == "critical":
         return (
-            f"Mon cot loi ({subject.credits} tin chi), can dat {target_grade} de keo GPA tich luy"
+            f"Môn cốt lõi ({subject.credits} tín chỉ), cần đạt {target_grade} để kéo GPA tích lũy"
         )
 
     if priority == "high":
-        return f"Mon quan trong, nen dat toi thieu {target_grade} de giu tien do GPA"
+        return f"Môn quan trọng, nên đạt tối thiểu {target_grade} để giữ tiến độ GPA"
 
-    return f"Mon bo tro, muc tieu {target_grade} la phu hop de can bang tai"
+    return f"Môn bổ trợ, mục tiêu {target_grade} là phù hợp để cân bằng tải"
 
 
 def _build_gpa_roadmap(request_data: GpaRoadmapRequest) -> GpaRoadmapResponse:
@@ -315,7 +320,7 @@ def _build_gpa_roadmap(request_data: GpaRoadmapRequest) -> GpaRoadmapResponse:
             isAchievable=request_data.currentGpaAccumulated >= request_data.targetGpa,
             requiredGpaRemaining=0,
             subjectPlans=[],
-            summary="Ban da hoan thanh toan bo mon hoc trong chuong trinh khung.",
+            summary="Bạn đã hoàn thành toàn bộ môn học trong chương trình khung.",
             semesterBreakdown=[],
         )
 
@@ -384,9 +389,9 @@ def _build_gpa_roadmap(request_data: GpaRoadmapRequest) -> GpaRoadmapResponse:
 
     focus_subjects = ", ".join(item.subjectName for item in sorted_remaining[:3])
     summary = (
-        f"De dat GPA {request_data.targetGpa:.2f} ({_target_label(request_data.targetGpa)}), "
-        f"ban can dat trung binh {required_remaining:.2f} GPA o {len(sorted_remaining)} mon con lai. "
-        f"Can uu tien cac mon: {focus_subjects}."
+        f"Để đạt GPA {request_data.targetGpa:.2f} ({_target_label(request_data.targetGpa)}), "
+        f"bạn cần đạt trung bình {required_remaining:.2f} GPA ở {len(sorted_remaining)} môn còn lại. "
+        f"Cần ưu tiên các môn: {focus_subjects}."
     )
 
     return GpaRoadmapResponse(
@@ -409,9 +414,9 @@ def _build_retake_item(
 ) -> RetakeSubject:
     target_grade = "B" if urgency == "urgent" else "A"
     reason = (
-        "Mon F anh huong manh den GPA, can hoc lai ngay"
+        "Môn F ảnh hưởng mạnh đến GPA, cần học lại ngay"
         if urgency == "urgent"
-        else "Mon C nen cai thien de tang GPA tich luy"
+        else "Môn C nên cải thiện để tăng GPA tích lũy"
     )
 
     return RetakeSubject(
@@ -476,8 +481,8 @@ def _build_retake_roadmap(request_data: RetakeRoadmapRequest) -> RetakeRoadmapRe
         slot_semester, slot_year = _next_semester_year(slot_semester, slot_year)
 
     note = (
-        f"Can uu tien hoc lai {len(urgent_retakes)} mon F truoc, "
-        f"sau do cai thien {len(recommended_retakes)} mon C de tang GPA."
+        f"Cần ưu tiên học lại {len(urgent_retakes)} môn F trước, "
+        f"sau đó cải thiện {len(recommended_retakes)} môn C để tăng GPA."
     )
 
     return RetakeRoadmapResponse(
@@ -512,9 +517,9 @@ def _build_semester_plan(request_data: SemesterPlanRequest) -> SemesterPlanRespo
         target_gpa4 = 4.0 if target_grade == "A" else 3.0
 
         reason = (
-            "Mon cot loi, can diem cao de bao toan muc tieu GPA"
+            "Môn cốt lõi, cần điểm cao để bảo toàn mục tiêu GPA"
             if target_grade == "A"
-            else "Dat B la du de giu tien do va tranh qua tai"
+            else "Đạt B là đủ để giữ tiến độ và tránh quá tải"
         )
 
         subject_targets.append(
@@ -536,14 +541,14 @@ def _build_semester_plan(request_data: SemesterPlanRequest) -> SemesterPlanRespo
     warnings: list[str] = []
     weak_names = [item.subjectName for item in request_data.weakSubjects[:3]]
     if weak_names:
-        warnings.append("Can theo sat cac mon yeu tu ky truoc: " + ", ".join(weak_names))
+        warnings.append("Cần theo sát các môn yếu từ kỳ trước: " + ", ".join(weak_names))
 
     if gap > 0.6:
-        warnings.append("Muc tieu GPA cao, can uu tien nhip hoc deu va giu diem qua trinh")
+        warnings.append("Mục tiêu GPA cao, cần ưu tiên nhịp học đều và giữ điểm quá trình")
 
     summary = (
-        f"Ky nay can duy tri GPA trung binh khoang {predicted_semester_gpa:.2f}. "
-        f"Tap trung mon trong diem cao de huong den muc tieu {request_data.targetGpa:.2f}."
+        f"Kỳ này cần duy trì GPA trung bình khoảng {predicted_semester_gpa:.2f}. "
+        f"Tập trung môn trọng điểm cao để hướng đến mục tiêu {request_data.targetGpa:.2f}."
     )
 
     return SemesterPlanResponse(
@@ -615,6 +620,36 @@ def predict_batch(request_list: list[PredictRequest]) -> list[PredictResponse]:
         return []
 
     return [_predict_single(item) for item in request_list]
+
+
+@app.post("/predict-all-semesters", response_model=PredictResponse)
+def predict_all_semesters(request_data: PredictAllRequest) -> PredictResponse:
+    """
+    Du doan tong hop tu nhieu hoc ky.
+    HK gan nhat co trong so 2, cac HK truoc trong so 1.
+    """
+    semesters = request_data.semesters
+    if not semesters:
+        raise HTTPException(status_code=400, detail="Can it nhat 1 hoc ky")
+
+    n = len(semesters)
+    weights = [1.0] * n
+    weights[-1] = 2.0  # HK gan nhat quan trong hon
+    total_w = sum(weights)
+
+    avg_final = sum(s.finalScore * w for s, w in zip(semesters, weights)) / total_w
+    avg_gpa4 = sum(s.gpa4 * w for s, w in zip(semesters, weights)) / total_w
+    avg_absent = sum(s.attendanceAbsent for s in semesters) / n
+
+    synthetic = PredictRequest(
+        scores={},
+        diem_hk_truoc=round(avg_final, 2),
+        so_buoi_vang=int(round(avg_absent)),
+        hanh_kiem=2,
+        finalScore=round(avg_final, 2),
+        gpa4=round(avg_gpa4, 2),
+    )
+    return _predict_single(synthetic)
 
 
 @app.post("/gpa-roadmap", response_model=GpaRoadmapResponse)
