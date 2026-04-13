@@ -715,3 +715,10 @@ Bước 6 — AI Nâng cấp:
 5. Khi deploy: Socket.io cần sticky sessions nếu dùng
    nhiều instance — hiện tại 1 VPS thì không cần lo.
 ```
+
+Update sau ngày 15/4
+mã lớp riêng cho mỗi học sinh để cố vấn quản lý
+gọi dự đoán cho lớp là mã lớp riêng gắn với mỗi sinh viên: 1 lớp sẽ có 60 sinh viên và 1 vố vấn học tập ví dụ như lớp 23DKTPM1A,1B,1C sẽ có 60 học sinh
+logic gọi AI dự đoán ở lớp học phần như hiện tại là sai.
+xây dựng lại tên lớp học phần cho đúng định dạng
+ví dụ như học phần cơ sở lập trình sẽ có định dạng Mã lớp riêng + tên học phần: 23DKTPM-Cơ sở lập trình

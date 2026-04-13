@@ -41,7 +41,7 @@ interface UserCreatePayload {
   password: string;
   role: 'teacher' | 'advisor';
   departmentIds: string[];
-  advisingStudentIds?: string[];
+  advisingClassCodes?: string[];
 }
 
 interface UserEditPayload {
@@ -54,8 +54,8 @@ interface UserAssignPayload {
   departmentIds: string[];
 }
 
-interface UserAssignAdvisingPayload {
-  advisingStudentIds: string[];
+interface UserAssignAdvisingClassesPayload {
+  advisingClassCodes: string[];
 }
 
 interface UserDialogData {
@@ -69,12 +69,12 @@ interface DepartmentDialogData {
 
 interface UserCreateDialogData {
   departments: Department[];
-  students: Student[];
+  classCodes: string[];
 }
 
-interface AdvisingStudentsDialogData {
+interface AdvisingClassesDialogData {
   user: User;
-  students: Student[];
+  classCodes: string[];
 }
 
 @Component({
@@ -531,7 +531,7 @@ export class UserListComponent implements OnInit {
   users: User[] = [];
   filteredUsers: User[] = [];
   departments: Department[] = [];
-  students: Student[] = [];
+  classCodes: string[] = [];
 
   selectedDepartmentId = 'all';
   selectedStatus: 'all' | 'active' | 'inactive' = 'all';
@@ -597,16 +597,16 @@ export class UserListComponent implements OnInit {
         },
       });
 
-    // Load students separately — non-blocking, only needed for advisor checkbox list.
+    // Load home class codes for advisor dialog — non-blocking.
     this.apiService
-      .get<ApiResponse<Student[]>>('/students', { paged: 'false' })
+      .get<ApiResponse<string[]>>('/students/home-class-codes')
       .pipe(
         map((response) => (Array.isArray(response.data) ? response.data : [])),
         takeUntilDestroyed(this.destroyRef),
       )
       .subscribe({
-        next: (students) => {
-          this.students = students;
+        next: (codes) => {
+          this.classCodes = codes;
         },
       });
   }
@@ -682,12 +682,25 @@ export class UserListComponent implements OnInit {
   }
 
   openCreateDialog(): void {
+    this.apiService
+      .get<ApiResponse<string[]>>('/students/home-class-codes')
+      .pipe(
+        map((response) => (Array.isArray(response.data) ? response.data : [])),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((codes) => {
+        this.classCodes = codes;
+        this._openCreateDialogWithCodes(codes);
+      });
+  }
+
+  private _openCreateDialogWithCodes(codes: string[]): void {
     const dialogRef = this.dialog.open(UserCreateDialogComponent, {
       width: '760px',
       maxWidth: '95vw',
       data: {
         departments: this.departments,
-        students: this.students,
+        classCodes: codes,
       } satisfies UserCreateDialogData,
     });
 
@@ -778,32 +791,45 @@ export class UserListComponent implements OnInit {
   }
 
   openAssignAdvisingStudentsDialog(user: User): void {
+    this.apiService
+      .get<ApiResponse<string[]>>('/students/home-class-codes')
+      .pipe(
+        map((response) => (Array.isArray(response.data) ? response.data : [])),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe((codes) => {
+        this.classCodes = codes;
+        this._openAssignAdvisingDialogWithCodes(user, codes);
+      });
+  }
+
+  private _openAssignAdvisingDialogWithCodes(user: User, codes: string[]): void {
     const dialogRef = this.dialog.open(UserAssignAdvisingStudentsDialogComponent, {
       width: '760px',
       maxWidth: '95vw',
       data: {
         user,
-        students: this.students,
-      } satisfies AdvisingStudentsDialogData,
+        classCodes: codes,
+      } satisfies AdvisingClassesDialogData,
     });
 
     dialogRef
       .afterClosed()
       .pipe(takeUntilDestroyed(this.destroyRef))
-      .subscribe((payload: UserAssignAdvisingPayload | undefined) => {
+      .subscribe((payload: UserAssignAdvisingClassesPayload | undefined) => {
         if (!payload) {
           return;
         }
 
         this.apiService
-          .patch<ApiResponse<User>, UserAssignAdvisingPayload>(
-            `/users/${user._id}/advising-students`,
+          .patch<ApiResponse<User>, UserAssignAdvisingClassesPayload>(
+            `/users/${user._id}/advising-classes`,
             payload,
           )
           .pipe(takeUntilDestroyed(this.destroyRef))
           .subscribe({
             next: () => {
-              this.snackBar.open('Cập nhật sinh viên cố vấn thành công', 'Đóng', {
+              this.snackBar.open('Cập nhật lớp cố vấn thành công', 'Đóng', {
                 duration: 2200,
               });
               this.loadData();
@@ -913,14 +939,17 @@ export class UserListComponent implements OnInit {
 
       @if (form.controls.role.value === 'advisor') {
         <div class="checkbox-box checkbox-box--students">
-          <p>Phân sinh viên cố vấn (tùy chọn)</p>
-          @for (student of data.students; track student._id) {
+          <p>Phân lớp sinh hoạt cố vấn (tùy chọn)</p>
+          @for (code of data.classCodes; track code) {
             <mat-checkbox
-              [checked]="isStudentChecked(student._id)"
-              (change)="toggleStudent(student._id, $event.checked)"
+              [checked]="isClassCodeChecked(code)"
+              (change)="toggleClassCode(code, $event.checked)"
             >
-              {{ formatStudentCode(student) }} - {{ student.fullName }}
+              {{ code }}
             </mat-checkbox>
+          }
+          @if (data.classCodes.length === 0) {
+            <span class="no-data">Chưa có lớp sinh hoạt nào</span>
           }
         </div>
       }
@@ -960,6 +989,11 @@ export class UserListComponent implements OnInit {
         font-weight: 700;
       }
 
+      .no-data {
+        font-size: 0.82rem;
+        color: var(--text-sub);
+      }
+
       .error {
         margin: 0;
         color: #dc2626;
@@ -986,7 +1020,7 @@ export class UserCreateDialogComponent {
     password: ['', [Validators.required, Validators.minLength(6)]],
     role: ['teacher' as 'teacher' | 'advisor', [Validators.required]],
     departmentIds: this.fb.nonNullable.control<string[]>([], [arrayRequiredValidator()]),
-    advisingStudentIds: this.fb.nonNullable.control<string[]>([]),
+    advisingClassCodes: this.fb.nonNullable.control<string[]>([]),
   });
 
   close(): void {
@@ -1013,27 +1047,23 @@ export class UserCreateDialogComponent {
     this.form.controls.departmentIds.markAsTouched();
   }
 
-  isStudentChecked(id: string): boolean {
-    return this.form.controls.advisingStudentIds.value.includes(id);
+  isClassCodeChecked(code: string): boolean {
+    return this.form.controls.advisingClassCodes.value.includes(code);
   }
 
-  toggleStudent(id: string, checked: boolean): void {
-    const current = [...this.form.controls.advisingStudentIds.value];
-    const index = current.indexOf(id);
+  toggleClassCode(code: string, checked: boolean): void {
+    const current = [...this.form.controls.advisingClassCodes.value];
+    const index = current.indexOf(code);
 
     if (checked && index < 0) {
-      current.push(id);
+      current.push(code);
     }
 
     if (!checked && index >= 0) {
       current.splice(index, 1);
     }
 
-    this.form.controls.advisingStudentIds.setValue(current);
-  }
-
-  formatStudentCode(student: Student): string {
-    return toTenDigitStudentCode(student.studentCode, student._id);
+    this.form.controls.advisingClassCodes.setValue(current);
   }
 
   submit(): void {
@@ -1050,7 +1080,7 @@ export class UserCreateDialogComponent {
       password: raw.password,
       role: raw.role,
       departmentIds: raw.departmentIds,
-      advisingStudentIds: raw.role === 'advisor' ? raw.advisingStudentIds : [],
+      advisingClassCodes: raw.role === 'advisor' ? raw.advisingClassCodes : [],
     });
   }
 }
@@ -1274,7 +1304,7 @@ export class UserAssignDepartmentDialogComponent {
   standalone: true,
   imports: [CommonModule, ReactiveFormsModule, MatButtonModule, MatCheckboxModule, MatDialogModule],
   template: `
-    <h2 mat-dialog-title>Phân sinh viên cố vấn</h2>
+    <h2 mat-dialog-title>Phân lớp sinh hoạt cố vấn</h2>
 
     <div mat-dialog-content class="dialog-form">
       <p class="desc">
@@ -1282,13 +1312,16 @@ export class UserAssignDepartmentDialogComponent {
       </p>
 
       <div class="checkbox-box checkbox-box--students">
-        @for (student of data.students; track student._id) {
+        @for (code of data.classCodes; track code) {
           <mat-checkbox
-            [checked]="isChecked(student._id)"
-            (change)="toggleStudent(student._id, $event.checked)"
+            [checked]="isChecked(code)"
+            (change)="toggleClassCode(code, $event.checked)"
           >
-            {{ formatStudentCode(student) }} - {{ student.fullName }}
+            {{ code }}
           </mat-checkbox>
+        }
+        @if (data.classCodes.length === 0) {
+          <span class="no-data">Chưa có lớp sinh hoạt nào trong hệ thống</span>
         }
       </div>
     </div>
@@ -1327,6 +1360,11 @@ export class UserAssignDepartmentDialogComponent {
         overflow: auto;
       }
 
+      .no-data {
+        font-size: 0.82rem;
+        color: var(--text-sub);
+      }
+
       .btn-primary {
         background: var(--navy) !important;
         color: #fff !important;
@@ -1337,50 +1375,44 @@ export class UserAssignDepartmentDialogComponent {
 export class UserAssignAdvisingStudentsDialogComponent {
   private readonly fb = inject(FormBuilder);
   private readonly dialogRef = inject(
-    MatDialogRef<UserAssignAdvisingStudentsDialogComponent, UserAssignAdvisingPayload | undefined>,
+    MatDialogRef<
+      UserAssignAdvisingStudentsDialogComponent,
+      UserAssignAdvisingClassesPayload | undefined
+    >,
   );
-  readonly data = inject<AdvisingStudentsDialogData>(MAT_DIALOG_DATA);
+  readonly data = inject<AdvisingClassesDialogData>(MAT_DIALOG_DATA);
 
-  advisingStudentIdsControl = this.fb.nonNullable.control<string[]>(
-    this.extractCurrentAdvisingStudentIds(),
+  advisingClassCodesControl = this.fb.nonNullable.control<string[]>(
+    this.data.user.advisingClassCodes ?? [],
   );
 
   close(): void {
     this.dialogRef.close(undefined);
   }
 
-  isChecked(id: string): boolean {
-    return this.advisingStudentIdsControl.value.includes(id);
+  isChecked(code: string): boolean {
+    return this.advisingClassCodesControl.value.includes(code);
   }
 
-  toggleStudent(id: string, checked: boolean): void {
-    const current = [...this.advisingStudentIdsControl.value];
-    const index = current.indexOf(id);
+  toggleClassCode(code: string, checked: boolean): void {
+    const current = [...this.advisingClassCodesControl.value];
+    const index = current.indexOf(code);
 
     if (checked && index < 0) {
-      current.push(id);
+      current.push(code);
     }
 
     if (!checked && index >= 0) {
       current.splice(index, 1);
     }
 
-    this.advisingStudentIdsControl.setValue(current);
-  }
-
-  formatStudentCode(student: Student): string {
-    return toTenDigitStudentCode(student.studentCode, student._id);
+    this.advisingClassCodesControl.setValue(current);
   }
 
   submit(): void {
     this.dialogRef.close({
-      advisingStudentIds: this.advisingStudentIdsControl.value,
+      advisingClassCodes: this.advisingClassCodesControl.value,
     });
-  }
-
-  private extractCurrentAdvisingStudentIds(): string[] {
-    const values = this.data.user.advisingStudentIds || [];
-    return values.map((item) => (typeof item === 'string' ? item : item._id));
   }
 }
 

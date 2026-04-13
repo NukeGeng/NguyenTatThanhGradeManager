@@ -83,6 +83,22 @@ const generateStudentCode = async () => {
   return String(maxNumber + 1).padStart(10, "0");
 };
 
+router.get("/home-class-codes", async (req, res, next) => {
+  try {
+    const codes = await Student.distinct("homeClassCode", {
+      homeClassCode: { $exists: true, $ne: "" },
+    });
+
+    return res.status(200).json({
+      success: true,
+      data: codes.sort(),
+      message: "Get home class codes successfully",
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
 router.get("/", async (req, res, next) => {
   try {
     const { classId, status, search, departmentId } = req.query;

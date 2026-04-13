@@ -30,9 +30,9 @@ import { ApiResponse, Department, Major } from '../../shared/models/interfaces';
     <section class="container page-wrap">
       <header class="page-header">
         <div>
-          <p class="eyebrow">Chuong trinh khung</p>
-          <h1 class="page-title">Nganh dao tao</h1>
-          <p class="subtitle">Quan ly danh sach nganh va dieu huong den danh sach CTDT.</p>
+          <p class="eyebrow">Chương trình khung</p>
+          <h1 class="page-title">Ngành đào tạo</h1>
+          <p class="subtitle">Quản lý danh sách ngành và điều hướng đến danh sách CTDT.</p>
         </div>
       </header>
 
@@ -40,7 +40,7 @@ import { ApiResponse, Department, Major } from '../../shared/models/interfaces';
         <mat-form-field appearance="outline" subscriptSizing="dynamic">
           <mat-label>Khoa</mat-label>
           <mat-select [(value)]="selectedDepartmentId" (selectionChange)="applyFilter()">
-            <mat-option value="">Tat ca khoa</mat-option>
+            <mat-option value="">Tất cả khoa</mat-option>
             @for (department of departments; track department._id) {
               <mat-option [value]="department._id">{{ department.name }}</mat-option>
             }
@@ -51,13 +51,13 @@ import { ApiResponse, Department, Major } from '../../shared/models/interfaces';
       @if (isLoading) {
         <mat-card class="state-card">
           <mat-spinner [diameter]="34"></mat-spinner>
-          <p>Dang tai danh sach nganh...</p>
+          <p>Đang tải danh sách ngành...</p>
         </mat-card>
       } @else if (errorMessage) {
         <mat-card class="state-card error">
           <lucide-icon name="x-circle" [size]="20"></lucide-icon>
           <p>{{ errorMessage }}</p>
-          <button mat-stroked-button type="button" (click)="loadData()">Thu lai</button>
+          <button mat-stroked-button type="button" (click)="loadData()">Thử lại</button>
         </mat-card>
       } @else {
         <div class="major-grid">
@@ -67,8 +67,8 @@ import { ApiResponse, Department, Major } from '../../shared/models/interfaces';
               <h2>{{ major.name }}</h2>
 
               <div class="meta-row">
-                <span>{{ major.totalCredits }} tin chi</span>
-                <span>{{ major.durationYears }} nam</span>
+                <span>{{ major.totalCredits }} tín chỉ</span>
+                <span>{{ major.durationYears }} năm</span>
               </div>
 
               <p class="dept-name">{{ resolveDepartmentName(major.departmentId) }}</p>
@@ -89,7 +89,7 @@ import { ApiResponse, Department, Major } from '../../shared/models/interfaces';
         @if (!filteredMajors.length) {
           <mat-card class="state-card empty">
             <lucide-icon name="info" [size]="20"></lucide-icon>
-            <p>Khong co nganh nao theo bo loc da chon.</p>
+            <p>Không có ngành nào theo bộ lọc đã chọn.</p>
           </mat-card>
         }
       }
@@ -251,13 +251,13 @@ export class MajorListComponent implements OnInit {
       if (typeof apiMessage === 'string' && apiMessage.trim()) {
         return apiMessage;
       }
-      return error.message || 'Khong the tai danh sach nganh.';
+      return error.message || 'Không thể tải danh sách ngành.';
     }
 
     if (error instanceof Error && error.message.trim()) {
       return error.message;
     }
 
-    return 'Khong the tai danh sach nganh.';
+    return 'Không thể tải danh sách ngành.';
   }
 }

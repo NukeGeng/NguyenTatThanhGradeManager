@@ -89,7 +89,9 @@ import { toTenDigitStudentCode } from '../../shared/utils/code-format.util';
             <table mat-table [dataSource]="students" class="full-table nttu-table">
               <ng-container matColumnDef="studentCode">
                 <th mat-header-cell *matHeaderCellDef>Mã HS</th>
-                <td mat-cell *matCellDef="let row">{{ formatStudentCode(row) }}</td>
+                <td mat-cell *matCellDef="let row" class="cell-center">
+                  {{ formatStudentCode(row) }}
+                </td>
               </ng-container>
 
               <ng-container matColumnDef="fullName">
@@ -99,17 +101,19 @@ import { toTenDigitStudentCode } from '../../shared/utils/code-format.util';
 
               <ng-container matColumnDef="gender">
                 <th mat-header-cell *matHeaderCellDef>Giới tính</th>
-                <td mat-cell *matCellDef="let row">{{ formatGender(row.gender) }}</td>
+                <td mat-cell *matCellDef="let row" class="cell-center">
+                  {{ formatGender(row.gender) }}
+                </td>
               </ng-container>
 
               <ng-container matColumnDef="status">
                 <th mat-header-cell *matHeaderCellDef>Trạng thái</th>
-                <td mat-cell *matCellDef="let row">
-                  <span
-                    class="badge"
-                    [class.badge-active]="row.status === 'active'"
-                    [class.badge-off]="row.status !== 'active'"
-                  >
+                <td mat-cell *matCellDef="let row" class="cell-center">
+                  <span class="status-chip" [class.status-chip--active]="row.status === 'active'">
+                    <span
+                      class="status-dot"
+                      [class.status-dot--active]="row.status === 'active'"
+                    ></span>
                     {{ formatStatus(row.status) }}
                   </span>
                 </td>
@@ -203,33 +207,109 @@ import { toTenDigitStudentCode } from '../../shared/utils/code-format.util';
 
       .table-wrap {
         overflow-x: auto;
+        border: 1px solid #c8d0d8;
+        border-radius: 4px;
+        background: #fff;
       }
 
       .full-table {
         width: 100%;
+        border-collapse: collapse;
+      }
+
+      .full-table .mat-mdc-header-row {
+        height: 58px;
+        background: #d8e1e8;
+      }
+
+      .full-table .mat-mdc-header-cell {
+        color: #1f8fe4;
+        font-weight: 700;
+        font-size: 0.92rem;
+        border-bottom: 1px solid #bcc8d2;
+        border-right: 1px solid #c7d1da;
+        text-align: center;
+      }
+
+      .full-table .mat-mdc-cell {
+        height: 52px;
+        color: #4f6679;
+        font-size: 0.95rem;
+        border-bottom: 1px solid #d1d8de;
+        border-right: 1px solid #d1d8de;
+      }
+
+      .full-table .mat-mdc-header-cell:first-child,
+      .full-table .mat-mdc-cell:first-child {
+        border-left: 1px solid #c7d1da;
+      }
+
+      .full-table .mat-mdc-row:last-child .mat-mdc-cell {
+        border-bottom: 0;
+      }
+
+      .cell-center {
+        text-align: center;
+        justify-content: center;
+      }
+
+      .full-table .mat-column-studentCode {
+        width: 150px;
+        min-width: 150px;
+        max-width: 150px;
+      }
+
+      .full-table .mat-column-fullName {
+        width: auto;
+        min-width: 180px;
+      }
+
+      .full-table .mat-column-gender {
+        width: 110px;
+        min-width: 110px;
+        max-width: 110px;
+      }
+
+      .full-table .mat-column-status {
+        width: 150px;
+        min-width: 150px;
+        max-width: 150px;
+      }
+
+      .full-table .mat-column-actions {
+        width: 80px;
+        min-width: 80px;
+        max-width: 80px;
       }
 
       .actions-cell {
         white-space: nowrap;
+        text-align: center;
+        justify-content: center;
       }
 
-      .badge {
+      .status-chip {
         display: inline-flex;
         align-items: center;
+        gap: 0.35rem;
         border-radius: 999px;
-        padding: 0.2rem 0.55rem;
-        font-size: 0.73rem;
+        padding: 0.2rem 0.6rem;
+        font-size: 0.75rem;
         font-weight: 700;
-      }
-
-      .badge-active {
-        background: #f0fdf4;
-        color: #16a34a;
-      }
-
-      .badge-off {
-        background: #fef2f2;
+        background: #fee2e2;
         color: #dc2626;
+      }
+
+      .status-dot {
+        width: 8px;
+        height: 8px;
+        border-radius: 50%;
+        background: currentColor;
+      }
+
+      .status-chip--active {
+        background: #dcfce7;
+        color: #16a34a;
       }
 
       @media (max-width: 768px) {

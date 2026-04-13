@@ -31,7 +31,7 @@ import {
     <section class="chat-page">
       <aside class="rooms-panel">
         <header class="rooms-head">
-          <h1>Doan chat</h1>
+          <h1>Đoạn chat</h1>
           @if (totalUnread > 0) {
             <span class="unread-pill">{{ totalUnread }}</span>
           }
@@ -42,20 +42,20 @@ import {
           <input
             [(ngModel)]="searchText"
             (ngModelChange)="applyRoomFilter()"
-            placeholder="Tim kiem doan chat"
+            placeholder="Tìm kiếm đoạn chat"
           />
         </label>
 
         <div class="rooms-tabs">
-          <button type="button" class="tab tab--active">Tat ca</button>
-          <button type="button" class="tab">Chua doc</button>
-          <button type="button" class="tab">Nhom</button>
+          <button type="button" class="tab tab--active">Tất cả</button>
+          <button type="button" class="tab">Chưa đọc</button>
+          <button type="button" class="tab">Nhóm</button>
         </div>
 
         @if (loadingRooms) {
           <div class="state-box">
             <mat-spinner [diameter]="28"></mat-spinner>
-            <p>Dang tai room...</p>
+            <p>Đang tải room...</p>
           </div>
         } @else {
           <div class="room-list">
@@ -89,7 +89,7 @@ import {
         @if (!selectedRoomId) {
           <div class="empty-chat">
             <lucide-icon name="message-circle" [size]="20"></lucide-icon>
-            <p>Chon mot room de bat dau tro chuyen.</p>
+            <p>Chọn một room để bắt đầu trò chuyện.</p>
           </div>
         } @else {
           <header class="chat-head">
@@ -99,7 +99,7 @@ import {
               }}</span>
               <div>
                 <h2>{{ selectedRoomLabel }}</h2>
-                <p>{{ messages.length }} tin nhan</p>
+                <p>{{ messages.length }} tin nhắn</p>
               </div>
             </div>
           </header>
@@ -119,7 +119,7 @@ import {
 
             @if (typingUserName) {
               <p class="typing">
-                {{ typingUserName }} dang nhap
+                {{ typingUserName }} đang nhập
                 <span class="typing-dots"><span></span><span></span><span></span></span>
               </p>
             }
@@ -130,7 +130,7 @@ import {
               [(ngModel)]="draft"
               (keydown)="handleKeydown($event)"
               (input)="onTyping()"
-              placeholder="Nhap tin nhan..."
+              placeholder="Nhập tin nhắn..."
               maxlength="2000"
             ></textarea>
 
@@ -138,7 +138,7 @@ import {
               <p class="char-count" [class.warn]="draft.length > 1800">{{ 2000 - draft.length }}</p>
               <button mat-flat-button class="btn-send" type="button" (click)="send()">
                 <lucide-icon name="send" [size]="16"></lucide-icon>
-                Gui
+                Gửi
               </button>
             </div>
           </footer>
@@ -652,10 +652,10 @@ export class ChatComponent implements OnInit, OnDestroy {
     }
 
     if (room.roomType === 'department') {
-      return `Nhom khoa (${room.roomId.replace('dept_', '')})`;
+      return `Nhóm khoa (${room.roomId.replace('dept_', '')})`;
     }
 
-    return 'Trao doi truc tiep';
+    return 'Trao đổi trực tiếp';
   }
 
   roomAvatarText(room: MessageRoomSummary): string {
@@ -675,8 +675,8 @@ export class ChatComponent implements OnInit, OnDestroy {
     const content = String(room.lastMessage?.content || '').trim();
     if (!content) {
       return room.roomType === 'department'
-        ? 'Chua co tin nhan trong nhom.'
-        : 'Bat dau tro chuyen.';
+        ? 'Chưa có tin nhắn trong nhóm.'
+        : 'Bắt đầu trò chuyện.';
     }
 
     const sender = String(room.lastMessage?.senderName || '').trim();

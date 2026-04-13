@@ -228,6 +228,7 @@ export interface User {
   role: UserRole;
   departmentIds: Array<string | Department>;
   advisingStudentIds?: Array<string | Student>;
+  advisingClassCodes?: string[];
   phone?: string;
   avatar?: string;
   isActive?: boolean;

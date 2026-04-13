@@ -71,6 +71,11 @@ interface SemesterOption {
           </button>
 
           @if (student) {
+            <a mat-stroked-button [routerLink]="['/students', student._id, 'curriculum']">
+              <lucide-icon name="book-open" [size]="16"></lucide-icon>
+              CTĐT
+            </a>
+
             <a
               mat-flat-button
               class="btn-primary"

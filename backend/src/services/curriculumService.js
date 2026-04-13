@@ -86,6 +86,7 @@ const calculateProgress = async (studentId) => {
       credits: Number(item.credits || 0),
       year: Number(item.year || 1),
       semester: Number(item.semester || 1),
+      subjectType: item.subjectType || "required",
       status,
       gpa4: registration?.gradeId?.gpa4 ?? registration?.gpa4 ?? null,
       letterGrade: letterGrade || null,

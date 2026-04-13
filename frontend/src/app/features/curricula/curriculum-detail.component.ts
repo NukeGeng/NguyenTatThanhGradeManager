@@ -35,18 +35,18 @@ interface SemesterTimeline {
       <header class="page-header">
         <div>
           <p class="eyebrow">Timeline CTDT</p>
-          <h1 class="page-title">{{ curriculum?.name || 'Chi tiet CTDT' }}</h1>
-          <p class="subtitle">Phan bo mon hoc theo tung nam, tung hoc ky.</p>
+          <h1 class="page-title">{{ curriculum?.name || 'Chi tiết CTDT' }}</h1>
+          <p class="subtitle">Phân bổ môn học theo từng năm, từng học kỳ.</p>
         </div>
 
         <div class="head-actions">
           <a mat-stroked-button routerLink="/curricula">
             <lucide-icon name="arrow-left" [size]="16"></lucide-icon>
-            Danh sach CTDT
+            Danh sách CTDT
           </a>
           <button mat-flat-button class="btn-primary" type="button" (click)="exportPdf()">
             <lucide-icon name="file-down" [size]="16"></lucide-icon>
-            Xuat PDF
+            Xuất PDF
           </button>
         </div>
       </header>
@@ -54,22 +54,22 @@ interface SemesterTimeline {
       @if (isLoading) {
         <mat-card class="state-card">
           <mat-spinner [diameter]="34"></mat-spinner>
-          <p>Dang tai chi tiet CTDT...</p>
+          <p>Đang tải chi tiết CTDT...</p>
         </mat-card>
       } @else if (errorMessage) {
         <mat-card class="state-card error">
           <lucide-icon name="x-circle" [size]="20"></lucide-icon>
           <p>{{ errorMessage }}</p>
-          <button mat-stroked-button type="button" (click)="loadData()">Thu lai</button>
+          <button mat-stroked-button type="button" (click)="loadData()">Thử lại</button>
         </mat-card>
       } @else if (curriculum) {
         <div class="timeline-grid">
           @for (slot of timeline; track trackTimeline(slot)) {
             <mat-card class="semester-card">
               <div class="semester-head">
-                <h2>Nam {{ slot.year }} · HK{{ slot.semester }}</h2>
+                <h2>Năm {{ slot.year }} · HK{{ slot.semester }}</h2>
                 @if (slot.semester === 3) {
-                  <span class="summer-badge">He</span>
+                  <span class="summer-badge">Hè</span>
                 }
               </div>
 
@@ -87,7 +87,7 @@ interface SemesterTimeline {
                 }
               </ul>
 
-              <footer>{{ slot.items.length }} mon · {{ slot.credits }} tin chi</footer>
+              <footer>{{ slot.items.length }} môn · {{ slot.credits }} tín chỉ</footer>
             </mat-card>
           }
         </div>
@@ -232,7 +232,7 @@ export class CurriculumDetailComponent implements OnInit {
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       this.curriculumId = params.get('id') ?? '';
       if (!this.curriculumId) {
-        this.errorMessage = 'Khong tim thay CTDT.';
+        this.errorMessage = 'Không tìm thấy CTDT.';
         this.isLoading = false;
         return;
       }
@@ -271,14 +271,14 @@ export class CurriculumDetailComponent implements OnInit {
 
   subjectTypeLabel(type: CurriculumItem['subjectType']): string {
     if (type === 'elective') {
-      return 'Tu chon';
+      return 'Tự chọn';
     }
 
     if (type === 'prerequisite') {
-      return 'Tien quyet';
+      return 'Tiên quyết';
     }
 
-    return 'Bat buoc';
+    return 'Bắt buộc';
   }
 
   badgeClass(type: CurriculumItem['subjectType']): string {
@@ -337,13 +337,13 @@ export class CurriculumDetailComponent implements OnInit {
       if (typeof apiMessage === 'string' && apiMessage.trim()) {
         return apiMessage;
       }
-      return error.message || 'Khong the tai chi tiet CTDT.';
+      return error.message || 'Không thể tải chi tiết CTDT.';
     }
 
     if (error instanceof Error && error.message.trim()) {
       return error.message;
     }
 
-    return 'Khong the tai chi tiet CTDT.';
+    return 'Không thể tải chi tiết CTDT.';
   }
 }

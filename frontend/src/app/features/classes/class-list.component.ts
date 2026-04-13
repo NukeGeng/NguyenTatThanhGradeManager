@@ -78,7 +78,7 @@ interface ClassUpsertPayload {
       <header class="page-header">
         <div>
           <p class="eyebrow">Quản lý học vụ</p>
-          <h1>Lớp học phần</h1>
+          <h1>{{ selectedClassType === 'homeroom' ? 'Lớp sinh hoạt' : 'Lớp học phần' }}</h1>
           <p class="subtitle">Theo dõi theo năm học, học kỳ, khoa và trạng thái mở lớp.</p>
         </div>
 
@@ -90,6 +90,15 @@ interface ClassUpsertPayload {
 
       <mat-card class="content-card">
         <div class="filter-bar">
+          <mat-form-field appearance="outline">
+            <mat-label>Loại lớp</mat-label>
+            <mat-select [(ngModel)]="selectedClassType" (ngModelChange)="applyFilters()">
+              <mat-option value="subject">Lớp học phần</mat-option>
+              <mat-option value="homeroom">Lớp sinh hoạt</mat-option>
+              <mat-option value="all">Tất cả</mat-option>
+            </mat-select>
+          </mat-form-field>
+
           <mat-form-field appearance="outline">
             <mat-label>Năm học</mat-label>
             <mat-select [(ngModel)]="selectedSchoolYearId" (ngModelChange)="applyFilters()">
@@ -151,7 +160,7 @@ interface ClassUpsertPayload {
         } @else if (filteredClasses.length === 0) {
           <div class="empty-state">
             <lucide-icon name="book-open" [size]="44"></lucide-icon>
-            <h3>Không có lớp học phần phù hợp</h3>
+            <h3>Không có lớp phù hợp</h3>
             <p>Thử thay đổi bộ lọc hoặc thêm lớp mới để bắt đầu.</p>
           </div>
         } @else {
@@ -486,20 +495,35 @@ export class ClassListComponent implements OnInit {
   private readonly snackBar = inject(MatSnackBar);
   private readonly destroyRef = inject(DestroyRef);
 
-  readonly displayedColumns = [
-    'index',
-    'code',
-    'name',
-    'department',
-    'schoolYear',
-    'semester',
-    'credits',
-    'studentCount',
-    'weights',
-    'teacher',
-    'status',
-    'actions',
-  ];
+  get displayedColumns(): string[] {
+    if (this.selectedClassType === 'homeroom') {
+      return [
+        'index',
+        'code',
+        'name',
+        'department',
+        'schoolYear',
+        'semester',
+        'studentCount',
+        'status',
+        'actions',
+      ];
+    }
+    return [
+      'index',
+      'code',
+      'name',
+      'department',
+      'schoolYear',
+      'semester',
+      'credits',
+      'studentCount',
+      'weights',
+      'teacher',
+      'status',
+      'actions',
+    ];
+  }
 
   classes: Class[] = [];
   filteredClasses: Class[] = [];
@@ -511,6 +535,7 @@ export class ClassListComponent implements OnInit {
   selectedSchoolYearId = 'all';
   selectedSemester: 'all' | '1' | '2' | '3' = 'all';
   selectedDepartmentId = 'all';
+  selectedClassType: 'all' | 'subject' | 'homeroom' = 'subject';
   searchKeyword = '';
 
   isLoading = true;
@@ -563,6 +588,10 @@ export class ClassListComponent implements OnInit {
       });
   }
 
+  isHomeroomClass(classItem: Class): boolean {
+    return !String(classItem.code || '').includes('-');
+  }
+
   applyFilters(): void {
     const keyword = this.searchKeyword.trim().toLowerCase();
 
@@ -570,7 +599,14 @@ export class ClassListComponent implements OnInit {
       const schoolYearId = this.resolveRefId(item.schoolYearId);
       const departmentId = this.resolveRefId(item.departmentId);
       const semesterText = String(item.semester);
+      const homeroom = this.isHomeroomClass(item);
 
+      const byType =
+        this.selectedClassType === 'all'
+          ? true
+          : this.selectedClassType === 'homeroom'
+            ? homeroom
+            : !homeroom;
       const byYear =
         this.selectedSchoolYearId === 'all' ? true : schoolYearId === this.selectedSchoolYearId;
       const bySemester =
@@ -579,7 +615,7 @@ export class ClassListComponent implements OnInit {
         this.selectedDepartmentId === 'all' ? true : departmentId === this.selectedDepartmentId;
 
       if (!keyword) {
-        return byYear && bySemester && byDepartment;
+        return byType && byYear && bySemester && byDepartment;
       }
 
       const text = [
@@ -591,7 +627,7 @@ export class ClassListComponent implements OnInit {
         .join(' ')
         .toLowerCase();
 
-      return byYear && bySemester && byDepartment && text.includes(keyword);
+      return byType && byYear && bySemester && byDepartment && text.includes(keyword);
     });
   }
 

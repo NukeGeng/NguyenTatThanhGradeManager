@@ -167,6 +167,13 @@ interface StudentListPayload {
                 <td mat-cell *matCellDef="let row">{{ getClassName(row.classId) }}</td>
               </ng-container>
 
+              <ng-container matColumnDef="homeClassCode">
+                <th mat-header-cell *matHeaderCellDef>Lớp sinh hoạt</th>
+                <td mat-cell *matCellDef="let row" class="cell-center">
+                  {{ row.homeClassCode || '-' }}
+                </td>
+              </ng-container>
+
               <ng-container matColumnDef="gender">
                 <th mat-header-cell *matHeaderCellDef>Giới tính</th>
                 <td mat-cell *matCellDef="let row" class="cell-center">
@@ -209,6 +216,16 @@ interface StudentListPayload {
                       (click)="predictStudent(row)"
                     >
                       <lucide-icon name="brain-circuit" [size]="15"></lucide-icon>
+                    </button>
+
+                    <button
+                      type="button"
+                      class="action-btn"
+                      aria-label="Chương trình đào tạo"
+                      title="CTĐT"
+                      (click)="viewCurriculum(row)"
+                    >
+                      <lucide-icon name="book-open" [size]="15"></lucide-icon>
                     </button>
 
                     <button
@@ -358,6 +375,10 @@ interface StudentListPayload {
         width: 140px;
       }
 
+      .full-table .mat-column-homeClassCode {
+        width: 140px;
+      }
+
       .full-table .mat-column-gender {
         width: 110px;
       }
@@ -458,6 +479,7 @@ export class StudentListComponent implements OnInit, OnDestroy {
     'studentCode',
     'fullName',
     'class',
+    'homeClassCode',
     'gender',
     'status',
     'actions',
@@ -580,6 +602,10 @@ export class StudentListComponent implements OnInit, OnDestroy {
 
   viewStudent(student: Student): void {
     this.router.navigate(['/students', student._id]);
+  }
+
+  viewCurriculum(student: Student): void {
+    this.router.navigate(['/students', student._id, 'curriculum']);
   }
 
   predictStudent(student: Student): void {

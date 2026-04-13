@@ -38,6 +38,12 @@ const userSchema = new mongoose.Schema(
         ref: "Student",
       },
     ],
+    advisingClassCodes: [
+      {
+        type: String,
+        trim: true,
+      },
+    ],
     phone: {
       type: String,
       trim: true,

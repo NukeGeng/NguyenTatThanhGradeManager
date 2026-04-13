@@ -27,27 +27,27 @@ import { ApiResponse, Curriculum, Major } from '../../shared/models/interfaces';
     <section class="container page-wrap">
       <header class="page-header">
         <div>
-          <p class="eyebrow">Chuong trinh khung</p>
-          <h1 class="page-title">Danh sach CTDT</h1>
-          <p class="subtitle">Quan ly va theo doi cac chuong trinh khung theo tung nganh.</p>
+          <p class="eyebrow">Chương trình khung</p>
+          <h1 class="page-title">Danh sách CTDT</h1>
+          <p class="subtitle">Quản lý và theo dõi các chương trình khung theo từng ngành.</p>
         </div>
 
         <a mat-stroked-button routerLink="/majors">
           <lucide-icon name="arrow-left" [size]="16"></lucide-icon>
-          Quay lai nganh
+          Quay lại ngành
         </a>
       </header>
 
       @if (isLoading) {
         <mat-card class="state-card">
           <mat-spinner [diameter]="34"></mat-spinner>
-          <p>Dang tai danh sach CTDT...</p>
+          <p>Đang tải danh sách CTDT...</p>
         </mat-card>
       } @else if (errorMessage) {
         <mat-card class="state-card error">
           <lucide-icon name="x-circle" [size]="20"></lucide-icon>
           <p>{{ errorMessage }}</p>
-          <button mat-stroked-button type="button" (click)="loadData()">Thu lai</button>
+          <button mat-stroked-button type="button" (click)="loadData()">Thử lại</button>
         </mat-card>
       } @else {
         <div class="grid">
@@ -55,7 +55,7 @@ import { ApiResponse, Curriculum, Major } from '../../shared/models/interfaces';
             <mat-card class="curr-card">
               <p class="code">{{ resolveMajorCode(item.majorId) }}</p>
               <h2>{{ item.name }}</h2>
-              <p class="desc">Khoa: {{ item.schoolYear }} · Tong {{ item.totalCredits }} tin chi</p>
+              <p class="desc">Khoa: {{ item.schoolYear }} · Tổng {{ item.totalCredits }} tín chỉ</p>
 
               <button mat-flat-button class="btn-primary" type="button" (click)="openDetail(item)">
                 <lucide-icon name="arrow-right" [size]="16"></lucide-icon>
@@ -68,7 +68,7 @@ import { ApiResponse, Curriculum, Major } from '../../shared/models/interfaces';
         @if (!curricula.length) {
           <mat-card class="state-card empty">
             <lucide-icon name="info" [size]="20"></lucide-icon>
-            <p>Khong co CTDT nao phu hop.</p>
+            <p>Không có CTDT nào phù hợp.</p>
           </mat-card>
         }
       }
@@ -210,13 +210,13 @@ export class CurriculumListComponent implements OnInit {
       if (typeof apiMessage === 'string' && apiMessage.trim()) {
         return apiMessage;
       }
-      return error.message || 'Khong the tai danh sach CTDT.';
+      return error.message || 'Không thể tải danh sách CTDT.';
     }
 
     if (error instanceof Error && error.message.trim()) {
       return error.message;
     }
 
-    return 'Khong the tai danh sach CTDT.';
+    return 'Không thể tải danh sách CTDT.';
   }
 }

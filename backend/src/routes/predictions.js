@@ -318,36 +318,25 @@ router.post("/predict", async (req, res, next) => {
 
 router.post("/predict-class", async (req, res, next) => {
   try {
-    if (req.user.role === "advisor") {
-      return res.status(403).json({
-        success: false,
-        message: "Advisor không có quyền chạy dự đoán cả lớp",
-      });
-    }
+    const { homeClassCode } = req.body;
 
-    const { classId } = req.body;
-
-    if (!classId) {
+    if (!homeClassCode) {
       return res.status(400).json({
         success: false,
-        message: "classId là bắt buộc",
+        message: "homeClassCode là bắt buộc",
       });
     }
 
-    const classData = await Class.findById(classId).select(
-      "_id departmentId code name",
-    );
-
-    if (!classData) {
-      return res.status(404).json({
-        success: false,
-        message: "Class not found",
-      });
-    }
-
-    if (req.user.role !== "admin") {
-      const allowedDepartmentIds = getAllowedDepartmentIds(req.user);
-      if (!allowedDepartmentIds.includes(String(classData.departmentId))) {
+    // Advisors can only predict their own advising classes
+    if (
+      req.user.role === "advisor" ||
+      (req.user.advisingClassCodes || []).length > 0
+    ) {
+      const advisingCodes = (req.user.advisingClassCodes || []).map(String);
+      if (
+        req.user.role !== "admin" &&
+        !advisingCodes.includes(String(homeClassCode))
+      ) {
         return res.status(403).json({
           success: false,
           message: "Bạn không có quyền dự đoán cho lớp này",
@@ -355,14 +344,13 @@ router.post("/predict-class", async (req, res, next) => {
       }
     }
 
-    const grades = await Grade.find({ classId: classData._id })
-      .populate("subjectId", "code name")
-      .populate("studentId", "_id classId")
-      .select(
-        "studentId classId departmentId subjectId schoolYearId semester finalScore gkScore tktScore txAvg conductScore hanhKiem so_buoi_vang attendanceAbsent diem_hk_truoc previousSemesterScore",
-      );
+    const students = await Student.find({
+      homeClassCode: String(homeClassCode),
+    })
+      .select("_id studentCode homeClassCode")
+      .lean();
 
-    if (!grades.length) {
+    if (!students.length) {
       return res.status(200).json({
         success: true,
         data: {
@@ -370,30 +358,39 @@ router.post("/predict-class", async (req, res, next) => {
           failed: 0,
           failures: [],
         },
-        message: "Lớp chưa có bảng điểm để dự đoán",
+        message: "Lớp chưa có sinh viên để dự đoán",
       });
     }
 
     const failures = [];
     let processed = 0;
 
-    for (const grade of grades) {
+    for (const student of students) {
       try {
-        const predictInput = await buildRealtimePredictInput(grade);
+        const predictInput = await buildOverallPredictInput(student._id);
+
+        if (Object.keys(predictInput.scores).length === 0) {
+          failures.push({
+            studentId: String(student._id),
+            studentCode: student.studentCode,
+            message: "Chưa có điểm để dự đoán",
+          });
+          continue;
+        }
+
         const aiResult = await predictStudent(predictInput);
         const mappedPrediction = mapPredictionFromAI(aiResult);
 
         await Prediction.create({
-          studentId: grade.studentId?._id || grade.studentId,
-          gradeId: grade._id,
+          studentId: student._id,
           ...mappedPrediction,
         });
 
         processed += 1;
       } catch (error) {
         failures.push({
-          gradeId: String(grade._id),
-          studentId: String(grade.studentId?._id || grade.studentId),
+          studentId: String(student._id),
+          studentCode: student.studentCode,
           message: error?.message || "Không thể dự đoán",
         });
       }

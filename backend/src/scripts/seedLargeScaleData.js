@@ -1173,9 +1173,11 @@ const buildCurriculumBlueprint = (majorCode, durationYears, totalCredits) => {
   };
 };
 
-const buildMajorCohortCodes = (majorCode, targetStudents) => {
+const deptCohortCounterMap = new Map();
+
+const buildMajorCohortCodesForDept = (deptCode, targetStudents) => {
   const yearSuffix = String(ENROLLED_YEAR).slice(-2);
-  const normalizedMajor = String(majorCode || "")
+  const normalizedDept = String(deptCode || "")
     .toUpperCase()
     .replace(/[^A-Z0-9]/g, "");
   const sectionCount = Math.max(
@@ -1183,14 +1185,17 @@ const buildMajorCohortCodes = (majorCode, targetStudents) => {
     Math.ceil(Number(targetStudents || 0) / MAX_STUDENTS_PER_CLASS),
   );
 
-  return Array.from({ length: sectionCount }, (_, index) => {
-    const suffix = String.fromCharCode(65 + index);
-    return `${yearSuffix}D${normalizedMajor}1${suffix}`;
+  const currentOffset = deptCohortCounterMap.get(deptCode) || 0;
+  const codes = Array.from({ length: sectionCount }, (_, index) => {
+    const suffix = String.fromCharCode(65 + currentOffset + index);
+    return `${yearSuffix}D${normalizedDept}1${suffix}`;
   });
+  deptCohortCounterMap.set(deptCode, currentOffset + sectionCount);
+  return codes;
 };
 
 const toClassCode = (item, cohortCode) =>
-  `${String(item.code || "").toUpperCase()}-${cohortCode}`;
+  `${cohortCode}-${String(item.code || "").toUpperCase()}`;
 
 const generateStudentCode = (value) => `HS${String(value).padStart(6, "0")}`;
 
@@ -1615,7 +1620,7 @@ const clearExistingCohort = async (advisorEmails, schoolYearId) => {
 
   await User.updateMany(
     { email: { $in: advisorEmails } },
-    { $set: { advisingStudentIds: [] } },
+    { $set: { advisingStudentIds: [], advisingClassCodes: [] } },
   );
 
   await Grade.deleteMany({ schoolYearId });
@@ -1874,7 +1879,10 @@ const run = async () => {
       },
     );
 
-    const cohortCodes = buildMajorCohortCodes(major.code, row.targetStudents);
+    const cohortCodes = buildMajorCohortCodesForDept(
+      row.departmentCode,
+      row.targetStudents,
+    );
 
     const offeredItemsRaw = curriculumItems.filter(
       (item) =>
@@ -1924,7 +1932,7 @@ const run = async () => {
             update: {
               $set: {
                 code: classCode,
-                name: `${item.subjectName} - ${cohortCode}`,
+                name: `${cohortCode}-${item.subjectName}`,
                 subjectId: item.subjectId,
                 departmentId: department._id,
                 schoolYearId: schoolYear._id,
@@ -1984,8 +1992,94 @@ const run = async () => {
       cohortCodes,
       classSectionsByItem,
       advisors: advisorsByDepartment.get(row.departmentCode) || [],
-      homeItemKey: offeredItems[0]?.key || null,
     });
+  }
+
+  // Create homeroom subjects and Class documents per department
+  const sinhHoatSubjectsByDept = new Map();
+  for (const departmentSpec of DEPARTMENT_SPECS) {
+    const dept = departmentsByCode.get(departmentSpec.code);
+    if (!dept) continue;
+    const shCode = `sinhhoat${departmentSpec.code.toLowerCase()}`;
+    const shSubject = await Subject.findOneAndUpdate(
+      { code: shCode },
+      {
+        $set: {
+          code: shCode,
+          name: `Lop sinh hoat ${departmentSpec.code}`,
+          departmentId: dept._id,
+          credits: 2,
+          semester: 1,
+          coefficient: 1,
+          category: "theory",
+          defaultWeights: { tx: 0, gk: 0, th: 0, tkt: 100 },
+          txCount: 1,
+          isActive: false,
+        },
+      },
+      { new: true, upsert: true },
+    );
+    sinhHoatSubjectsByDept.set(departmentSpec.code, shSubject);
+  }
+
+  const deptCohortCodesMap = new Map();
+  for (const plan of majorPlans) {
+    const existing = deptCohortCodesMap.get(plan.departmentCode) || [];
+    for (const code of plan.cohortCodes) {
+      if (!existing.includes(code)) existing.push(code);
+    }
+    deptCohortCodesMap.set(plan.departmentCode, existing);
+  }
+
+  const homeroomOps = [];
+  for (const [deptCode, codes] of deptCohortCodesMap) {
+    const dept = departmentsByCode.get(deptCode);
+    const shSubject = sinhHoatSubjectsByDept.get(deptCode);
+    if (!dept || !shSubject) continue;
+    for (const code of codes) {
+      homeroomOps.push({
+        updateOne: {
+          filter: { code, schoolYearId: schoolYear._id, semester: 1 },
+          update: {
+            $set: {
+              code,
+              name: code,
+              subjectId: shSubject._id,
+              departmentId: dept._id,
+              schoolYearId: schoolYear._id,
+              semester: 1,
+              weights: { tx: 0, gk: 0, th: 0, tkt: 100 },
+              txCount: 1,
+              studentCount: 0,
+              isActive: true,
+            },
+          },
+          upsert: true,
+        },
+      });
+    }
+  }
+  if (homeroomOps.length > 0) {
+    await ClassModel.bulkWrite(homeroomOps, { ordered: false });
+  }
+
+  const allCohortCodes = majorPlans.flatMap((plan) => plan.cohortCodes);
+  const homeroomDocs = await ClassModel.find({
+    code: { $in: allCohortCodes },
+    schoolYearId: schoolYear._id,
+    semester: 1,
+  })
+    .select("_id code")
+    .lean();
+  const homeroomByCode = new Map(homeroomDocs.map((doc) => [doc.code, doc]));
+
+  for (const plan of majorPlans) {
+    plan.homeroomClassIds = new Map();
+    for (const code of plan.cohortCodes) {
+      const hr = homeroomByCode.get(code);
+      if (!hr) throw new Error(`Homeroom class not found: ${code}`);
+      plan.homeroomClassIds.set(code, hr._id);
+    }
   }
 
   const safeBatchSize =
@@ -1998,10 +2092,10 @@ const run = async () => {
 
   const nextCodeStart = await getMaxStudentCodeNumber();
 
-  const advisorStudentMap = new Map();
+  const advisorCohortMap = new Map();
   majorPlans.forEach((plan) => {
     plan.advisors.forEach((advisor) => {
-      advisorStudentMap.set(String(advisor._id), []);
+      advisorCohortMap.set(String(advisor._id), new Set());
     });
   });
 
@@ -2027,11 +2121,6 @@ const run = async () => {
       throw new Error(`Khong co advisor cho major ${plan.major.code}`);
     }
 
-    const homeSections = plan.classSectionsByItem.get(plan.homeItemKey) || [];
-    if (!homeSections.length) {
-      throw new Error(`Khong tim thay lop dau ky cho major ${plan.major.code}`);
-    }
-
     for (let index = 0; index < plan.targetStudents; index += 1) {
       const studentObjectId = new mongoose.Types.ObjectId();
       globalCodeCounter += 1;
@@ -2042,7 +2131,9 @@ const run = async () => {
       const profile = pickProfile();
       const advisor = plan.advisors[index % plan.advisors.length];
       const cohortIndex = index % plan.cohortCodes.length;
-      const homeClass = homeSections[cohortIndex];
+      const homeroomClassId = plan.homeroomClassIds.get(
+        plan.cohortCodes[cohortIndex],
+      );
       const registrations = [];
 
       for (const item of plan.offeredItems) {
@@ -2149,9 +2240,10 @@ const run = async () => {
           1 + Math.floor(Math.random() * 27),
         ),
         gender: Math.random() < 0.5 ? "male" : "female",
-        classId: homeClass._id,
+        classId: homeroomClassId,
         majorId: plan.major._id,
         enrolledYear: ENROLLED_YEAR,
+        homeClassCode: plan.cohortCodes[cohortIndex],
         address: "TP HCM",
         parentName,
         parentPhone: `09${String(10000000 + (globalCodeCounter % 90000000)).padStart(8, "0")}`,
@@ -2168,9 +2260,9 @@ const run = async () => {
       });
 
       const advisorKey = String(advisor._id);
-      const advisedStudents = advisorStudentMap.get(advisorKey) || [];
-      advisedStudents.push(studentObjectId);
-      advisorStudentMap.set(advisorKey, advisedStudents);
+      const advisedCodes = advisorCohortMap.get(advisorKey) || new Set();
+      advisedCodes.add(plan.cohortCodes[cohortIndex]);
+      advisorCohortMap.set(advisorKey, advisedCodes);
 
       createdStudents += 1;
 
@@ -2237,20 +2329,39 @@ const run = async () => {
     await ClassModel.bulkWrite(classCountUpdates, { ordered: false });
   }
 
+  const homeroomCountAgg = await Student.aggregate([
+    { $match: { enrolledYear: ENROLLED_YEAR } },
+    { $group: { _id: "$classId", count: { $sum: 1 } } },
+  ]);
+  const homeroomCountById = new Map(
+    homeroomCountAgg.map((item) => [String(item._id), Number(item.count || 0)]),
+  );
+  const homeroomCountUpdates = [...homeroomByCode.values()].map((doc) => ({
+    updateOne: {
+      filter: { _id: doc._id },
+      update: {
+        $set: { studentCount: homeroomCountById.get(String(doc._id)) || 0 },
+      },
+    },
+  }));
+  if (homeroomCountUpdates.length > 0) {
+    await ClassModel.bulkWrite(homeroomCountUpdates, { ordered: false });
+  }
+
   const zeroClassCleanupResult = await ClassModel.deleteMany({
     studentCount: { $lte: 0 },
   });
 
   const advisorUpdates = [];
-  advisorStudentMap.forEach((studentIds, advisorId) => {
-    if (!studentIds.length) return;
+  advisorCohortMap.forEach((cohortCodes, advisorId) => {
+    if (!cohortCodes.size) return;
 
     advisorUpdates.push({
       updateOne: {
         filter: { _id: advisorId },
         update: {
           $addToSet: {
-            advisingStudentIds: { $each: studentIds },
+            advisingClassCodes: { $each: [...cohortCodes] },
           },
         },
       },

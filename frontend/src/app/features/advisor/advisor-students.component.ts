@@ -55,22 +55,22 @@ interface AdvisorStudentsOverviewPayload {
     <section class="container page-wrap">
       <header class="page-header">
         <div>
-          <p class="eyebrow">Co van hoc tap</p>
-          <h1 class="page-title">Sinh vien duoc phan cong</h1>
-          <p class="subtitle">Theo doi tien do chuong trinh khung va canh bao hoc tap.</p>
+          <p class="eyebrow">Cố vấn học tập</p>
+          <h1 class="page-title">Sinh viên được phân công</h1>
+          <p class="subtitle">Theo dõi tiến độ chương trình khung và cảnh báo học tập.</p>
         </div>
       </header>
 
       @if (isLoading) {
         <mat-card class="state-card">
           <mat-spinner [diameter]="34"></mat-spinner>
-          <p>Dang tai danh sach sinh vien...</p>
+          <p>Đang tải danh sách sinh viên...</p>
         </mat-card>
       } @else if (errorMessage) {
         <mat-card class="state-card error">
           <lucide-icon name="x-circle" [size]="20"></lucide-icon>
           <p>{{ errorMessage }}</p>
-          <button mat-stroked-button type="button" (click)="loadData()">Thu lai</button>
+          <button mat-stroked-button type="button" (click)="loadData()">Thử lại</button>
         </mat-card>
       } @else {
         <div class="student-grid">
@@ -86,7 +86,7 @@ interface AdvisorStudentsOverviewPayload {
 
               <div class="progress-wrap">
                 <p>
-                  Tien do tin chi:
+                  Tiến độ tín chỉ:
                   {{ progress(student._id).creditsEarned }}/{{
                     progress(student._id).creditsRequired
                   }}
@@ -100,10 +100,10 @@ interface AdvisorStudentsOverviewPayload {
 
               <div class="badges">
                 @if (progress(student._id).failed > 0) {
-                  <span class="badge danger">Canh bao F: {{ progress(student._id).failed }}</span>
+                  <span class="badge danger">Cảnh báo F: {{ progress(student._id).failed }}</span>
                 }
                 @if (progress(student._id).progressPercent < 35) {
-                  <span class="badge warn">Tien do cham</span>
+                  <span class="badge warn">Tiến độ chậm</span>
                 }
               </div>
 
@@ -114,7 +114,7 @@ interface AdvisorStudentsOverviewPayload {
                 (click)="openDetail(student)"
               >
                 <lucide-icon name="target" [size]="16"></lucide-icon>
-                Xem chi tiet co van
+                Xem chi tiết cố vấn
               </button>
             </mat-card>
           }
@@ -141,10 +141,10 @@ interface AdvisorStudentsOverviewPayload {
               [disabled]="page <= 1 || isLoading"
               (click)="prevPage()"
             >
-              Trang truoc
+              Trang trước
             </button>
 
-            <p>Trang {{ page }}/{{ totalPages }} · Tong {{ totalStudents }} sinh vien</p>
+            <p>Trang {{ page }}/{{ totalPages }} · Tổng {{ totalStudents }} sinh viên</p>
 
             <button
               mat-stroked-button
@@ -160,7 +160,7 @@ interface AdvisorStudentsOverviewPayload {
         @if (!students.length) {
           <mat-card class="state-card empty">
             <lucide-icon name="info" [size]="20"></lucide-icon>
-            <p>Chua co sinh vien nao duoc phan cong.</p>
+            <p>Chưa có sinh viên nào được phân công.</p>
           </mat-card>
         }
       }
@@ -422,13 +422,13 @@ export class AdvisorStudentsComponent implements OnInit {
       if (typeof apiMessage === 'string' && apiMessage.trim()) {
         return apiMessage;
       }
-      return error.message || 'Khong the tai danh sach sinh vien.';
+      return error.message || 'Không thể tải danh sách sinh viên.';
     }
 
     if (error instanceof Error && error.message.trim()) {
       return error.message;
     }
 
-    return 'Khong the tai danh sach sinh vien.';
+    return 'Không thể tải danh sách sinh viên.';
   }
 }

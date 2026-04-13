@@ -108,31 +108,31 @@ type StudentGradeWithAverage = Grade & {
     <section class="container page-wrap">
       <header class="page-header">
         <div>
-          <p class="eyebrow">Ho so co van</p>
-          <h1 class="page-title">{{ student?.fullName || 'Chi tiet sinh vien' }}</h1>
-          <p class="subtitle">Tong quan GPA, tien do CTDT va lo trinh hoc tap tu AI.</p>
+          <p class="eyebrow">Hồ sơ cố vấn</p>
+          <h1 class="page-title">{{ student?.fullName || 'Chi tiết sinh viên' }}</h1>
+          <p class="subtitle">Tổng quan GPA, tiến độ CTDT và lộ trình học tập từ AI.</p>
         </div>
 
         <a mat-stroked-button class="btn-back" routerLink="/advisor/students">
           <lucide-icon name="arrow-left" [size]="16"></lucide-icon>
-          Danh sach sinh vien
+          Danh sách sinh viên
         </a>
       </header>
 
       @if (isLoading) {
         <mat-card class="state-card">
           <mat-spinner [diameter]="34"></mat-spinner>
-          <p>Dang tai du lieu co van...</p>
+          <p>Đang tải dữ liệu cố vấn...</p>
         </mat-card>
       } @else if (errorMessage) {
         <mat-card class="state-card error">
           <lucide-icon name="x-circle" [size]="20"></lucide-icon>
           <p>{{ errorMessage }}</p>
-          <button mat-stroked-button type="button" (click)="loadData()">Thu lai</button>
+          <button mat-stroked-button type="button" (click)="loadData()">Thử lại</button>
         </mat-card>
       } @else {
         <mat-tab-group animationDuration="120ms">
-          <mat-tab label="Tong quan">
+          <mat-tab label="Tổng quan">
             <div class="tab-wrap">
               <mat-card class="student-info-card">
                 <div class="student-info-grid">
@@ -157,27 +157,27 @@ type StudentGradeWithAverage = Grade & {
                     </div>
 
                     <div class="meta-item">
-                      <span class="meta-label">Ho ten</span>
+                      <span class="meta-label">Họ tên</span>
                       <span class="meta-value">{{ student?.fullName || '-' }}</span>
                     </div>
 
                     <div class="meta-item">
-                      <span class="meta-label">Gioi tinh</span>
+                      <span class="meta-label">Giới tính</span>
                       <span class="meta-value">{{ genderLabel(student?.gender) }}</span>
                     </div>
 
                     <div class="meta-item">
-                      <span class="meta-label">Ngay sinh</span>
+                      <span class="meta-label">Ngày sinh</span>
                       <span class="meta-value">{{ dateLabel(student?.dateOfBirth) }}</span>
                     </div>
 
                     <div class="meta-item">
-                      <span class="meta-label">Lop hoc</span>
+                      <span class="meta-label">Lớp học</span>
                       <span class="meta-value">{{ classLabel() }}</span>
                     </div>
 
                     <div class="meta-item">
-                      <span class="meta-label">Nganh</span>
+                      <span class="meta-label">Ngành</span>
                       <span class="meta-value">{{ majorLabel() }}</span>
                     </div>
                   </div>
@@ -187,7 +187,7 @@ type StudentGradeWithAverage = Grade & {
               <div class="overview-analytics-grid">
                 <mat-card class="analytics-card result-panel">
                   <div class="panel-head">
-                    <h3>Ket qua hoc tap</h3>
+                    <h3>Kết quả học tập</h3>
                     <mat-form-field appearance="outline" class="term-field">
                       <mat-select
                         [(ngModel)]="selectedResultSemesterKey"
@@ -201,11 +201,11 @@ type StudentGradeWithAverage = Grade & {
                   </div>
 
                   @if (!resultChartRows.length) {
-                    <p class="empty-note">Chua co du lieu diem cho hoc ky da chon.</p>
+                    <p class="empty-note">Chưa có dữ liệu điểm cho học kỳ đã chọn.</p>
                   } @else {
                     <div class="result-chart-wrap">
-                      <div class="y-axis-label y-axis-label--left">Diem TKT</div>
-                      <div class="y-axis-label y-axis-label--right">Diem TB lop HP</div>
+                      <div class="y-axis-label y-axis-label--left">Điểm TKT</div>
+                      <div class="y-axis-label y-axis-label--right">Điểm TB lớp HP</div>
 
                       <svg class="mixed-chart" viewBox="0 0 100 60" preserveAspectRatio="none">
                         @for (tick of chartGridTicks(); track tick) {
@@ -272,11 +272,11 @@ type StudentGradeWithAverage = Grade & {
                     <div class="chart-legend">
                       <span class="legend-item">
                         <span class="legend-dot legend-dot--bar"></span>
-                        Diem TKT cua ban
+                        Điểm TKT của bạn
                       </span>
                       <span class="legend-item">
                         <span class="legend-dot legend-dot--line"></span>
-                        Diem TB lop hoc phan
+                        Điểm TB lớp học phần
                       </span>
                     </div>
                   }
@@ -312,7 +312,7 @@ type StudentGradeWithAverage = Grade & {
 
                     @if (progressRingHovered) {
                       <div class="donut-hover-center">
-                        <p>Da hoc: {{ completedCredits() }} tin chi</p>
+                        <p>Đã học: {{ completedCredits() }} tín chỉ</p>
                         <strong>{{ progressPercent() }}%</strong>
                       </div>
                     }
@@ -323,7 +323,7 @@ type StudentGradeWithAverage = Grade & {
 
                 <mat-card class="analytics-card classes-panel">
                   <div class="panel-head">
-                    <h3>Lop hoc phan</h3>
+                    <h3>Lớp học phần</h3>
                     <mat-form-field appearance="outline" class="term-field">
                       <mat-select
                         [(ngModel)]="selectedClassSemesterKey"
@@ -337,14 +337,14 @@ type StudentGradeWithAverage = Grade & {
                   </div>
 
                   @if (!classSemesterRows.length) {
-                    <p class="empty-note">Chua co lop hoc phan trong hoc ky da chon.</p>
+                    <p class="empty-note">Chưa có lớp học phần trong học kỳ đã chọn.</p>
                   } @else {
                     <div class="table-wrap class-panel-table">
                       <table class="full-table class-term-table">
                         <thead>
                           <tr>
-                            <th>Mon hoc/hoc phan</th>
-                            <th>So tin chi</th>
+                            <th>Môn học/học phần</th>
+                            <th>Số tín chỉ</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -372,39 +372,39 @@ type StudentGradeWithAverage = Grade & {
 
               <div class="stats-grid">
                 <mat-card class="stat-card stat-card--orange">
-                  <p>Canh bao mon F</p>
+                  <p>Cảnh báo môn F</p>
                   <h2>{{ failedSubjects().length }}</h2>
                 </mat-card>
 
                 <mat-card class="stat-card stat-card--slate">
-                  <p>Du doan gan nhat</p>
+                  <p>Dự đoán gần nhất</p>
                   <h2>{{ latestPrediction?.predictedRank || '-' }}</h2>
                   <p [class.risk-high]="latestPrediction?.riskLevel === 'high'">
-                    {{ latestPrediction?.riskLevel || 'chua co' }}
+                    {{ latestPrediction?.riskLevel || 'chưa có' }}
                   </p>
                 </mat-card>
               </div>
 
               <mat-card class="f-warning-card">
                 <div class="f-warning-head">
-                  <h3>Cac mon dang bi F / hoc lai</h3>
-                  <span class="count-badge">{{ failedSubjects().length }} mon</span>
+                  <h3>Các môn đang bị F / học lại</h3>
+                  <span class="count-badge">{{ failedSubjects().length }} môn</span>
                 </div>
 
                 @if (!failedSubjects().length) {
-                  <p class="empty-note">Khong co mon F trong tien do hien tai.</p>
+                  <p class="empty-note">Không có môn F trong tiến độ hiện tại.</p>
                 } @else {
                   <div class="table-wrap">
                     <table class="full-table failed-table">
                       <thead>
                         <tr>
                           <th>STT</th>
-                          <th>Ma mon</th>
-                          <th>Ten mon</th>
-                          <th>Tin chi</th>
-                          <th>Hoc ky</th>
-                          <th>Diem chu</th>
-                          <th>Trang thai</th>
+                          <th>Mã môn</th>
+                          <th>Tên môn</th>
+                          <th>Tín chỉ</th>
+                          <th>Học kỳ</th>
+                          <th>Điểm chữ</th>
+                          <th>Trạng thái</th>
                         </tr>
                       </thead>
                       <tbody>
@@ -435,18 +435,18 @@ type StudentGradeWithAverage = Grade & {
             </div>
           </mat-tab>
 
-          <mat-tab label="Tien do CTDT">
+          <mat-tab label="Tiến độ CTDT">
             <div class="tab-wrap">
               <div class="table-wrap">
                 <table class="full-table progress-table">
                   <thead>
                     <tr>
-                      <th>Nam</th>
-                      <th>Hoc ky</th>
-                      <th>Mon hoc</th>
-                      <th>Tin chi</th>
-                      <th>Trang thai</th>
-                      <th>Diem chu</th>
+                      <th>Năm</th>
+                      <th>Học kỳ</th>
+                      <th>Môn học</th>
+                      <th>Tín chỉ</th>
+                      <th>Trạng thái</th>
+                      <th>Điểm chữ</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -480,7 +480,7 @@ type StudentGradeWithAverage = Grade & {
             </div>
           </mat-tab>
 
-          <mat-tab label="Lo trinh AI">
+          <mat-tab label="Lộ trình AI">
             <div class="tab-wrap">
               <div class="target-row">
                 <button
@@ -489,7 +489,7 @@ type StudentGradeWithAverage = Grade & {
                   [class.active]="targetGpa === 3.2"
                   (click)="changeTarget(3.2)"
                 >
-                  Muc tieu Gioi GPA >= 3.2
+                  Mục tiêu Giỏi GPA >= 3.2
                 </button>
                 <button
                   mat-stroked-button
@@ -497,7 +497,7 @@ type StudentGradeWithAverage = Grade & {
                   [class.active]="targetGpa === 3.6"
                   (click)="changeTarget(3.6)"
                 >
-                  Muc tieu Xuat sac GPA >= 3.6
+                  Mục tiêu Xuất sắc GPA >= 3.6
                 </button>
               </div>
 
@@ -510,8 +510,8 @@ type StudentGradeWithAverage = Grade & {
                   <p class="summary-title">
                     {{
                       gpaRoadmap.isAchievable
-                        ? 'Co the dat muc tieu voi ke hoach hien tai.'
-                        : 'Can no luc rat cao de dat muc tieu nay.'
+                        ? 'Có thể đạt mục tiêu với kế hoạch hiện tại.'
+                        : 'Cần nỗ lực rất cao để đạt mục tiêu này.'
                     }}
                   </p>
                   <p>{{ gpaRoadmap.summary }}</p>
@@ -519,7 +519,7 @@ type StudentGradeWithAverage = Grade & {
 
                 <details class="ai-dropdown">
                   <summary>
-                    Danh sach lo trinh mon hoc
+                    Danh sách lộ trình môn học
                     <span>({{ gpaRoadmap.subjectPlans.length }})</span>
                   </summary>
 
@@ -529,12 +529,12 @@ type StudentGradeWithAverage = Grade & {
                         <thead>
                           <tr>
                             <th>STT</th>
-                            <th>Mon hoc</th>
-                            <th>Tin chi</th>
-                            <th>Uu tien</th>
-                            <th>Can dat</th>
-                            <th>Hoc ky</th>
-                            <th>Ly do</th>
+                            <th>Môn học</th>
+                            <th>Tín chỉ</th>
+                            <th>ưu tiên</th>
+                            <th>Cần đạt</th>
+                            <th>Học kỳ</th>
+                            <th>Lý do</th>
                           </tr>
                         </thead>
                         <tbody>
@@ -572,7 +572,7 @@ type StudentGradeWithAverage = Grade & {
                   @if (retakeRoadmap.urgentRetakes.length) {
                     <details class="ai-dropdown ai-dropdown--danger">
                       <summary>
-                        Hoc lai ngay
+                        Học lại ngay
                         <span>({{ retakeRoadmap.urgentRetakes.length }})</span>
                       </summary>
                       <div class="ai-dropdown-body">
@@ -591,7 +591,7 @@ type StudentGradeWithAverage = Grade & {
                   @if (retakeRoadmap.recommendedRetakes.length) {
                     <details class="ai-dropdown ai-dropdown--warn">
                       <summary>
-                        Nen cai thien
+                        Nên cải thiện
                         <span>({{ retakeRoadmap.recommendedRetakes.length }})</span>
                       </summary>
                       <div class="ai-dropdown-body">
@@ -1365,7 +1365,7 @@ export class AdvisorStudentDetailComponent implements OnInit {
     this.route.paramMap.pipe(takeUntilDestroyed(this.destroyRef)).subscribe((params) => {
       this.studentId = params.get('id') ?? '';
       if (!this.studentId) {
-        this.errorMessage = 'Khong tim thay sinh vien.';
+        this.errorMessage = 'Không tìm thấy sinh viên.';
         this.isLoading = false;
         return;
       }
@@ -1435,18 +1435,18 @@ export class AdvisorStudentDetailComponent implements OnInit {
 
   statusLabel(status: ProgressDetail['status']): string {
     if (status === 'completed') {
-      return 'Hoan thanh';
+      return 'Hoàn thành';
     }
 
     if (status === 'in-progress') {
-      return 'Dang hoc';
+      return 'Đang học';
     }
 
     if (status === 'failed') {
-      return 'Hoc lai';
+      return 'Học lại';
     }
 
-    return 'Chua hoc';
+    return 'Chưa học';
   }
 
   completedCredits(): number {
@@ -1582,7 +1582,7 @@ export class AdvisorStudentDetailComponent implements OnInit {
     }
 
     if (gender === 'female') {
-      return 'Nu';
+      return 'Nữ';
     }
 
     return '-';
@@ -1670,14 +1670,14 @@ export class AdvisorStudentDetailComponent implements OnInit {
 
   priorityLabel(priority: 'critical' | 'high' | 'normal'): string {
     if (priority === 'critical') {
-      return 'Cot loi';
+      return 'Cốt lõi';
     }
 
     if (priority === 'high') {
-      return 'Quan trong';
+      return 'Quan trọng';
     }
 
-    return 'Thong thuong';
+    return 'Thông thường';
   }
 
   private initOverviewSemesterData(): void {
@@ -1909,7 +1909,7 @@ export class AdvisorStudentDetailComponent implements OnInit {
     const className =
       typeof classInfo === 'string'
         ? subjectName || 'Hoc phan chua xac dinh'
-        : classInfo?.name || subjectName || 'Hoc phan chua xac dinh';
+        : classInfo?.name || subjectName || 'Học phần chưa xác định';
 
     const credits = typeof subjectInfo === 'string' ? 0 : Number(subjectInfo?.credits || 0);
 
@@ -1935,18 +1935,18 @@ export class AdvisorStudentDetailComponent implements OnInit {
 
   private registrationStatusLabel(status: StudentRegistration['status']): string {
     if (status === 'completed') {
-      return 'Da hoan thanh';
+      return 'Đã hoàn thành';
     }
 
     if (status === 'failed') {
-      return 'Hoc lai';
+      return 'Học lại';
     }
 
     if (status === 'retaking') {
-      return 'Dang hoc lai';
+      return 'Đang học lại';
     }
 
-    return 'Dang hoc';
+    return 'Đang học';
   }
 
   private resolveId(value: unknown): string {

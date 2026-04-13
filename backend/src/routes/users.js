@@ -67,6 +67,7 @@ router.post("/", async (req, res, next) => {
       role = "teacher",
       departmentIds = [],
       advisingStudentIds = [],
+      advisingClassCodes = [],
     } = req.body;
 
     if (!name || !email || !password) {
@@ -136,6 +137,10 @@ router.post("/", async (req, res, next) => {
       departmentIds: normalizedRole === "admin" ? [] : departmentIds,
       advisingStudentIds:
         normalizedRole === "advisor" ? advisingStudentIds : [],
+      advisingClassCodes:
+        normalizedRole === "advisor"
+          ? advisingClassCodes.map((code) => String(code).trim())
+          : [],
     });
 
     const populated = await User.findById(user._id)
@@ -302,6 +307,52 @@ router.patch("/:id/departments", async (req, res, next) => {
       success: true,
       data: populated,
       message: "Update departments successfully",
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.patch("/:id/advising-classes", async (req, res, next) => {
+  try {
+    const { advisingClassCodes = [] } = req.body;
+
+    if (!Array.isArray(advisingClassCodes)) {
+      return res.status(400).json({
+        success: false,
+        message: "advisingClassCodes must be an array",
+      });
+    }
+
+    const user = await User.findById(req.params.id);
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found",
+      });
+    }
+
+    if (user.role !== "advisor") {
+      return res.status(400).json({
+        success: false,
+        message: "Only advisor can update advising class codes",
+      });
+    }
+
+    user.advisingClassCodes = advisingClassCodes.map((code) =>
+      String(code).trim(),
+    );
+    await user.save();
+
+    const populated = await User.findById(user._id)
+      .select("-password")
+      .populate("departmentIds", "_id code name")
+      .populate("advisingStudentIds", "_id studentCode fullName");
+
+    return res.status(200).json({
+      success: true,
+      data: populated,
+      message: "Update advising class codes successfully",
     });
   } catch (error) {
     return next(error);

@@ -7,7 +7,8 @@ const advisorAccess = async (req, res, next) => {
       return next();
     }
 
-    if (role !== "advisor") {
+    const advisingClassCodes = (req.user?.advisingClassCodes || []).map(String);
+    if (!advisingClassCodes.length) {
       return res.status(403).json({
         success: false,
         message: "Chỉ cố vấn học tập hoặc admin có quyền truy cập",
@@ -27,20 +28,17 @@ const advisorAccess = async (req, res, next) => {
       });
     }
 
-    const advisingIds = (req.user?.advisingStudentIds || []).map((item) =>
-      String(item?._id || item),
-    );
-
-    if (advisingIds.includes(String(studentId))) {
-      return next();
-    }
-
-    const student = await Student.findById(studentId).select("_id");
+    const student =
+      await Student.findById(studentId).select("_id homeClassCode");
     if (!student) {
       return res.status(404).json({
         success: false,
         message: "Student not found",
       });
+    }
+
+    if (advisingClassCodes.includes(String(student.homeClassCode))) {
+      return next();
     }
 
     return res.status(403).json({

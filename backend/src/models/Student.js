@@ -37,6 +37,11 @@ const studentSchema = new mongoose.Schema(
       trim: true,
       default: "",
     },
+    homeClassCode: {
+      type: String,
+      trim: true,
+      default: "",
+    },
     address: {
       type: String,
       trim: true,
@@ -82,5 +87,6 @@ studentSchema.index({ classId: 1, status: 1 });
 studentSchema.index({ majorId: 1 });
 studentSchema.index({ fullName: 1 });
 studentSchema.index({ enrolledYear: 1, majorId: 1 });
+studentSchema.index({ homeClassCode: 1 });
 
 module.exports = mongoose.model("Student", studentSchema);
