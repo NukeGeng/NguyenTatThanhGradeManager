@@ -562,14 +562,6 @@ interface PredictClassSummary {
         gap: 1rem;
       }
 
-      .page-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 1rem;
-        flex-wrap: wrap;
-      }
-
       .eyebrow {
         margin: 0;
         color: var(--blue);
@@ -636,13 +628,11 @@ interface PredictClassSummary {
       }
 
       .filters-grid {
-        display: grid;
-        grid-template-columns: repeat(3, minmax(0, 1fr));
         gap: 0.75rem;
       }
 
       .filters-grid.filter-bar {
-        padding: 0.75rem;
+        padding: 0;
       }
 
       .class-meta {
@@ -820,7 +810,7 @@ interface PredictClassSummary {
 
       @media (max-width: 960px) {
         .filters-grid {
-          grid-template-columns: 1fr;
+          flex-wrap: wrap;
         }
 
         .score-grid {

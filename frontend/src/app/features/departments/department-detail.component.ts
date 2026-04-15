@@ -330,14 +330,6 @@ interface SubjectUpsertPayload {
         gap: 1rem;
       }
 
-      .page-header {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 1rem;
-        flex-wrap: wrap;
-      }
-
       .subtitle {
         margin: 0;
         color: var(--text-sub);

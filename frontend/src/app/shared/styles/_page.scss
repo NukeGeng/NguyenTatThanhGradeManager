@@ -50,7 +50,7 @@
 /* Header cua trang: title ben trai, action button ben phai */
 .page-header {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: space-between;
   gap: 1rem;
   flex-wrap: wrap;
@@ -59,6 +59,14 @@
   border-radius: var(--radius);
   box-shadow: var(--shadow);
   padding: 1rem 1.2rem;
+}
+
+.page-header button,
+.page-header a[mat-flat-button],
+.page-header a[mat-stroked-button] {
+  min-width: 10rem;
+  max-width: 10rem;
+  width: 10rem;
 }
 
 .page-header h1,
@@ -245,6 +253,11 @@
   padding: 0.75rem 1rem !important;
 }
 
+/* Center sort-header arrow+text when cell has cell-center */
+.cell-center .mat-sort-header-container {
+  justify-content: center;
+}
+
 .mat-mdc-row {
   border-bottom: 1px solid var(--gray-100) !important;
   transition: background 0.15s;
@@ -411,13 +424,10 @@
   border-color: var(--blue);
   box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
 }
-
 /* Filter bar */
 .filter-bar {
-  background: var(--white);
-  border: 1px solid var(--gray-200);
-  border-radius: var(--radius);
-  padding: 0.875rem 1.25rem;
+  padding: 0.5rem 0 0.875rem;
+  margin-bottom: 1rem;
   display: flex;
   align-items: center;
   gap: 1rem;
@@ -431,10 +441,30 @@
 .filter-bar mat-form-field,
 .filter-bar .mat-mdc-form-field {
   min-width: 160px;
-  flex-shrink: 0;
+  max-width: 340px;
+  flex: 1 1 160px;
   margin: 0 !important;
   --mat-form-field-container-height: 44px;
   --mat-form-field-container-vertical-padding: 10px;
+  /* square corners */
+  --mdc-outlined-text-field-container-shape: 0;
+}
+
+/* Default (idle) border colour + thin outline */
+.filter-bar .mat-mdc-text-field-wrapper .mdc-notched-outline__leading,
+.filter-bar .mat-mdc-text-field-wrapper .mdc-notched-outline__notch,
+.filter-bar .mat-mdc-text-field-wrapper .mdc-notched-outline__trailing {
+  border-color: #555555 !important;
+  border-radius: 0 !important;
+  border-width: 0.8px !important;
+}
+
+/* Keep hover/focus colours from theme — only override when not focused/hovered */
+.filter-bar .mat-mdc-form-field:not(.mat-focused):not(:hover) .mdc-notched-outline__leading,
+.filter-bar .mat-mdc-form-field:not(.mat-focused):not(:hover) .mdc-notched-outline__notch,
+.filter-bar .mat-mdc-form-field:not(.mat-focused):not(:hover) .mdc-notched-outline__trailing {
+  border-color: #555555 !important;
+  border-width: 0.8px !important;
 }
 
 .filter-bar .mat-mdc-form-field-subscript-wrapper,
@@ -663,7 +693,6 @@
 .school-theme .page-wrap > .state-card,
 .school-theme .page-header,
 .school-theme .content-card,
-.school-theme .filter-bar,
 .school-theme .score-sheet-wrap,
 .school-theme .table-wrap {
   background: #ffffff;
@@ -686,7 +715,7 @@
 }
 
 .school-theme .filter-bar {
-  padding: 0.75rem;
+  padding: 0.5rem 0;
   gap: 0.75rem;
 }
 
@@ -768,7 +797,7 @@
   }
 
   .filter-bar {
-    padding: 0.75rem 1rem;
+    padding: 0.5rem 0;
     gap: 0.65rem;
   }
 

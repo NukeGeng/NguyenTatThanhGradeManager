@@ -226,14 +226,6 @@ interface DepartmentUpsertPayload {
         padding: 0.95rem 1rem 1rem;
       }
 
-      .page-header {
-        display: flex;
-        align-items: flex-start;
-        justify-content: space-between;
-        gap: 1rem;
-        flex-wrap: wrap;
-      }
-
       .eyebrow {
         margin: 0;
         font-size: 0.8rem;

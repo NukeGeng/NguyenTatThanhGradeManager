@@ -1,9 +1,11 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
 import {
+  AfterViewInit,
   ChangeDetectorRef,
   Component,
   ElementRef,
+  NgZone,
   OnDestroy,
   OnInit,
   ViewChild,
@@ -116,9 +118,20 @@ interface AlertsPagePayload {
   templateUrl: './dashboard.component.html',
   styleUrl: './dashboard.component.scss',
 })
-export class DashboardComponent implements OnInit, OnDestroy {
+export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   private readonly apiService = inject(ApiService);
   private readonly cdr = inject(ChangeDetectorRef);
+  private readonly ngZone = inject(NgZone);
+
+  @ViewChild('particleCanvas')
+  private particleCanvas?: ElementRef<HTMLCanvasElement>;
+
+  @ViewChild('smokeCanvas')
+  private smokeCanvas?: ElementRef<HTMLCanvasElement>;
+
+  private particleAnimId?: number;
+  private smokeAnimId?: number;
+  private smokeHandler?: (e: MouseEvent) => void;
   private readonly requestTimeoutMs = 10000;
   private loadingGuardTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -172,8 +185,18 @@ export class DashboardComponent implements OnInit, OnDestroy {
     this.loadDashboardData();
   }
 
+  ngAfterViewInit(): void {
+    this.ngZone.runOutsideAngular(() => {
+      this.initPlexus();
+      this.initSmokeTrail();
+    });
+  }
+
   ngOnDestroy(): void {
     this.destroyChart();
+    if (this.particleAnimId !== undefined) cancelAnimationFrame(this.particleAnimId);
+    if (this.smokeAnimId !== undefined) cancelAnimationFrame(this.smokeAnimId);
+    if (this.smokeHandler) document.removeEventListener('mousemove', this.smokeHandler);
   }
 
   private loadDashboardData(): void {
@@ -564,5 +587,148 @@ export class DashboardComponent implements OnInit, OnDestroy {
   // Dam bao UI cap nhat ngay ca khi callback async chay ngoai vung change detection.
   private syncView(): void {
     this.cdr.detectChanges();
+  }
+
+  private initPlexus(): void {
+    const canvas = this.particleCanvas?.nativeElement;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const resize = () => {
+      canvas.width = canvas.offsetWidth || (canvas.parentElement?.offsetWidth ?? 800);
+      canvas.height = canvas.offsetHeight || (canvas.parentElement?.offsetHeight ?? 160);
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    const COUNT = 65;
+    const LINK_DIST = 130;
+
+    interface Node {
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      r: number;
+    }
+
+    const nodes: Node[] = Array.from({ length: COUNT }, () => ({
+      x: Math.random() * canvas.width,
+      y: Math.random() * canvas.height,
+      vx: (Math.random() - 0.5) * 0.38,
+      vy: (Math.random() - 0.5) * 0.38,
+      r: Math.random() * 1.6 + 0.8,
+    }));
+
+    const loop = () => {
+      this.particleAnimId = requestAnimationFrame(loop);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      for (const n of nodes) {
+        n.x += n.vx;
+        n.y += n.vy;
+        if (n.x < 0) n.x = canvas.width;
+        if (n.x > canvas.width) n.x = 0;
+        if (n.y < 0) n.y = canvas.height;
+        if (n.y > canvas.height) n.y = 0;
+      }
+
+      ctx.lineWidth = 0.55;
+      for (let i = 0; i < nodes.length; i++) {
+        for (let j = i + 1; j < nodes.length; j++) {
+          const dx = nodes[j].x - nodes[i].x;
+          const dy = nodes[j].y - nodes[i].y;
+          const dist = Math.sqrt(dx * dx + dy * dy);
+          if (dist < LINK_DIST) {
+            const alpha = (1 - dist / LINK_DIST) * 0.5;
+            ctx.strokeStyle = `rgba(190,210,255,${alpha})`;
+            ctx.beginPath();
+            ctx.moveTo(nodes[i].x, nodes[i].y);
+            ctx.lineTo(nodes[j].x, nodes[j].y);
+            ctx.stroke();
+          }
+        }
+      }
+
+      for (const n of nodes) {
+        ctx.beginPath();
+        ctx.arc(n.x, n.y, n.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(220,232,255,0.85)';
+        ctx.fill();
+      }
+    };
+    loop();
+  }
+
+  private initSmokeTrail(): void {
+    const canvas = this.smokeCanvas?.nativeElement;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const resize = () => {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    };
+    resize();
+    window.addEventListener('resize', resize);
+
+    interface SP {
+      x: number;
+      y: number;
+      vx: number;
+      vy: number;
+      r: number;
+      alpha: number;
+      decay: number;
+      grow: number;
+    }
+    const particles: SP[] = [];
+
+    this.smokeHandler = (e: MouseEvent) => {
+      for (let i = 0; i < 6; i++) {
+        const spread = (Math.random() - 0.5) * 14;
+        particles.push({
+          x: e.clientX + spread,
+          y: e.clientY + (Math.random() - 0.5) * 8,
+          vx: (Math.random() - 0.5) * 0.7,
+          vy: -(Math.random() * 1.4 + 0.4),
+          r: Math.random() * 12 + 8,
+          alpha: Math.random() * 0.1 + 0.04,
+          decay: Math.random() * 0.003 + 0.0018,
+          grow: Math.random() * 0.35 + 0.18,
+        });
+      }
+      if (particles.length > 450) particles.splice(0, particles.length - 450);
+    };
+    document.addEventListener('mousemove', this.smokeHandler);
+
+    const loop = () => {
+      this.smokeAnimId = requestAnimationFrame(loop);
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (let i = particles.length - 1; i >= 0; i--) {
+        const p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        p.vx *= 0.985;
+        p.vy *= 0.975;
+        p.r += p.grow;
+        p.alpha -= p.decay;
+        if (p.alpha <= 0) {
+          particles.splice(i, 1);
+          continue;
+        }
+        const g = ctx.createRadialGradient(p.x, p.y, 0, p.x, p.y, p.r);
+        g.addColorStop(0, `rgba(255,255,255,${p.alpha})`);
+        g.addColorStop(0.45, `rgba(240,242,255,${p.alpha * 0.35})`);
+        g.addColorStop(1, 'rgba(255,255,255,0)');
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = g;
+        ctx.fill();
+      }
+    };
+    loop();
   }
 }

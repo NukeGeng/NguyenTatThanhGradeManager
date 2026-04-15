@@ -144,45 +144,49 @@ interface StudentListPayload {
           <div class="table-wrap">
             <table mat-table [dataSource]="dataSource" matSort class="full-table nttu-table">
               <ng-container matColumnDef="index">
-                <th mat-header-cell *matHeaderCellDef>STT</th>
+                <th mat-header-cell *matHeaderCellDef class="cell-center">STT</th>
                 <td mat-cell *matCellDef="let row; let index = index" class="cell-center">
                   {{ (currentPage - 1) * pageSize + index + 1 }}
                 </td>
               </ng-container>
 
               <ng-container matColumnDef="studentCode">
-                <th mat-header-cell *matHeaderCellDef mat-sort-header>Mã HS</th>
+                <th mat-header-cell *matHeaderCellDef mat-sort-header class="cell-center">Mã HS</th>
                 <td mat-cell *matCellDef="let row" class="cell-center">
                   {{ formatStudentCode(row) }}
                 </td>
               </ng-container>
 
               <ng-container matColumnDef="fullName">
-                <th mat-header-cell *matHeaderCellDef mat-sort-header>Họ tên</th>
-                <td mat-cell *matCellDef="let row">{{ row.fullName }}</td>
+                <th mat-header-cell *matHeaderCellDef mat-sort-header class="cell-center">
+                  Họ tên
+                </th>
+                <td mat-cell *matCellDef="let row" class="cell-center">{{ row.fullName }}</td>
               </ng-container>
 
               <ng-container matColumnDef="class">
-                <th mat-header-cell *matHeaderCellDef>Lớp</th>
-                <td mat-cell *matCellDef="let row">{{ getClassName(row.classId) }}</td>
+                <th mat-header-cell *matHeaderCellDef class="cell-center">Lớp</th>
+                <td mat-cell *matCellDef="let row" class="cell-center">
+                  {{ getClassName(row.classId) }}
+                </td>
               </ng-container>
 
               <ng-container matColumnDef="homeClassCode">
-                <th mat-header-cell *matHeaderCellDef>Lớp sinh hoạt</th>
+                <th mat-header-cell *matHeaderCellDef class="cell-center">Lớp sinh hoạt</th>
                 <td mat-cell *matCellDef="let row" class="cell-center">
                   {{ row.homeClassCode || '-' }}
                 </td>
               </ng-container>
 
               <ng-container matColumnDef="gender">
-                <th mat-header-cell *matHeaderCellDef>Giới tính</th>
+                <th mat-header-cell *matHeaderCellDef class="cell-center">Giới tính</th>
                 <td mat-cell *matCellDef="let row" class="cell-center">
                   {{ formatGender(row.gender) }}
                 </td>
               </ng-container>
 
               <ng-container matColumnDef="status">
-                <th mat-header-cell *matHeaderCellDef>Trạng thái</th>
+                <th mat-header-cell *matHeaderCellDef class="cell-center">Trạng thái</th>
                 <td mat-cell *matCellDef="let row" class="cell-center">
                   <span class="status-chip" [class.status-chip--active]="row.status === 'active'">
                     <span
@@ -195,7 +199,7 @@ interface StudentListPayload {
               </ng-container>
 
               <ng-container matColumnDef="actions">
-                <th mat-header-cell *matHeaderCellDef>Thao tác</th>
+                <th mat-header-cell *matHeaderCellDef class="cell-center">Thao tác</th>
                 <td mat-cell *matCellDef="let row" class="actions-cell cell-center">
                   <div class="actions-wrap">
                     <button
@@ -280,14 +284,6 @@ interface StudentListPayload {
         padding: 1rem 1.1rem 1.1rem;
       }
 
-      .page-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 1rem;
-        flex-wrap: wrap;
-      }
-
       .eyebrow {
         margin: 0;
         color: var(--blue);
@@ -313,9 +309,6 @@ interface StudentListPayload {
       }
 
       .filters {
-        display: grid;
-        grid-template-columns: 1.5fr 1fr 1fr 1fr;
-        gap: 0.75rem;
         margin-bottom: 0;
       }
 
@@ -453,7 +446,7 @@ interface StudentListPayload {
 
       @media (max-width: 768px) {
         .filters {
-          grid-template-columns: 1fr;
+          flex-wrap: wrap;
         }
       }
     `,

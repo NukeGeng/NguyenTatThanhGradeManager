@@ -367,14 +367,6 @@ interface ImportPresetParams {
         gap: 1rem;
       }
 
-      .page-header {
-        display: flex;
-        justify-content: space-between;
-        align-items: flex-start;
-        gap: 1rem;
-        flex-wrap: wrap;
-      }
-
       .eyebrow {
         margin: 0;
         color: var(--blue);

@@ -10,6 +10,7 @@ import { filter, map } from 'rxjs';
 import { AuthService } from '../../../core/services/auth.service';
 import { ApiService } from '../../../core/services/api.service';
 import { ApiResponse, Prediction, User, UserRole } from '../../models/interfaces';
+import { SeasonParticleComponent } from '../season-particle/season-particle.component';
 
 interface LayoutNavItem {
   label: string;
@@ -31,8 +32,10 @@ interface LayoutNavItem {
     MatButtonModule,
     MatSidenavModule,
     LucideAngularModule,
+    SeasonParticleComponent,
   ],
   template: `
+    <app-season-particle></app-season-particle>
     <section class="shell">
       <header class="topbar">
         <div class="topbar-left">

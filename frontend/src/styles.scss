@@ -9,6 +9,10 @@
   --blue-light: #3b82f6;
   --blue-pale: #eff6ff;
   --gold: #f59e0b;
+  /* Hero gradient used by dashboard page-header — overridden per season */
+  --hero-bg: linear-gradient(135deg, #0d1b2e 0%, #162744 55%, #0c1b30 100%);
+  /* Outer glow on dashboard page-header per season */
+  --hero-glow: 0 4px 28px rgba(0, 0, 0, 0.22);
 
   --white: #ffffff;
   --gray-50: #f8fafc;
@@ -195,29 +199,43 @@ body {
 .mat-mdc-dialog-container .mat-mdc-dialog-surface {
   border-radius: 4px !important;
   border: 1px solid var(--gray-200);
+  box-shadow: 0 8px 40px rgba(15, 33, 68, 0.18) !important;
   padding: 0.2rem 0 0.3rem;
   overflow: hidden;
 }
 
 .mat-mdc-dialog-container .mat-mdc-dialog-title {
-  padding: 1rem 1.2rem 0.4rem !important;
+  padding: 1rem 1.5rem 0.5rem !important;
+  font-size: 1.15rem !important;
+  font-weight: 700 !important;
+  color: var(--blue) !important;
+  border-bottom: 1px solid var(--gray-100);
+  margin-bottom: 0 !important;
 }
 
 .mat-mdc-dialog-container .mat-mdc-dialog-content {
-  padding: 0 1.2rem 0.85rem !important;
+  padding: 1rem 1.5rem 0.85rem !important;
   max-height: min(74vh, 760px) !important;
   scrollbar-gutter: stable;
 }
 
 .mat-mdc-dialog-container .mat-mdc-dialog-content .mat-mdc-form-field {
   width: 100%;
-  font-size: 0.84rem;
-  --mat-form-field-container-height: 42px;
-  --mat-form-field-container-vertical-padding: 9px;
+  font-size: 0.875rem;
+  --mat-form-field-container-height: 44px;
+  --mat-form-field-container-vertical-padding: 10px;
 }
 
 .mat-mdc-dialog-container .mat-mdc-dialog-content .mat-mdc-text-field-wrapper {
-  border-radius: 8px !important;
+  border-radius: 0 !important;
+}
+
+.mat-mdc-dialog-container .mat-mdc-dialog-content .mdc-notched-outline__leading,
+.mat-mdc-dialog-container .mat-mdc-dialog-content .mdc-notched-outline__notch,
+.mat-mdc-dialog-container .mat-mdc-dialog-content .mdc-notched-outline__trailing {
+  border-color: var(--gray-300) !important;
+  border-width: 0.8px !important;
+  border-radius: 0 !important;
 }
 
 .mat-mdc-dialog-container .mat-mdc-dialog-content textarea.mat-mdc-input-element {
@@ -225,9 +243,11 @@ body {
 }
 
 .mat-mdc-dialog-container .mat-mdc-dialog-actions {
-  padding: 0.6rem 1.2rem 1rem !important;
+  padding: 0.75rem 1.5rem 1rem !important;
   min-height: auto !important;
   margin: 0 !important;
+  border-top: 1px solid var(--gray-100);
+  gap: 0.5rem;
 }
 
 .grade-weight-dialog-panel .mat-mdc-dialog-surface.mdc-dialog__surface {
@@ -265,4 +285,227 @@ body {
   padding: 0.55rem 0.45rem 0.2rem !important;
   border-top: 1px solid var(--gray-100);
   background: #fbfdff;
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   SEASON THEMES — applied via body.season-{name} class
+   SeasonParticleComponent manages adding/removing these classes on document.body
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* Smooth transition for all themed elements */
+body,
+.mat-mdc-card,
+.page-header,
+.content-card,
+.stat-card,
+.filter-bar,
+.breadcrumb {
+  transition:
+    background-color 0.5s ease,
+    border-color 0.5s ease,
+    color 0.5s ease;
+}
+
+/* ── Xuân 🌸 — Cherry Blossom / Plum Pink ───────────────────────────────── */
+body.season-spring {
+  --hero-bg: linear-gradient(135deg, #3b0a20 0%, #5c1535 55%, #2d0817 100%);
+  --hero-glow: 0 0 0 3px rgba(190, 24, 93, 0.22), 0 8px 36px rgba(190, 24, 93, 0.28);
+  --navy: #831843;
+  --navy-dark: #500724;
+  --navy-mid: #9d174d;
+  --blue: #be185d;
+  --blue-light: #f9a8d4;
+  --blue-pale: #fce7f3;
+  --gray-50: #fdf4f8;
+  --gray-100: #fce7f3;
+  --shadow: 0 1px 3px rgba(190, 24, 93, 0.06), 0 4px 16px rgba(190, 24, 93, 0.08);
+}
+
+body.season-spring,
+body.season-spring .main-content {
+  background: #fdf2f8 !important;
+}
+
+body.season-spring .sidebar {
+  background: #fff8fb !important;
+  border-right-color: #fbcfe8 !important;
+}
+
+body.season-spring .topbar {
+  background: #fff5f8 !important;
+  border-bottom-color: #fbcfe8 !important;
+}
+
+body.season-spring .page-header:not(.dashboard-hero) {
+  background: linear-gradient(120deg, #fff0f7 0%, #fff8fb 100%) !important;
+  border-color: #fbcfe8 !important;
+}
+
+body.season-spring .content-card,
+body.season-spring .mat-mdc-card {
+  background: #fffafc !important;
+  border-color: #fce7f3 !important;
+}
+
+body.season-spring .stat-card {
+  background: #fffafc !important;
+  border-color: #fce7f3 !important;
+}
+
+body.season-spring .menu-link.active,
+body.season-spring .menu-link:hover {
+  background: #fce7f3 !important;
+}
+
+/* ── Hạ ☀️ — Sunny Orange / Phoenix Flame ──────────────────────────────── */
+body.season-summer {
+  --hero-bg: linear-gradient(135deg, #431407 0%, #7c2d12 55%, #350e05 100%);
+  --hero-glow: 0 0 0 3px rgba(234, 88, 12, 0.22), 0 8px 36px rgba(234, 88, 12, 0.3);
+  --navy: #7c2d12;
+  --navy-dark: #431407;
+  --navy-mid: #9a3412;
+  --blue: #ea580c;
+  --blue-light: #fb923c;
+  --blue-pale: #fff7ed;
+  --gray-50: #fffbf7;
+  --gray-100: #ffedd5;
+  --shadow: 0 1px 3px rgba(234, 88, 12, 0.07), 0 4px 16px rgba(234, 88, 12, 0.09);
+}
+
+body.season-summer,
+body.season-summer .main-content {
+  background: #fff8f1 !important;
+}
+
+body.season-summer .sidebar {
+  background: #fffcf8 !important;
+  border-right-color: #fed7aa !important;
+}
+
+body.season-summer .topbar {
+  background: #fffaf5 !important;
+  border-bottom-color: #fed7aa !important;
+}
+
+body.season-summer .page-header:not(.dashboard-hero) {
+  background: linear-gradient(120deg, #fff7ed 0%, #fffcf8 100%) !important;
+  border-color: #fed7aa !important;
+}
+
+body.season-summer .content-card,
+body.season-summer .mat-mdc-card {
+  background: #fffdfb !important;
+  border-color: #ffedd5 !important;
+}
+
+body.season-summer .stat-card {
+  background: #fffdfb !important;
+  border-color: #ffedd5 !important;
+}
+
+body.season-summer .menu-link.active,
+body.season-summer .menu-link:hover {
+  background: #fff7ed !important;
+}
+
+/* ── Thu 🍂 — Amber Autumn / Golden Leaves ──────────────────────────────── */
+body.season-autumn {
+  --hero-bg: linear-gradient(135deg, #3b1a05 0%, #6d2f08 55%, #2e1304 100%);
+  --hero-glow: 0 0 0 3px rgba(180, 83, 9, 0.22), 0 8px 36px rgba(180, 83, 9, 0.28);
+  --navy: #78350f;
+  --navy-dark: #451a03;
+  --navy-mid: #92400e;
+  --blue: #b45309;
+  --blue-light: #fcd34d;
+  --blue-pale: #fef3c7;
+  --gray-50: #fdfaf3;
+  --gray-100: #fef3c7;
+  --shadow: 0 1px 3px rgba(180, 83, 9, 0.07), 0 4px 16px rgba(180, 83, 9, 0.09);
+}
+
+body.season-autumn,
+body.season-autumn .main-content {
+  background: #fefaef !important;
+}
+
+body.season-autumn .sidebar {
+  background: #fffdf7 !important;
+  border-right-color: #fde68a !important;
+}
+
+body.season-autumn .topbar {
+  background: #fffef9 !important;
+  border-bottom-color: #fde68a !important;
+}
+
+body.season-autumn .page-header:not(.dashboard-hero) {
+  background: linear-gradient(120deg, #fef9e7 0%, #fffdf5 100%) !important;
+  border-color: #fde68a !important;
+}
+
+body.season-autumn .content-card,
+body.season-autumn .mat-mdc-card {
+  background: #fffef9 !important;
+  border-color: #fef3c7 !important;
+}
+
+body.season-autumn .stat-card {
+  background: #fffef9 !important;
+  border-color: #fef3c7 !important;
+}
+
+body.season-autumn .menu-link.active,
+body.season-autumn .menu-link:hover {
+  background: #fef3c7 !important;
+}
+
+/* ── Đông ❄️ — Icy Blue / Crystal Winter ───────────────────────────────── */
+body.season-winter {
+  --hero-bg: linear-gradient(135deg, #082f49 0%, #0c4a6e 55%, #051e30 100%);
+  --hero-glow: 0 0 0 3px rgba(2, 132, 199, 0.25), 0 8px 36px rgba(2, 132, 199, 0.32);
+  --navy: #0c4a6e;
+  --navy-dark: #082f49;
+  --navy-mid: #0369a1;
+  --blue: #0284c7;
+  --blue-light: #38bdf8;
+  --blue-pale: #e0f2fe;
+  --gray-50: #f0f9ff;
+  --gray-100: #e0f2fe;
+  --shadow: 0 1px 3px rgba(2, 132, 199, 0.07), 0 4px 16px rgba(2, 132, 199, 0.1);
+}
+
+body.season-winter,
+body.season-winter .main-content {
+  background: #eef8ff !important;
+}
+
+body.season-winter .sidebar {
+  background: #f5fbff !important;
+  border-right-color: #bae6fd !important;
+}
+
+body.season-winter .topbar {
+  background: #f8fcff !important;
+  border-bottom-color: #bae6fd !important;
+}
+
+body.season-winter .page-header:not(.dashboard-hero) {
+  background: linear-gradient(120deg, #e0f2fe 0%, #f5fbff 100%) !important;
+  border-color: #bae6fd !important;
+}
+
+body.season-winter .content-card,
+body.season-winter .mat-mdc-card {
+  background: #f8fcff !important;
+  border-color: #e0f2fe !important;
+}
+
+body.season-winter .stat-card {
+  background: #f8fcff !important;
+  border-color: #e0f2fe !important;
+}
+
+body.season-winter .menu-link.active,
+body.season-winter .menu-link:hover {
+  background: #e0f2fe !important;
 }
