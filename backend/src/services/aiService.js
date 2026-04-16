@@ -180,14 +180,24 @@ const toSubjectResult = (item, registration) => {
     letterGrade: String(registration?.letterGrade || ""),
     status,
     isRequired: String(item?.subjectType || "required") !== "elective",
+    category: String(
+      item?.category ||
+        item?.subjectId?.category ||
+        registration?.subjectId?.category ||
+        "theory",
+    ),
   };
 };
 
 const snapshotStudentCurriculum = async (studentId) => {
   const studentCurriculum = await StudentCurriculum.findOne({ studentId })
     .populate("studentId", "_id studentCode fullName")
-    .populate("curriculumId", "_id name items")
-    .populate("registrations.subjectId", "_id code name credits");
+    .populate({
+      path: "curriculumId",
+      select: "_id name items",
+      populate: { path: "items.subjectId", select: "category" },
+    })
+    .populate("registrations.subjectId", "_id code name credits category");
 
   if (!studentCurriculum) {
     const student = await Student.findById(studentId)
@@ -289,7 +299,7 @@ const snapshotStudentCurriculum = async (studentId) => {
   };
 };
 
-const parseAiError = (error) => {
+const parseAiError = (error, timeoutMs = 30000) => {
   const statusCode = Number(error?.response?.status || 0);
   const errorCode = String(error?.code || "");
   const detail = error?.response?.data?.detail;
@@ -325,7 +335,7 @@ const parseAiError = (error) => {
   }
 
   if (!serverMessage && errorCode === "ECONNABORTED") {
-    serverMessage = "AI Engine phản hồi quá chậm (timeout 10s)";
+    serverMessage = `AI Engine phản hồi quá chậm (timeout ${timeoutMs / 1000}s)`;
   }
 
   if (!serverMessage && statusCode === 422) {
@@ -344,10 +354,10 @@ const parseAiError = (error) => {
   return serverMessage || fallbackMessage;
 };
 
-const postToAiEngine = async (path, payload) => {
+const postToAiEngine = async (path, payload, timeoutMs = 30000) => {
   try {
     const response = await axios.post(`${AI_ENGINE_URL}${path}`, payload, {
-      timeout: 10000,
+      timeout: timeoutMs,
       headers: {
         "Content-Type": "application/json",
       },
@@ -359,7 +369,9 @@ const postToAiEngine = async (path, payload) => {
 
     return response.data;
   } catch (error) {
-    throw new Error(`Không thể gọi AI Engine: ${parseAiError(error)}`);
+    throw new Error(
+      `Không thể gọi AI Engine: ${parseAiError(error, timeoutMs)}`,
+    );
   }
 };
 
@@ -437,7 +449,7 @@ const getGpaRoadmap = async (studentId, targetGpa = 3.2) => {
     targetGpa: target,
   };
 
-  const data = await postToAiEngine("/gpa-roadmap", payload);
+  const data = await postToAiEngine("/gpa-roadmap", payload, 45000);
   setCacheEntry(cacheKey, data);
   return data;
 };
@@ -466,7 +478,7 @@ const getRetakeRoadmap = async (studentId) => {
     currentYear,
   };
 
-  return postToAiEngine("/retake-roadmap", payload);
+  return postToAiEngine("/retake-roadmap", payload, 60000);
 };
 
 const getSemesterPlan = async (

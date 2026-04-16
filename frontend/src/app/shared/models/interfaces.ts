@@ -136,6 +136,8 @@ export interface SubjectPlan {
   reason: string;
   semester: 1 | 2 | 3;
   year: number;
+  weeklyPlan: string[];
+  resources: StudyResource[];
 }
 
 export interface GpaRoadmap {
@@ -161,6 +163,12 @@ export interface GpaRoadmap {
   }>;
 }
 
+export interface StudyResource {
+  title: string;
+  url: string;
+  type: 'search' | 'video' | 'opencourse' | 'docs';
+}
+
 export interface RetakeSubject {
   subjectCode: string;
   subjectName: string;
@@ -172,6 +180,8 @@ export interface RetakeSubject {
   prerequisiteFor: string[];
   suggestedSemester: 1 | 2 | 3;
   reason: string;
+  weeklyPlan: string[];
+  resources: StudyResource[];
 }
 
 export interface RetakeRoadmap {

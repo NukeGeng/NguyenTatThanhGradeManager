@@ -12,7 +12,7 @@ import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
 import { MatTabsModule } from '@angular/material/tabs';
 import { LucideAngularModule } from 'lucide-angular';
-import { finalize, forkJoin, map } from 'rxjs';
+import { catchError, finalize, forkJoin, map, of } from 'rxjs';
 
 import { ApiService } from '../../core/services/api.service';
 import {
@@ -505,6 +505,13 @@ type StudentGradeWithAverage = Grade & {
                 <mat-card class="state-card small">
                   <mat-spinner [diameter]="30"></mat-spinner>
                 </mat-card>
+              } @else if (roadmapError) {
+                <mat-card class="state-card small error">
+                  <p>
+                    Không thể tải lộ trình AI. Vui lòng kiểm tra AI Engine đang chạy và thử lại.
+                  </p>
+                  <button mat-stroked-button type="button" (click)="loadRoadmaps()">Thử lại</button>
+                </mat-card>
               } @else if (gpaRoadmap) {
                 <mat-card class="roadmap-card" [class.warn]="!gpaRoadmap.isAchievable">
                   <p class="summary-title">
@@ -520,46 +527,72 @@ type StudentGradeWithAverage = Grade & {
                 <details class="ai-dropdown">
                   <summary>
                     Danh sách lộ trình môn học
-                    <span>({{ gpaRoadmap.subjectPlans.length }})</span>
+                    <span class="grade-split">
+                      <span class="chip chip--a">{{ roadmapCountA }} môn cần A</span>
+                      <span class="chip chip--b">{{ roadmapCountB }} môn đạt B</span>
+                    </span>
                   </summary>
 
                   <div class="ai-dropdown-body">
-                    <div class="table-wrap">
-                      <table class="full-table roadmap-table">
-                        <thead>
-                          <tr>
-                            <th>STT</th>
-                            <th>Môn học</th>
-                            <th>Tín chỉ</th>
-                            <th>ưu tiên</th>
-                            <th>Cần đạt</th>
-                            <th>Học kỳ</th>
-                            <th>Lý do</th>
-                          </tr>
-                        </thead>
-                        <tbody>
-                          @for (
-                            plan of gpaRoadmap.subjectPlans;
-                            let index = $index;
-                            track plan.subjectCode + plan.semester + plan.year
-                          ) {
-                            <tr>
-                              <td class="cell-center">{{ index + 1 }}</td>
-                              <td>{{ plan.subjectName }}</td>
-                              <td class="cell-center">{{ plan.credits }}</td>
-                              <td>
-                                <span class="priority" [class]="priorityClass(plan.priority)">
-                                  {{ priorityLabel(plan.priority) }}
-                                </span>
-                              </td>
-                              <td class="cell-center">{{ plan.targetGrade }}</td>
-                              <td class="cell-center">N{{ plan.year }} · HK{{ plan.semester }}</td>
-                              <td>{{ plan.reason }}</td>
-                            </tr>
-                          }
-                        </tbody>
-                      </table>
-                    </div>
+                    <ul class="plan-subject-list">
+                      @for (
+                        plan of gpaRoadmap.subjectPlans;
+                        let index = $index;
+                        track plan.subjectCode + plan.semester + plan.year
+                      ) {
+                        <li class="plan-subject-item">
+                          <details class="plan-subject-details">
+                            <summary class="plan-subject-summary">
+                              <span class="plan-idx">{{ index + 1 }}</span>
+                              <span class="plan-name">{{ plan.subjectName }}</span>
+                              <span class="plan-meta">
+                                {{ plan.credits }} TC &middot; N{{ plan.year }} HK{{
+                                  plan.semester
+                                }}
+                              </span>
+                              <span class="priority" [class]="priorityClass(plan.priority)">
+                                {{ priorityLabel(plan.priority) }}
+                              </span>
+                              <span
+                                class="grade-badge"
+                                [class.grade-badge--a]="plan.targetGrade === 'A'"
+                                [class.grade-badge--b]="plan.targetGrade === 'B'"
+                                >Cần {{ plan.targetGrade }}</span
+                              >
+                            </summary>
+
+                            <div class="plan-subject-body">
+                              <p class="plan-reason">{{ plan.reason }}</p>
+
+                              @if (plan.weeklyPlan?.length) {
+                                <div class="plan-weekly">
+                                  <strong>Lộ trình {{ plan.weeklyPlan.length }} tuần</strong>
+                                  <ol class="weekly-plan">
+                                    @for (step of plan.weeklyPlan; track $index) {
+                                      <li>{{ step }}</li>
+                                    }
+                                  </ol>
+                                </div>
+                              }
+
+                              @if (plan.resources?.length) {
+                                <div class="resource-links">
+                                  @for (res of plan.resources; track res.url) {
+                                    <a
+                                      [href]="res.url"
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      [class]="'res-chip res-chip--' + res.type"
+                                      >{{ res.title }}</a
+                                    >
+                                  }
+                                </div>
+                              }
+                            </div>
+                          </details>
+                        </li>
+                      }
+                    </ul>
                   </div>
                 </details>
               }
@@ -578,9 +611,38 @@ type StudentGradeWithAverage = Grade & {
                       <div class="ai-dropdown-body">
                         <ul class="retake-list">
                           @for (item of retakeRoadmap.urgentRetakes; track item.subjectCode) {
-                            <li>
-                              {{ item.subjectName }} · HK{{ item.suggestedSemester }}
-                              <small>{{ item.reason }}</small>
+                            <li class="retake-item">
+                              <div class="retake-header">
+                                <strong>{{ item.subjectName }}</strong>
+                                <span class="retake-meta"
+                                  >HK{{ item.suggestedSemester }} · {{ item.credits }} TC · Điểm
+                                  hiện tại: {{ item.currentGrade }}</span
+                                >
+                              </div>
+                              <small class="retake-reason">{{ item.reason }}</small>
+                              @if (item.weeklyPlan?.length) {
+                                <details class="plan-details">
+                                  <summary>Lộ trình {{ item.weeklyPlan.length }} tuần</summary>
+                                  <ol class="weekly-plan">
+                                    @for (step of item.weeklyPlan; track $index) {
+                                      <li>{{ step }}</li>
+                                    }
+                                  </ol>
+                                </details>
+                              }
+                              @if (item.resources?.length) {
+                                <div class="resource-links">
+                                  @for (res of item.resources; track res.url) {
+                                    <a
+                                      [href]="res.url"
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      [class]="'res-chip res-chip--' + res.type"
+                                      >{{ res.title }}</a
+                                    >
+                                  }
+                                </div>
+                              }
                             </li>
                           }
                         </ul>
@@ -597,9 +659,38 @@ type StudentGradeWithAverage = Grade & {
                       <div class="ai-dropdown-body">
                         <ul class="retake-list">
                           @for (item of retakeRoadmap.recommendedRetakes; track item.subjectCode) {
-                            <li>
-                              {{ item.subjectName }} · HK{{ item.suggestedSemester }}
-                              <small>{{ item.reason }}</small>
+                            <li class="retake-item">
+                              <div class="retake-header">
+                                <strong>{{ item.subjectName }}</strong>
+                                <span class="retake-meta"
+                                  >HK{{ item.suggestedSemester }} · {{ item.credits }} TC · Điểm
+                                  hiện tại: {{ item.currentGrade }}</span
+                                >
+                              </div>
+                              <small class="retake-reason">{{ item.reason }}</small>
+                              @if (item.weeklyPlan?.length) {
+                                <details class="plan-details">
+                                  <summary>Lộ trình {{ item.weeklyPlan.length }} tuần</summary>
+                                  <ol class="weekly-plan">
+                                    @for (step of item.weeklyPlan; track $index) {
+                                      <li>{{ step }}</li>
+                                    }
+                                  </ol>
+                                </details>
+                              }
+                              @if (item.resources?.length) {
+                                <div class="resource-links">
+                                  @for (res of item.resources; track res.url) {
+                                    <a
+                                      [href]="res.url"
+                                      target="_blank"
+                                      rel="noopener noreferrer"
+                                      [class]="'res-chip res-chip--' + res.type"
+                                      >{{ res.title }}</a
+                                    >
+                                  }
+                                </div>
+                              }
                             </li>
                           }
                         </ul>
@@ -1265,16 +1356,212 @@ type StudentGradeWithAverage = Grade & {
         margin: 0;
         padding: 0;
         display: grid;
-        gap: 0.45rem;
+        gap: 0.75rem;
       }
 
-      .retake-list li {
+      .retake-item {
         display: grid;
-        gap: 0.18rem;
+        gap: 0.25rem;
+        padding: 0.6rem 0.75rem;
+        border-radius: 6px;
+        background: rgba(0 0 0 / 0.03);
+        border-left: 3px solid var(--color-primary, #3b82f6);
       }
 
-      .retake-list li small {
-        color: var(--text-sub);
+      .retake-header {
+        display: flex;
+        flex-wrap: wrap;
+        align-items: center;
+        gap: 0.5rem;
+      }
+
+      .retake-header strong {
+        font-weight: 600;
+      }
+
+      .retake-meta {
+        font-size: 0.8rem;
+        color: var(--text-sub, #6b7280);
+      }
+
+      .retake-reason {
+        color: var(--text-sub, #6b7280);
+        font-size: 0.82rem;
+      }
+
+      .plan-details {
+        margin-top: 0.3rem;
+      }
+
+      .plan-details > summary {
+        font-size: 0.82rem;
+        font-weight: 600;
+        cursor: pointer;
+        color: var(--color-primary, #3b82f6);
+        padding: 0.2rem 0;
+      }
+
+      .weekly-plan {
+        margin: 0.4rem 0 0 1rem;
+        padding: 0;
+        display: grid;
+        gap: 0.2rem;
+        font-size: 0.82rem;
+        color: var(--text-main, #1f2937);
+      }
+
+      .resource-links {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 0.35rem;
+        margin-top: 0.35rem;
+      }
+
+      .res-chip {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.25rem;
+        padding: 0.2rem 0.6rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 500;
+        text-decoration: none;
+        border: 1px solid currentColor;
+        transition: opacity 0.15s;
+      }
+
+      .res-chip:hover {
+        opacity: 0.75;
+      }
+
+      .res-chip--search {
+        color: #1d4ed8;
+        background: #eff6ff;
+      }
+      .res-chip--video {
+        color: #dc2626;
+        background: #fef2f2;
+      }
+      .res-chip--opencourse {
+        color: #7c3aed;
+        background: #f5f3ff;
+      }
+      .res-chip--docs {
+        color: #065f46;
+        background: #ecfdf5;
+      }
+
+      .grade-split {
+        display: inline-flex;
+        gap: 0.4rem;
+        margin-left: 0.4rem;
+      }
+
+      .chip {
+        display: inline-block;
+        padding: 0.1rem 0.55rem;
+        border-radius: 999px;
+        font-size: 0.75rem;
+        font-weight: 600;
+      }
+
+      .chip--a {
+        background: #fef9c3;
+        color: #854d0e;
+      }
+      .chip--b {
+        background: #dbeafe;
+        color: #1e40af;
+      }
+
+      /* ── GPA Roadmap subject accordion ── */
+      .plan-subject-list {
+        list-style: none;
+        margin: 0;
+        padding: 0;
+        display: grid;
+        gap: 0.35rem;
+      }
+
+      .plan-subject-details {
+        border: 1px solid #e2e8f0;
+        border-radius: 6px;
+        overflow: hidden;
+      }
+
+      .plan-subject-summary {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+        padding: 0.5rem 0.75rem;
+        cursor: pointer;
+        list-style: none;
+        background: #f8fafc;
+        transition: background 0.15s;
+      }
+
+      .plan-subject-summary:hover {
+        background: #f1f5f9;
+      }
+
+      .plan-subject-details[open] > .plan-subject-summary {
+        background: #eff6ff;
+      }
+
+      .plan-idx {
+        font-size: 0.75rem;
+        color: var(--text-sub, #6b7280);
+        min-width: 1.5rem;
+        text-align: right;
+      }
+
+      .plan-name {
+        flex: 1;
+        font-weight: 600;
+        font-size: 0.875rem;
+      }
+
+      .plan-meta {
+        font-size: 0.75rem;
+        color: var(--text-sub, #6b7280);
+      }
+
+      .grade-badge {
+        padding: 0.1rem 0.5rem;
+        border-radius: 999px;
+        font-size: 0.72rem;
+        font-weight: 700;
+      }
+
+      .grade-badge--a {
+        background: #fef9c3;
+        color: #92400e;
+      }
+      .grade-badge--b {
+        background: #dbeafe;
+        color: #1e40af;
+      }
+
+      .plan-subject-body {
+        padding: 0.6rem 0.75rem 0.75rem;
+        display: grid;
+        gap: 0.5rem;
+        background: #fff;
+        border-top: 1px solid #e2e8f0;
+      }
+
+      .plan-reason {
+        font-size: 0.82rem;
+        color: var(--text-sub, #6b7280);
+        margin: 0;
+      }
+
+      .plan-weekly strong {
+        font-size: 0.82rem;
+        display: block;
+        margin-bottom: 0.3rem;
+        color: var(--text-main, #1f2937);
       }
 
       .state-card {
@@ -1352,6 +1639,7 @@ export class AdvisorStudentDetailComponent implements OnInit {
 
   gpaRoadmap: GpaRoadmap | null = null;
   retakeRoadmap: RetakeRoadmap | null = null;
+  roadmapError = false;
 
   isLoading = true;
   loadingRoadmap = false;
@@ -1668,6 +1956,14 @@ export class AdvisorStudentDetailComponent implements OnInit {
     return `priority-${priority}`;
   }
 
+  get roadmapCountA(): number {
+    return this.gpaRoadmap?.subjectPlans.filter((p) => p.targetGrade === 'A').length ?? 0;
+  }
+
+  get roadmapCountB(): number {
+    return this.gpaRoadmap?.subjectPlans.filter((p) => p.targetGrade === 'B').length ?? 0;
+  }
+
   priorityLabel(priority: 'critical' | 'high' | 'normal'): string {
     if (priority === 'critical') {
       return 'Cốt lõi';
@@ -1966,18 +2262,25 @@ export class AdvisorStudentDetailComponent implements OnInit {
     return '';
   }
 
-  private loadRoadmaps(): void {
+  protected loadRoadmaps(): void {
     this.loadingRoadmap = true;
+    this.roadmapError = false;
 
     forkJoin({
       gpaRoadmap: this.apiService
         .get<ApiResponse<GpaRoadmap>>(`/predictions/student/${this.studentId}/gpa-roadmap`, {
           targetGpa: this.targetGpa,
         })
-        .pipe(map((response) => response.data)),
+        .pipe(
+          map((response) => response.data),
+          catchError(() => of(null)),
+        ),
       retakeRoadmap: this.apiService
         .get<ApiResponse<RetakeRoadmap>>(`/predictions/student/${this.studentId}/retake-roadmap`)
-        .pipe(map((response) => response.data)),
+        .pipe(
+          map((response) => response.data),
+          catchError(() => of(null)),
+        ),
     })
       .pipe(
         finalize(() => {
@@ -1989,6 +2292,9 @@ export class AdvisorStudentDetailComponent implements OnInit {
         next: ({ gpaRoadmap, retakeRoadmap }) => {
           this.gpaRoadmap = gpaRoadmap;
           this.retakeRoadmap = retakeRoadmap;
+          if (!gpaRoadmap && !retakeRoadmap) {
+            this.roadmapError = true;
+          }
         },
         error: () => {
           this.gpaRoadmap = null;

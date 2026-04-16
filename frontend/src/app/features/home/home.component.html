@@ -1,3 +1,6 @@
+<!-- SMOKE TRAIL CURSOR (same as /dashboard) -->
+<canvas #smokeCanvas class="smoke-overlay" aria-hidden="true"></canvas>
+
 <!-- NAVBAR -->
 <header class="navbar">
   <div class="container">
@@ -28,6 +31,7 @@
 
 <!-- HERO -->
 <section class="hero">
+  <canvas #heroCanvas class="hero-particles" aria-hidden="true"></canvas>
   <div class="container">
     <div class="hero__inner">
       <div>
@@ -293,6 +297,7 @@
       </div>
 
       <div class="role-card role-card--teacher reveal reveal-d2">
+        <canvas #teacherCanvas class="section-particles" aria-hidden="true"></canvas>
         <div class="role-card__header">
           <div class="role-card__avatar">
             <lucide-icon name="user" [size]="20"></lucide-icon>
@@ -461,6 +466,7 @@
 
 <!-- TECH STACK -->
 <section class="section section--navy" id="tech">
+  <canvas #navyCanvas class="section-particles" aria-hidden="true"></canvas>
   <div class="container">
     <div style="text-align: center">
       <div class="section__label" style="margin-inline: auto">
@@ -514,6 +520,7 @@
 <section class="section">
   <div class="container container--md">
     <div class="cta-box reveal">
+      <canvas #ctaCanvas class="section-particles" aria-hidden="true"></canvas>
       <h2 class="cta-box__title">Bắt đầu sử dụng ngay</h2>
       <p class="cta-box__sub">
         Đăng nhập bằng tài khoản được cấp bởi Admin khoa.<br />
@@ -541,6 +548,7 @@
 
 <!-- FOOTER -->
 <footer class="footer">
+  <canvas #footerCanvas class="section-particles" aria-hidden="true"></canvas>
   <div class="container">
     <div class="footer__inner">
       <div class="footer__logo">

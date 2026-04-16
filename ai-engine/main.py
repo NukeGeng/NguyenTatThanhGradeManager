@@ -2,7 +2,7 @@ import os
 import pickle
 from pathlib import Path
 from typing import Any
-from urllib.parse import urlparse
+from urllib.parse import urlparse, quote
 
 import numpy as np
 from dotenv import load_dotenv
@@ -22,6 +22,7 @@ from schemas import (
     RetakeSubject,
     SemesterPlanRequest,
     SemesterPlanResponse,
+    StudyResource,
     SubjectPlan,
     SubjectResult,
 )
@@ -277,21 +278,44 @@ def _subject_priority(subject: SubjectResult) -> str:
     return "normal"
 
 
-def _target_grade(required_remaining: float, priority: str) -> tuple[str, float]:
-    if required_remaining >= 3.8:
-        return "A", 4.0
+def _allocate_grades(
+    sorted_subjects: list[SubjectResult],
+    required_remaining: float,
+) -> list[tuple[str, float]]:
+    """
+    Phân bổ A/B sao cho trung bình GPA4 có trọng số tín chỉ đạt đúng required_remaining.
 
-    if required_remaining >= 3.2:
-        if priority in {"critical", "high"}:
-            return "A", 4.0
-        return "B", 3.0
+    Thuật toán:
+    1. Tính min/max có thể đạt được (tất cả B = 3.0, tất cả A = 4.0).
+    2. Nếu required_remaining <= 3.0 → tất cả B.
+    3. Nếu required_remaining >= 4.0 → tất cả A.
+    4. Ngược lại, tính số tín chỉ cần đạt A (credits_A) để trung bình = required_remaining:
+         credits_A * 4.0 + credits_B * 3.0 = required_remaining * total_credits
+         credits_A = (required_remaining - 3.0) * total_credits
+    5. Sắp xếp theo priority (critical > high > normal), gán A cho đến khi đủ credits_A.
+    """
+    total_credits = sum(s.credits for s in sorted_subjects)
+    if total_credits == 0:
+        return [("B", 3.0) for _ in sorted_subjects]
 
-    if required_remaining >= 2.5:
-        if priority == "critical":
-            return "A", 4.0
-        return "B", 3.0
+    if required_remaining <= 3.0:
+        return [("B", 3.0) for _ in sorted_subjects]
 
-    return "B", 3.0
+    if required_remaining >= 4.0:
+        return [("A", 4.0) for _ in sorted_subjects]
+
+    credits_need_a = (required_remaining - 3.0) * total_credits  # số tín chỉ phải đạt A
+    accumulated_a = 0.0
+    results: list[tuple[str, float]] = []
+
+    for subject in sorted_subjects:
+        if accumulated_a < credits_need_a:
+            results.append(("A", 4.0))
+            accumulated_a += subject.credits
+        else:
+            results.append(("B", 3.0))
+
+    return results
 
 
 def _build_subject_reason(subject: SubjectResult, priority: str, target_grade: str) -> str:
@@ -345,13 +369,15 @@ def _build_gpa_roadmap(request_data: GpaRoadmapRequest) -> GpaRoadmapResponse:
     subjects_in_current_slot = 0
     max_subjects_per_semester = 6
 
-    for subject in sorted_remaining:
+    # Phân bổ A/B theo trọng số tín chỉ, không dùng threshold cứng per-subject
+    grade_allocations = _allocate_grades(sorted_remaining, required_remaining)
+
+    for subject, (target_grade, target_gpa4) in zip(sorted_remaining, grade_allocations):
         if subjects_in_current_slot >= max_subjects_per_semester:
             semester, year = _next_semester_year(semester, year)
             subjects_in_current_slot = 0
 
         priority = _subject_priority(subject)
-        target_grade, target_gpa4 = _target_grade(required_remaining, priority)
 
         plan = SubjectPlan(
             subjectCode=subject.subjectCode,
@@ -363,6 +389,15 @@ def _build_gpa_roadmap(request_data: GpaRoadmapRequest) -> GpaRoadmapResponse:
             reason=_build_subject_reason(subject, priority, target_grade),
             semester=semester,
             year=year,
+            weeklyPlan=_gen_weekly_plan(
+                subject.subjectName,
+                getattr(subject, "category", "theory") or "theory",
+                subject.credits,
+            ),
+            resources=_gen_resources(
+                subject.subjectName,
+                getattr(subject, "category", "theory") or "theory",
+            ),
         )
         subject_plans.append(plan)
 
@@ -388,9 +423,13 @@ def _build_gpa_roadmap(request_data: GpaRoadmapRequest) -> GpaRoadmapResponse:
         subjects_in_current_slot += 1
 
     focus_subjects = ", ".join(item.subjectName for item in sorted_remaining[:3])
+    count_a = sum(1 for p in subject_plans if p.targetGrade == "A")
+    count_b = sum(1 for p in subject_plans if p.targetGrade == "B")
+    grade_breakdown = f"{count_a} môn cần đạt A, {count_b} môn đạt B là đủ. "
     summary = (
         f"Để đạt GPA {request_data.targetGpa:.2f} ({_target_label(request_data.targetGpa)}), "
         f"bạn cần đạt trung bình {required_remaining:.2f} GPA ở {len(sorted_remaining)} môn còn lại. "
+        f"{grade_breakdown}"
         f"Cần ưu tiên các môn: {focus_subjects}."
     )
 
@@ -407,6 +446,156 @@ def _build_gpa_roadmap(request_data: GpaRoadmapRequest) -> GpaRoadmapResponse:
     )
 
 
+# ============================================================
+# TEMPLATE ENGINE & SEARCH LINK GENERATOR
+# ============================================================
+
+_WEEKLY_PLAN_TEMPLATES: dict[str, list[str]] = {
+    "language": [
+        "Tuần {w1}: Ôn lại toàn bộ từ vựng và ngữ pháp nền tảng của môn {name}",
+        "Tuần {w2}: Luyện kỹ năng đọc hiểu — đọc ít nhất 1 bài/ngày và ghi chép từ mới",
+        "Tuần {w3}: Luyện kỹ năng nghe — nghe audio bài giảng và podcast liên quan",
+        "Tuần {w4}: Luyện viết và nói — viết đoạn văn ngắn, luyện phát âm theo bài mẫu",
+        "Tuần {w5}: Làm lại toàn bộ bài tập trong giáo trình {name}",
+        "Tuần {w6}: Luyện đề thi cũ — phân tích lỗi sai và bổ sung từng điểm yếu",
+        "Tuần {w7}: Kiểm tra thử với đề thi mới, củng cố những mảng còn yếu",
+        "Tuần {w8}: Ôn tổng hợp — tập trung vào dạng câu hỏi hay ra trong kỳ thi",
+    ],
+    "practice": [
+        "Tuần {w1}: Đọc lại toàn bộ lý thuyết nền của môn {name}, lập mind-map từng chương",
+        "Tuần {w2}: Xem lại slide bài giảng và ghi chú những khái niệm chưa rõ",
+        "Tuần {w3}: Làm lại từng bài lab từ đầu — chạy lại code/thực hành từng bước",
+        "Tuần {w4}: Tự build project nhỏ áp dụng kiến thức môn {name} từ đầu",
+        "Tuần {w5}: Debug và hoàn thiện project, viết ghi chú kỹ thuật từng phần",
+        "Tuần {w6}: Xem thêm ví dụ trên internet, so sánh với cách làm của mình",
+        "Tuần {w7}: Ôn lý thuyết đi kèm phần thực hành — chuẩn bị cho phần thi lý thuyết",
+        "Tuần {w8}: Làm đề thi thử, kiểm tra lại toàn bộ kỹ năng thực hành",
+    ],
+    "both": [
+        "Tuần {w1}: Đọc lại lý thuyết chương 1–2 của môn {name}, ghi chú khái niệm cốt lõi",
+        "Tuần {w2}: Làm bài tập lý thuyết chương 1–2 và hoàn thành bài lab tương ứng",
+        "Tuần {w3}: Đọc lý thuyết chương 3–4, tiếp tục bài thực hành theo tiến độ",
+        "Tuần {w4}: Làm bài tập tổng hợp chương 1–4, xem lại lỗi sai",
+        "Tuần {w5}: Ôn toàn bộ phần lý thuyết còn lại, tập trung phần hay thi",
+        "Tuần {w6}: Hoàn thiện toàn bộ bài lab — đảm bảo mỗi bài chạy đúng",
+        "Tuần {w7}: Luyện đề thi cũ kết hợp lý thuyết và thực hành",
+        "Tuần {w8}: Kiểm tra thử toàn bộ, củng cố điểm yếu cuối cùng",
+    ],
+    "science": [
+        "Tuần {w1}: Đọc lại lý thuyết và công thức cốt lõi của môn {name}",
+        "Tuần {w2}: Giải bài tập chương 1–2 từ cơ bản đến nâng cao",
+        "Tuần {w3}: Giải bài tập chương 3–4, đặc biệt chú ý dạng bài tính toán",
+        "Tuần {w4}: Làm đề thi cũ phần trắc nghiệm — rà soát lỗi sai từng câu",
+        "Tuần {w5}: Ôn lại công thức và định lý, lập bảng tổng hợp công thức",
+        "Tuần {w6}: Giải đề thi tự luận cũ — rèn kỹ năng trình bày bài toán",
+        "Tuần {w7}: Luyện tập dạng bài khó và dạng bài mới",
+        "Tuần {w8}: Kiểm tra thử toàn bộ chương trình môn {name}",
+    ],
+    "social": [
+        "Tuần {w1}: Đọc lại toàn bộ giáo trình môn {name}, tóm tắt ý chính từng chương",
+        "Tuần {w2}: Ghi nhớ các khái niệm, định nghĩa và mô hình lý thuyết quan trọng",
+        "Tuần {w3}: Làm bài tập phân tích tình huống — liên hệ lý thuyết với thực tiễn",
+        "Tuần {w4}: Đọc thêm tài liệu tham khảo, bổ sung ví dụ thực tế",
+        "Tuần {w5}: Ôn lý thuyết theo dạng câu hỏi thi — luyện trả lời ngắn gọn",
+        "Tuần {w6}: Làm đề thi thử và chấm điểm theo thang điểm đáp án",
+        "Tuần {w7}: Củng cố các mảng kiến thức còn yếu dựa trên kết quả làm đề",
+        "Tuần {w8}: Ôn tổng hợp và hệ thống hóa toàn bộ nội dung môn học",
+    ],
+    "specialized": [
+        "Tuần {w1}: Đọc lại đề cương và slide toàn bộ môn {name}, xác định trọng tâm",
+        "Tuần {w2}: Ôn lý thuyết chuyên ngành phần 1 — ghi chép và hệ thống hóa",
+        "Tuần {w3}: Ôn lý thuyết chuyên ngành phần 2 — kết hợp làm bài tập",
+        "Tuần {w4}: Tham khảo tài liệu kỹ thuật bổ trợ và tài liệu chuẩn ngành",
+        "Tuần {w5}: Làm bài tập tổng hợp và đề thi thử — phân tích đáp án",
+        "Tuần {w6}: Thực hành thêm case study hoặc bài tập tình huống thực tế",
+        "Tuần {w7}: Ôn toàn bộ trọng tâm — lập checklist kiến thức cần nhớ",
+        "Tuần {w8}: Kiểm tra thử lần cuối và bổ sung những điểm còn thiếu",
+    ],
+    "other": [
+        "Tuần {w1}: Đọc lại toàn bộ giáo trình và đề cương môn {name}",
+        "Tuần {w2}: Hệ thống hóa kiến thức theo từng chương — lập sơ đồ tư duy",
+        "Tuần {w3}: Làm bài tập và câu hỏi ôn tập từng chương",
+        "Tuần {w4}: Làm đề thi cũ, chú ý dạng câu hỏi hay gặp",
+        "Tuần {w5}: Ôn lại phần kiến thức còn yếu dựa trên kết quả đề cũ",
+        "Tuần {w6}: Kiểm tra thử toàn bộ nội dung môn học",
+    ],
+    "theory": [
+        "Tuần {w1}: Đọc lại lý thuyết từng chương của môn {name}, lập mind-map",
+        "Tuần {w2}: Ghi chép và ghi nhớ các khái niệm, định nghĩa quan trọng",
+        "Tuần {w3}: Làm bài tập lý thuyết và câu hỏi ôn tập từng chương",
+        "Tuần {w4}: Đọc thêm tài liệu tham khảo, mở rộng hiểu biết",
+        "Tuần {w5}: Luyện đề thi cũ — phân tích và sửa lỗi từng câu",
+        "Tuần {w6}: Ôn tổng hợp, tập trung phần hay thi và phần còn yếu",
+    ],
+}
+
+
+def _gen_weekly_plan(subject_name: str, category: str, credits: int) -> list[str]:
+    """Sinh lộ trình học theo tuần dựa trên category và số tín chỉ (credits * 2 tuần)."""
+    total_weeks = credits * 2
+    template_key = category if category in _WEEKLY_PLAN_TEMPLATES else "theory"
+    template = _WEEKLY_PLAN_TEMPLATES[template_key]
+    selected = template[:total_weeks]
+    result: list[str] = []
+    for i, item in enumerate(selected, start=1):
+        line = item.format(w1=1, w2=2, w3=3, w4=4, w5=5, w6=6, w7=7, w8=8, name=subject_name)
+        # Thay số tuần thực tế vào label
+        line = line.replace(f"Tuần {i - (i - 1)}", f"Tuần {i}", 1) if f"Tuần {i}" not in line else line
+        result.append(line)
+    return result
+
+
+def _gen_resources(subject_name: str, category: str) -> list[StudyResource]:
+    """Sinh danh sách link tìm kiếm tài liệu tự động theo tên môn."""
+    q_vi = quote(f"{subject_name} giáo trình đại học")
+    q_yt = quote(f"{subject_name} bài giảng")
+
+    resources: list[StudyResource] = [
+        StudyResource(
+            title=f"Tìm PDF giáo trình {subject_name} trên Google",
+            url=f"https://www.google.com/search?q={q_vi}+filetype:pdf",
+            type="search",
+        ),
+        StudyResource(
+            title=f"Xem bài giảng {subject_name} trên YouTube",
+            url=f"https://www.youtube.com/results?search_query={q_yt}+bai+giang",
+            type="video",
+        ),
+        StudyResource(
+            title=f"Tài liệu mở {subject_name} — MIT OpenCourseWare",
+            url=f"https://ocw.mit.edu/search/?q={quote(subject_name)}",
+            type="opencourse",
+        ),
+    ]
+
+    if category in {"practice", "both", "specialized"}:
+        resources.append(
+            StudyResource(
+                title=f"Tìm project mẫu {subject_name} trên GitHub",
+                url=f"https://github.com/search?q={quote(subject_name)}&type=repositories",
+                type="docs",
+            )
+        )
+    elif category == "language":
+        resources.append(
+            StudyResource(
+                title=f"Luyện tập {subject_name} trên BBC Learning English",
+                url="https://www.bbc.co.uk/learningenglish/",
+                type="docs",
+            )
+        )
+    elif category == "science":
+        resources.append(
+            StudyResource(
+                title=f"Tài liệu {subject_name} trên Khan Academy",
+                url=f"https://www.khanacademy.org/search?page_search_query={quote(subject_name)}",
+                type="docs",
+            )
+        )
+
+    return resources
+
+
 def _build_retake_item(
     subject: SubjectResult,
     urgency: str,
@@ -418,6 +607,7 @@ def _build_retake_item(
         if urgency == "urgent"
         else "Môn C nên cải thiện để tăng GPA tích lũy"
     )
+    category = getattr(subject, "category", "theory") or "theory"
 
     return RetakeSubject(
         subjectCode=subject.subjectCode,
@@ -430,6 +620,8 @@ def _build_retake_item(
         prerequisiteFor=[],
         suggestedSemester=suggested_semester,
         reason=reason,
+        weeklyPlan=_gen_weekly_plan(subject.subjectName, category, subject.credits),
+        resources=_gen_resources(subject.subjectName, category),
     )
 
 

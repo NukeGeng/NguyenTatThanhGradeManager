@@ -46,6 +46,7 @@ class SubjectResult(BaseModel):
     letterGrade: str = ""
     status: str
     isRequired: bool = True
+    category: str = "theory"  # theory|practice|both|science|social|language|specialized|other
 
 
 class GpaRoadmapRequest(BaseModel):
@@ -67,6 +68,14 @@ class SubjectPlan(BaseModel):
     reason: str
     semester: int = Field(ge=1, le=3)
     year: int = Field(ge=1)
+    weeklyPlan: list[str] = Field(default_factory=list)
+    resources: list["StudyResource"] = Field(default_factory=list)
+
+
+class StudyResource(BaseModel):
+    title: str
+    url: str
+    type: str  # search|video|opencourse|docs
 
 
 class RetakeSubject(BaseModel):
@@ -80,6 +89,8 @@ class RetakeSubject(BaseModel):
     prerequisiteFor: list[str] = Field(default_factory=list)
     suggestedSemester: int = Field(ge=1, le=3)
     reason: str
+    weeklyPlan: list[str] = Field(default_factory=list)
+    resources: list[StudyResource] = Field(default_factory=list)
 
 
 class GpaRoadmapResponse(BaseModel):

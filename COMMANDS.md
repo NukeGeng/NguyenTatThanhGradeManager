@@ -69,10 +69,13 @@ npm run dev
 # → Server chạy tại http://localhost:3000
 
 # Terminal 2 — AI Engine
-cd ai-engine
-venv\Scripts\activate        # Windows
-# source venv/bin/activate   # macOS/Linux
-uvicorn main:app --port 5000 --reload
+# Cách 1: dùng --app-dir (không cần cd vào thư mục ai-engine)
+.venv\Scripts\uvicorn.exe --app-dir ai-engine main:app --port 5000 --reload
+
+# Cách 2: activate venv rồi cd vào ai-engine
+# venv\Scripts\activate
+# cd ai-engine
+# uvicorn main:app --port 5000 --reload
 # → AI API chạy tại http://localhost:5000
 
 # Terminal 3 — Frontend
