@@ -32,6 +32,14 @@ export class ApiService {
     return this.http.delete<T>(this.toUrl(endpoint));
   }
 
+  postFormData<T>(endpoint: string, body: FormData): Observable<T> {
+    return this.http.post<T>(this.toUrl(endpoint), body);
+  }
+
+  putFormData<T>(endpoint: string, body: FormData): Observable<T> {
+    return this.http.put<T>(this.toUrl(endpoint), body);
+  }
+
   private toUrl(endpoint: string): string {
     const normalized = endpoint.startsWith('/') ? endpoint : `/${endpoint}`;
     return `${this.baseUrl}${normalized}`;

@@ -2120,13 +2120,20 @@ export class AdvisorStudentDetailComponent implements OnInit {
     registrations: StudentRegistration[],
   ): SemesterOption[] {
     const mapByKey = new Map<string, SemesterOption>();
+    const baseStartYear = this.resolveBaseStartYear(registrations);
 
     for (const item of details) {
-      const schoolYear = this.findSchoolYearForDetail(item, registrations);
       const key = `${item.year}-${item.semester}`;
-      const label = schoolYear
-        ? `HK ${item.semester} NH ${schoolYear}`
-        : `HK ${item.semester} Nam ${item.year}`;
+      let schoolYear: string | undefined;
+      let label: string;
+
+      if (baseStartYear !== null) {
+        const sy = baseStartYear + (item.year - 1);
+        schoolYear = `${sy}-${sy + 1}`;
+        label = `HK ${item.semester} NH ${schoolYear}`;
+      } else {
+        label = `HK ${item.semester} Năm ${item.year}`;
+      }
 
       mapByKey.set(key, {
         key,
@@ -2141,10 +2148,26 @@ export class AdvisorStudentDetailComponent implements OnInit {
       const yearA = Number(a.year || 0);
       const yearB = Number(b.year || 0);
       if (yearA !== yearB) {
-        return yearB - yearA;
+        return yearA - yearB;
       }
-      return b.semester - a.semester;
+      return a.semester - b.semester;
     });
+  }
+
+  private resolveBaseStartYear(registrations: StudentRegistration[]): number | null {
+    let minYear: number | null = null;
+    for (const reg of registrations) {
+      const match = String(reg.schoolYear || '')
+        .trim()
+        .match(/^(\d{4})-\d{4}$/);
+      if (match) {
+        const year = parseInt(match[1], 10);
+        if (minYear === null || year < minYear) {
+          minYear = year;
+        }
+      }
+    }
+    return minYear;
   }
 
   private buildClassSemesterOptions(registrations: StudentRegistration[]): SemesterOption[] {
@@ -2174,23 +2197,6 @@ export class AdvisorStudentDetailComponent implements OnInit {
       }
       return b.semester - a.semester;
     });
-  }
-
-  private findSchoolYearForDetail(
-    detail: ProgressDetail,
-    registrations: StudentRegistration[],
-  ): string | undefined {
-    const match = registrations.find((registration) => {
-      const subjectCode = this.registrationSubjectCode(registration);
-      return (
-        Number(registration.semester || 0) === detail.semester &&
-        subjectCode &&
-        subjectCode === detail.subjectCode
-      );
-    });
-
-    const schoolYear = String(match?.schoolYear || '').trim();
-    return schoolYear || undefined;
   }
 
   private mapRegistrationToClassRow(registration: StudentRegistration): ClassSemesterRow {

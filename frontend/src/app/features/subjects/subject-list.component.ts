@@ -167,7 +167,7 @@ interface SubjectUpsertPayload {
 
               <ng-container matColumnDef="name">
                 <th mat-header-cell *matHeaderCellDef>Tên môn</th>
-                <td mat-cell *matCellDef="let row">{{ row.name }}</td>
+                <td mat-cell *matCellDef="let row" class="cell-center">{{ row.name }}</td>
               </ng-container>
 
               <ng-container matColumnDef="department">

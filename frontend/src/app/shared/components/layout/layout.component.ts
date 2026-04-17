@@ -49,7 +49,6 @@ interface LayoutNavItem {
           </button>
 
           <a routerLink="/dashboard" class="school-brand">
-            <img class="school-shield" src="assets/images/logo-nttu.png" alt="Logo NTTU" />
             <img class="school-wordmark" src="assets/images/LogoNTTU.svg" alt="Logo NTTU" />
           </a>
 

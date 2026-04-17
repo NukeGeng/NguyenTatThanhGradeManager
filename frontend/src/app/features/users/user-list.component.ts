@@ -230,7 +230,7 @@ interface AdvisingClassesDialogData {
 
               <ng-container matColumnDef="teacher">
                 <th mat-header-cell *matHeaderCellDef>Họ tên</th>
-                <td mat-cell *matCellDef="let row">{{ row.name }}</td>
+                <td mat-cell *matCellDef="let row" class="cell-center">{{ row.name }}</td>
               </ng-container>
 
               <ng-container matColumnDef="role">
@@ -245,7 +245,7 @@ interface AdvisingClassesDialogData {
                 <td
                   mat-cell
                   *matCellDef="let row"
-                  class="department-cell"
+                  class="department-cell cell-center"
                   [title]="getDepartmentDisplay(row.departmentIds)"
                 >
                   {{ getDepartmentDisplay(row.departmentIds) }}
@@ -465,7 +465,6 @@ interface AdvisingClassesDialogData {
       }
 
       .department-cell {
-        text-align: left;
         white-space: nowrap;
         overflow: hidden;
         text-overflow: ellipsis;

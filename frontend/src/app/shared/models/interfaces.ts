@@ -102,6 +102,9 @@ export interface Message {
   senderId: string | User;
   senderName: string;
   content: string;
+  messageType: 'text' | 'image' | 'form';
+  imageUrl?: string;
+  formTitle?: string;
   isRead: boolean;
   readBy: Array<string | User>;
   createdAt: string;

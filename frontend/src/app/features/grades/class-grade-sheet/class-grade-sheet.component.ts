@@ -1,6 +1,6 @@
 import { CommonModule } from '@angular/common';
 import { HttpErrorResponse } from '@angular/common/http';
-import { Component, DestroyRef, OnInit, inject } from '@angular/core';
+import { Component, DestroyRef, Input, OnInit, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormBuilder, ReactiveFormsModule, Validators } from '@angular/forms';
 import { RouterLink } from '@angular/router';
@@ -45,70 +45,74 @@ interface RegistrationTermOption {
   ],
   template: `
     <section class="container page-wrap">
-      <nav class="breadcrumb" aria-label="Breadcrumb">
-        <span>Dashboard</span>
-        <span class="breadcrumb-sep">/</span>
-        <span>Nhập điểm</span>
-        <span class="breadcrumb-sep">/</span>
-        <span>Bảng điểm cả lớp</span>
-      </nav>
+      @if (!presetClass) {
+        <nav class="breadcrumb" aria-label="Breadcrumb">
+          <span>Dashboard</span>
+          <span class="breadcrumb-sep">/</span>
+          <span>Nhập điểm</span>
+          <span class="breadcrumb-sep">/</span>
+          <span>Bảng điểm cả lớp</span>
+        </nav>
 
-      <header class="page-header">
-        <div>
-          <p class="eyebrow">Tổng hợp điểm lớp</p>
-          <h1 class="page-title">Bảng điểm theo lớp học phần</h1>
-          <p class="subtitle">Xem toàn bộ điểm sinh viên trong một lớp theo dạng bảng tổng hợp.</p>
-        </div>
-
-        <a mat-stroked-button [routerLink]="['/grades']">
-          <lucide-icon name="arrow-left" [size]="16"></lucide-icon>
-          Quay lại nhập điểm
-        </a>
-      </header>
-
-      <mat-card class="content-card card-block">
-        <form [formGroup]="selectionForm" class="filters-grid filter-bar">
-          <mat-form-field appearance="outline">
-            <mat-label>Đợt đăng ký</mat-label>
-            <mat-select
-              formControlName="registrationTerm"
-              (selectionChange)="onRegistrationTermChange()"
-            >
-              <mat-option value="">Chọn đợt đăng ký</mat-option>
-              @for (term of registrationTerms; track term.key) {
-                <mat-option [value]="term.key">{{ term.label }}</mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-
-          <mat-form-field appearance="outline">
-            <mat-label>Lớp học phần</mat-label>
-            <mat-select formControlName="classId" (selectionChange)="onClassChange()">
-              <mat-option value="">Chọn lớp học phần</mat-option>
-              @for (classItem of filteredClasses; track classItem._id) {
-                <mat-option [value]="classItem._id">
-                  {{ classItem.code }} - {{ classItem.name || classItem.code }}
-                </mat-option>
-              }
-            </mat-select>
-          </mat-form-field>
-        </form>
-
-        @if (selectedClass) {
-          <div class="class-meta">
-            <p>
-              <strong>Lớp:</strong> {{ selectedClass.code }} -
-              {{ selectedClass.name || selectedClass.code }}
-            </p>
-            <p>
-              <strong>Trọng số:</strong>
-              TX({{ selectedClass.weights.tx }}%) · GK({{ selectedClass.weights.gk }}%) · TH({{
-                selectedClass.weights.th
-              }}%) · TKT({{ selectedClass.weights.tkt }}%)
+        <header class="page-header">
+          <div>
+            <p class="eyebrow">Tổng hợp điểm lớp</p>
+            <h1 class="page-title">Bảng điểm theo lớp học phần</h1>
+            <p class="subtitle">
+              Xem toàn bộ điểm sinh viên trong một lớp theo dạng bảng tổng hợp.
             </p>
           </div>
-        }
-      </mat-card>
+
+          <a mat-stroked-button [routerLink]="['/grades']">
+            <lucide-icon name="arrow-left" [size]="16"></lucide-icon>
+            Quay lại nhập điểm
+          </a>
+        </header>
+
+        <mat-card class="content-card card-block">
+          <form [formGroup]="selectionForm" class="filters-grid filter-bar">
+            <mat-form-field appearance="outline">
+              <mat-label>Đợt đăng ký</mat-label>
+              <mat-select
+                formControlName="registrationTerm"
+                (selectionChange)="onRegistrationTermChange()"
+              >
+                <mat-option value="">Chọn đợt đăng ký</mat-option>
+                @for (term of registrationTerms; track term.key) {
+                  <mat-option [value]="term.key">{{ term.label }}</mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+
+            <mat-form-field appearance="outline">
+              <mat-label>Lớp học phần</mat-label>
+              <mat-select formControlName="classId" (selectionChange)="onClassChange()">
+                <mat-option value="">Chọn lớp học phần</mat-option>
+                @for (classItem of filteredClasses; track classItem._id) {
+                  <mat-option [value]="classItem._id">
+                    {{ classItem.code }} - {{ classItem.name || classItem.code }}
+                  </mat-option>
+                }
+              </mat-select>
+            </mat-form-field>
+          </form>
+
+          @if (selectedClass) {
+            <div class="class-meta">
+              <p>
+                <strong>Lớp:</strong> {{ selectedClass.code }} -
+                {{ selectedClass.name || selectedClass.code }}
+              </p>
+              <p>
+                <strong>Trọng số:</strong>
+                TX({{ selectedClass.weights.tx }}%) · GK({{ selectedClass.weights.gk }}%) · TH({{
+                  selectedClass.weights.th
+                }}%) · TKT({{ selectedClass.weights.tkt }}%)
+              </p>
+            </div>
+          }
+        </mat-card>
+      }
 
       <mat-card class="content-card card-block">
         @if (!selectedClass) {
@@ -320,6 +324,8 @@ interface RegistrationTermOption {
   ],
 })
 export class ClassGradeSheetComponent implements OnInit {
+  @Input() presetClass: Class | null = null;
+
   private readonly apiService = inject(ApiService);
   private readonly fb = inject(FormBuilder);
   private readonly destroyRef = inject(DestroyRef);
@@ -351,7 +357,12 @@ export class ClassGradeSheetComponent implements OnInit {
   errorMessage = '';
 
   ngOnInit(): void {
-    this.loadMasterData();
+    if (this.presetClass) {
+      this.selectedClass = this.presetClass;
+      this.loadClassContext();
+    } else {
+      this.loadMasterData();
+    }
   }
 
   get txHeaderIndexes(): number[] {

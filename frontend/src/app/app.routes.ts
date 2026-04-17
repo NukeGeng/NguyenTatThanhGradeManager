@@ -24,6 +24,16 @@ export const routes: Routes = [
     loadComponent: () => import('./features/news/news.component').then((m) => m.NewsComponent),
   },
   {
+    path: 'news/:slug',
+    loadComponent: () =>
+      import('./features/news/news-category.component').then((m) => m.NewsCategoryComponent),
+  },
+  {
+    path: 'news/:category/:id',
+    loadComponent: () =>
+      import('./features/news/news-detail.component').then((m) => m.NewsDetailComponent),
+  },
+  {
     path: 'profile',
     canActivate: [authGuard],
     loadComponent: () =>
@@ -94,6 +104,11 @@ export const routes: Routes = [
     path: 'chat',
     canActivate: [authGuard],
     loadChildren: () => import('./features/chat/chat.routes').then((m) => m.CHAT_ROUTES),
+  },
+  {
+    path: 'support',
+    loadComponent: () =>
+      import('./features/support/support.component').then((m) => m.SupportComponent),
   },
   {
     path: '**',

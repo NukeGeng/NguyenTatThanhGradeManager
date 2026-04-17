@@ -24,9 +24,25 @@ const messageSchema = new mongoose.Schema(
     },
     content: {
       type: String,
-      required: [true, "content is required"],
+      default: "",
       trim: true,
       maxlength: 2000,
+    },
+    messageType: {
+      type: String,
+      enum: ["text", "image", "form"],
+      default: "text",
+    },
+    imageUrl: {
+      type: String,
+      default: "",
+      trim: true,
+    },
+    formTitle: {
+      type: String,
+      default: "",
+      trim: true,
+      maxlength: 200,
     },
     isRead: {
       type: Boolean,

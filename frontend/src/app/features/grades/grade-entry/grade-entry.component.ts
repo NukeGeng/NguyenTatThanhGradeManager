@@ -253,7 +253,7 @@ interface PredictClassSummary {
                   <th [attr.colspan]="txHeaderIndexes.length" class="group-col">
                     Đánh giá thường xuyên
                   </th>
-                  <th rowspan="3" class="group-col">TL/BTL</th>
+                  <th rowspan="3" class="group-col">GK</th>
                   <th [attr.colspan]="showThColumns ? thHeaderIndexes.length : 1" class="group-col">
                     Điểm thực hành
                   </th>
@@ -304,7 +304,7 @@ interface PredictClassSummary {
                       </td>
                     }
 
-                    <td>-</td>
+                    <td>{{ formatScore(getStudentGrade(student._id)?.gkScore) }}</td>
 
                     @if (showThColumns) {
                       @for (index of thHeaderIndexes; track index) {

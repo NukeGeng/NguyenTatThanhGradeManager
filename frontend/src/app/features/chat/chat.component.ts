@@ -5,7 +5,7 @@ import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { LucideAngularModule } from 'lucide-angular';
-import { debounceTime, finalize, map, Subject } from 'rxjs';
+import { debounceTime, finalize, map, Observable, Subject } from 'rxjs';
 
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
@@ -47,9 +47,33 @@ import {
         </label>
 
         <div class="rooms-tabs">
-          <button type="button" class="tab tab--active">Tất cả</button>
-          <button type="button" class="tab">Chưa đọc</button>
-          <button type="button" class="tab">Nhóm</button>
+          <button
+            type="button"
+            class="tab"
+            [class.tab--active]="activeTab === 'all'"
+            (click)="setTab('all')"
+          >
+            Tất cả
+          </button>
+          <button
+            type="button"
+            class="tab"
+            [class.tab--active]="activeTab === 'unread'"
+            (click)="setTab('unread')"
+          >
+            Chưa đọc
+            @if (totalUnread > 0) {
+              <span class="tab-badge">{{ totalUnread }}</span>
+            }
+          </button>
+          <button
+            type="button"
+            class="tab"
+            [class.tab--active]="activeTab === 'group'"
+            (click)="setTab('group')"
+          >
+            Nhóm
+          </button>
         </div>
 
         @if (loadingRooms) {
@@ -107,11 +131,36 @@ import {
           <div class="messages">
             @for (message of messages; track message._id) {
               <div class="message-row" [class.message-row--mine]="isMine(message)">
-                <article class="bubble" [class.mine]="isMine(message)">
+                <article
+                  class="bubble"
+                  [class.mine]="isMine(message)"
+                  [class.bubble--form]="message.messageType === 'form'"
+                >
                   @if (!isMine(message)) {
                     <p class="sender">{{ message.senderName }}</p>
                   }
-                  <p class="content">{{ message.content }}</p>
+                  @if (message.messageType === 'image') {
+                    <img [src]="resolveImageUrl(message.imageUrl)" alt="ảnh" class="bubble-image" />
+                    @if (message.content) {
+                      <p class="content">{{ message.content }}</p>
+                    }
+                  } @else if (message.messageType === 'form') {
+                    @if (message.formTitle) {
+                      <p class="form-msg-title">{{ message.formTitle }}</p>
+                    }
+                    @if (message.content) {
+                      <p class="content">{{ message.content }}</p>
+                    }
+                    @if (message.imageUrl) {
+                      <img
+                        [src]="resolveImageUrl(message.imageUrl)"
+                        alt="ảnh đính kèm"
+                        class="bubble-image"
+                      />
+                    }
+                  } @else {
+                    <p class="content">{{ message.content }}</p>
+                  }
                   <p class="time">{{ formatTime(message.createdAt) }}</p>
                 </article>
               </div>
@@ -126,21 +175,128 @@ import {
           </div>
 
           <footer class="composer">
-            <textarea
-              [(ngModel)]="draft"
-              (keydown)="handleKeydown($event)"
-              (input)="onTyping()"
-              placeholder="Nhập tin nhắn..."
-              maxlength="2000"
-            ></textarea>
+            @if (showFormPanel) {
+              <div class="form-panel">
+                <div class="form-panel-head">
+                  <span>Tin nhắn có tiêu đề</span>
+                  <button type="button" class="btn-icon" (click)="toggleFormPanel()">
+                    <lucide-icon name="x" [size]="14"></lucide-icon>
+                  </button>
+                </div>
+                <input
+                  [(ngModel)]="formTitle"
+                  placeholder="Tiêu đề (bắt buộc)..."
+                  maxlength="200"
+                  class="form-input"
+                />
+                <textarea
+                  [(ngModel)]="draft"
+                  (input)="onTyping()"
+                  placeholder="Nội dung..."
+                  maxlength="2000"
+                  class="form-textarea"
+                ></textarea>
+                <div class="form-panel-foot">
+                  <label class="image-upload-label">
+                    <lucide-icon name="image-plus" [size]="13"></lucide-icon>
+                    {{ formImageFile ? formImageFile.name : 'Đính kèm ảnh' }}
+                    <input
+                      #formImageInput
+                      type="file"
+                      accept="image/jpeg,image/png,image/gif,image/webp"
+                      style="display:none"
+                      (change)="onFormImageSelected($event)"
+                    />
+                  </label>
+                  @if (formImagePreview) {
+                    <div class="image-preview-wrap">
+                      <img [src]="formImagePreview" alt="preview" class="image-preview" />
+                      <button
+                        type="button"
+                        class="btn-icon btn-remove-img"
+                        (click)="clearFormImage()"
+                      >
+                        <lucide-icon name="x" [size]="11"></lucide-icon>
+                      </button>
+                    </div>
+                  }
+                  <span class="char-count" [class.warn]="draft.length > 1800">{{
+                    2000 - draft.length
+                  }}</span>
+                  <button
+                    mat-flat-button
+                    class="btn-send"
+                    type="button"
+                    (click)="sendForm()"
+                    [disabled]="!formTitle.trim()"
+                  >
+                    <lucide-icon name="send" [size]="14"></lucide-icon>
+                    Gửi
+                  </button>
+                </div>
+              </div>
+            } @else {
+              <div class="composer-row">
+                <div class="composer-tools">
+                  <button
+                    type="button"
+                    class="btn-icon"
+                    title="Gửi ảnh"
+                    (click)="imageInput.click()"
+                  >
+                    <lucide-icon name="image-plus" [size]="16"></lucide-icon>
+                  </button>
+                  <input
+                    #imageInput
+                    type="file"
+                    accept="image/jpeg,image/png,image/gif,image/webp"
+                    style="display:none"
+                    (change)="onImageSelected($event)"
+                  />
+                  <button
+                    type="button"
+                    class="btn-icon"
+                    title="Tin nhắn có tiêu đề"
+                    (click)="toggleFormPanel()"
+                  >
+                    <lucide-icon name="file-text" [size]="16"></lucide-icon>
+                  </button>
+                </div>
 
-            <div class="composer-actions">
-              <p class="char-count" [class.warn]="draft.length > 1800">{{ 2000 - draft.length }}</p>
-              <button mat-flat-button class="btn-send" type="button" (click)="send()">
-                <lucide-icon name="send" [size]="16"></lucide-icon>
-                Gửi
-              </button>
-            </div>
+                @if (pendingImage) {
+                  <div class="pending-image-row">
+                    <div class="image-preview-wrap">
+                      <img [src]="pendingImagePreview" alt="preview" class="image-preview" />
+                      <button
+                        type="button"
+                        class="btn-icon btn-remove-img"
+                        (click)="clearPendingImage()"
+                      >
+                        <lucide-icon name="x" [size]="11"></lucide-icon>
+                      </button>
+                    </div>
+                  </div>
+                } @else {
+                  <textarea
+                    [(ngModel)]="draft"
+                    (keydown)="handleKeydown($event)"
+                    (input)="onTyping(); autoResize($event)"
+                    placeholder="Nhập tin nhắn..."
+                    maxlength="2000"
+                    rows="1"
+                  ></textarea>
+                }
+
+                <button mat-flat-button class="btn-send" type="button" (click)="send()">
+                  <lucide-icon name="send" [size]="14"></lucide-icon>
+                </button>
+              </div>
+              @if (!pendingImage && draft.length > 1800) {
+                <p class="char-count warn" style="text-align:right;margin:0.2rem 0 0">
+                  {{ 2000 - draft.length }}
+                </p>
+              }
+            }
           </footer>
         }
       </section>
@@ -156,6 +312,8 @@ import {
         min-height: calc(100vh - 92px);
         max-height: calc(100vh - 92px);
         overflow: hidden;
+        /* Tránh đè lên nút theme-switcher cố định ở góc dưới phải */
+        padding-right: 3.5rem;
       }
 
       .rooms-panel,
@@ -222,14 +380,41 @@ import {
         border-radius: 999px;
         background: #fff;
         color: var(--text-sub);
-        font-size: 0.74rem;
-        font-weight: 700;
-        padding: 0.2rem 0.55rem;
+        font-size: 0.73rem;
+        font-weight: 600;
+        padding: 0.18rem 0.5rem;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        transition:
+          border-color 0.12s,
+          color 0.12s;
+      }
+
+      .tab:hover {
+        border-color: var(--navy);
+        color: var(--navy);
       }
 
       .tab--active {
-        border-color: var(--blue);
-        color: var(--blue);
+        border-color: var(--navy);
+        background: var(--navy);
+        color: #fff;
+      }
+
+      .tab--active:hover {
+        color: #fff;
+      }
+
+      .tab-badge {
+        background: #dc2626;
+        color: #fff;
+        border-radius: 999px;
+        font-size: 0.65rem;
+        font-weight: 700;
+        padding: 0 0.3rem;
+        line-height: 1.4;
       }
 
       .room-list {
@@ -347,12 +532,13 @@ import {
       .chat-head h2 {
         margin: 0;
         color: var(--navy);
+        font-size: 0.95rem;
       }
 
       .chat-head p {
-        margin: 0.15rem 0 0;
+        margin: 0.1rem 0 0;
         color: var(--text-sub);
-        font-size: 0.8rem;
+        font-size: 0.75rem;
       }
 
       .messages {
@@ -374,32 +560,36 @@ import {
       }
 
       .bubble {
-        max-width: min(78%, 620px);
-        background: #f3f4f6;
-        border-radius: 14px;
-        padding: 0.5rem 0.65rem;
+        max-width: min(75%, 560px);
+        background: #f1f5f9;
+        border-radius: 12px 12px 12px 3px;
+        padding: 0.45rem 0.65rem;
+        font-size: 0.875rem;
       }
 
       .bubble.mine {
-        background: #dbeafe;
+        background: var(--blue-pale, #dbeafe);
+        border-radius: 12px 12px 3px 12px;
       }
 
       .sender {
-        margin: 0;
+        margin: 0 0 0.12rem;
         color: var(--navy);
-        font-size: 0.73rem;
+        font-size: 0.72rem;
         font-weight: 700;
       }
 
       .content {
-        margin: 0.15rem 0;
+        margin: 0;
         white-space: pre-wrap;
+        line-height: 1.5;
       }
 
       .time {
-        margin: 0;
+        margin: 0.25rem 0 0;
         color: var(--text-sub);
-        font-size: 0.7rem;
+        font-size: 0.68rem;
+        text-align: right;
       }
 
       .typing {
@@ -435,30 +625,189 @@ import {
 
       .composer {
         border-top: 1px solid var(--gray-200);
-        padding: 0.7rem 0.9rem;
-        display: grid;
-        gap: 0.55rem;
+        padding: 0.5rem 0.75rem;
+        background: #fff;
       }
 
-      textarea {
-        width: 100%;
-        min-height: 80px;
-        resize: vertical;
-        border: 1px solid var(--gray-200);
+      .composer-row {
+        display: flex;
+        align-items: flex-end;
+        gap: 0.35rem;
+      }
+
+      .composer-tools {
+        display: flex;
+        gap: 0.15rem;
+        flex-shrink: 0;
+        padding-bottom: 0.15rem;
+      }
+
+      .btn-icon {
+        border: none;
+        background: transparent;
+        cursor: pointer;
+        padding: 0.28rem;
         border-radius: var(--radius-sm);
-        padding: 0.55rem 0.6rem;
-        font: inherit;
+        display: inline-flex;
+        align-items: center;
+        color: var(--text-sub);
+        flex-shrink: 0;
       }
 
-      .composer-actions {
+      .btn-icon:hover {
+        background: var(--gray-100);
+        color: var(--navy);
+      }
+
+      .image-preview-wrap {
+        position: relative;
+        display: inline-block;
+      }
+
+      .image-preview {
+        max-height: 120px;
+        max-width: 100%;
+        border-radius: var(--radius-sm);
+        border: 1px solid var(--gray-200);
+        display: block;
+      }
+
+      .btn-remove-img {
+        position: absolute;
+        top: 2px;
+        right: 2px;
+        background: rgba(0, 0, 0, 0.55) !important;
+        color: #fff !important;
+        border-radius: 999px;
+        padding: 0.15rem;
+        line-height: 1;
+      }
+
+      .form-panel {
+        display: grid;
+        gap: 0.35rem;
+        border: 1px solid var(--blue, #3b82f6);
+        border-radius: var(--radius-sm);
+        padding: 0.5rem 0.6rem;
+        background: var(--blue-pale, #eff6ff);
+      }
+
+      .form-panel-head {
         display: flex;
         justify-content: space-between;
         align-items: center;
+        font-size: 0.75rem;
+        font-weight: 700;
+        color: var(--navy);
+      }
+
+      .form-panel-foot {
+        display: flex;
+        align-items: center;
+        gap: 0.5rem;
+        flex-wrap: wrap;
+      }
+
+      .form-input {
+        border: 1px solid var(--gray-200);
+        border-radius: var(--radius-sm);
+        padding: 0.35rem 0.5rem;
+        font: inherit;
+        font-size: 0.85rem;
+        font-weight: 600;
+        outline: none;
+      }
+
+      .form-input:focus {
+        border-color: var(--blue, #3b82f6);
+      }
+
+      .form-textarea {
+        border: 1px solid var(--gray-200);
+        border-radius: var(--radius-sm);
+        padding: 0.35rem 0.5rem;
+        font: inherit;
+        font-size: 0.875rem;
+        min-height: 52px;
+        max-height: 120px;
+        resize: vertical;
+        outline: none;
+      }
+
+      .form-textarea:focus {
+        border-color: var(--blue, #3b82f6);
+      }
+
+      .image-upload-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        font-size: 0.75rem;
+        color: var(--text-sub);
+        cursor: pointer;
+        border: 1px dashed var(--gray-300, #cbd5e1);
+        border-radius: var(--radius-sm);
+        padding: 0.22rem 0.5rem;
+        white-space: nowrap;
+      }
+
+      .image-upload-label:hover {
+        border-color: var(--blue, #3b82f6);
+        color: var(--blue, #3b82f6);
+      }
+
+      .bubble-image {
+        max-width: 260px;
+        max-height: 200px;
+        border-radius: var(--radius-sm);
+        display: block;
+        margin-bottom: 0.25rem;
+        cursor: pointer;
+      }
+
+      .bubble--form {
+        border-left: 3px solid var(--blue);
+      }
+
+      .form-msg-title {
+        margin: 0 0 0.2rem;
+        font-weight: 700;
+        color: var(--navy);
+        font-size: 0.85rem;
+      }
+
+      textarea {
+        flex: 1;
+        min-width: 0;
+        min-height: 36px;
+        max-height: 140px;
+        resize: none;
+        overflow-y: auto;
+        border: 1px solid var(--gray-200);
+        border-radius: 18px;
+        padding: 0.45rem 0.75rem;
+        font: inherit;
+        font-size: 0.875rem;
+        line-height: 1.45;
+        outline: none;
+        transition: border-color 0.15s;
+      }
+
+      textarea:focus {
+        border-color: var(--blue, #3b82f6);
+      }
+
+      .pending-image-row {
+        flex: 1;
+        display: flex;
+        align-items: center;
+        min-height: 36px;
       }
 
       .char-count {
         margin: 0;
         color: var(--text-sub);
+        font-size: 0.72rem;
       }
 
       .char-count.warn {
@@ -468,6 +817,11 @@ import {
       .btn-send {
         background: var(--navy) !important;
         color: #fff !important;
+        padding: 0.35rem 0.6rem !important;
+        min-width: 0 !important;
+        border-radius: 8px !important;
+        flex-shrink: 0;
+        align-self: flex-end;
       }
 
       .empty-chat,
@@ -498,6 +852,7 @@ import {
           height: auto;
           min-height: auto;
           max-height: none;
+          padding-right: 3.5rem;
         }
 
         .rooms-panel {
@@ -526,7 +881,20 @@ export class ChatComponent implements OnInit, OnDestroy {
   draft = '';
   totalUnread = 0;
   typingUserName = '';
+  activeTab: 'all' | 'unread' | 'group' = 'all';
   private currentUserId = '';
+
+  // ── Form message ──
+  showFormPanel = false;
+  formTitle = '';
+
+  // ── Pending image (quick image send) ──
+  pendingImage: File | null = null;
+  pendingImagePreview = '';
+
+  // ── Form image ──
+  formImageFile: File | null = null;
+  formImagePreview = '';
 
   private readonly typingTrigger$ = new Subject<void>();
   private typingTimeoutRef: ReturnType<typeof setTimeout> | null = null;
@@ -626,13 +994,151 @@ export class ChatComponent implements OnInit, OnDestroy {
   }
 
   send(): void {
+    if (!this.selectedRoomId) {
+      return;
+    }
+
+    if (this.pendingImage) {
+      this.uploadAndSend(this.pendingImage, '', '', 'image');
+      return;
+    }
+
     const content = this.draft.trim();
-    if (!content || !this.selectedRoomId) {
+    if (!content) {
       return;
     }
 
     this.socketService.sendMessage(this.selectedRoomId, this.selectedRoomType, content);
     this.draft = '';
+  }
+
+  sendForm(): void {
+    if (!this.selectedRoomId || !this.formTitle.trim()) {
+      return;
+    }
+
+    const doSend = (imageUrl: string) => {
+      this.socketService.sendMessage(
+        this.selectedRoomId,
+        this.selectedRoomType,
+        this.draft.trim(),
+        { messageType: 'form', formTitle: this.formTitle.trim(), imageUrl },
+      );
+      this.formTitle = '';
+      this.draft = '';
+      this.clearFormImage();
+      this.showFormPanel = false;
+    };
+
+    if (this.formImageFile) {
+      this.uploadFile(this.formImageFile).subscribe({
+        next: (url: string) => doSend(url),
+        error: () => doSend(''),
+      });
+    } else {
+      doSend('');
+    }
+  }
+
+  toggleFormPanel(): void {
+    this.showFormPanel = !this.showFormPanel;
+    if (!this.showFormPanel) {
+      this.formTitle = '';
+      this.clearFormImage();
+    }
+  }
+
+  setTab(tab: 'all' | 'unread' | 'group'): void {
+    this.activeTab = tab;
+    this.applyRoomFilter();
+  }
+
+  autoResize(event: Event): void {
+    const el = event.target as HTMLTextAreaElement;
+    el.style.height = 'auto';
+    el.style.height = `${Math.min(el.scrollHeight, 140)}px`;
+  }
+
+  onImageSelected(event: Event): void {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) {
+      return;
+    }
+    this.pendingImage = file;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      this.pendingImagePreview = String(e.target?.result ?? '');
+    };
+    reader.readAsDataURL(file);
+    (event.target as HTMLInputElement).value = '';
+  }
+
+  clearPendingImage(): void {
+    this.pendingImage = null;
+    this.pendingImagePreview = '';
+  }
+
+  onFormImageSelected(event: Event): void {
+    const file = (event.target as HTMLInputElement).files?.[0];
+    if (!file) {
+      return;
+    }
+    this.formImageFile = file;
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      this.formImagePreview = String(e.target?.result ?? '');
+    };
+    reader.readAsDataURL(file);
+    (event.target as HTMLInputElement).value = '';
+  }
+
+  clearFormImage(): void {
+    this.formImageFile = null;
+    this.formImagePreview = '';
+  }
+
+  resolveImageUrl(url: string | undefined): string {
+    if (!url) {
+      return '';
+    }
+    if (url.startsWith('http')) {
+      return url;
+    }
+    return `http://localhost:3000${url}`;
+  }
+
+  private uploadAndSend(
+    file: File,
+    content: string,
+    formTitle: string,
+    messageType: 'image' | 'form',
+  ): void {
+    this.uploadFile(file).subscribe({
+      next: (imageUrl: string) => {
+        this.socketService.sendMessage(this.selectedRoomId, this.selectedRoomType, content, {
+          messageType,
+          imageUrl,
+          formTitle,
+        });
+        this.clearPendingImage();
+      },
+      error: () => {
+        this.clearPendingImage();
+      },
+    });
+  }
+
+  private uploadFile(file: File): Observable<string> {
+    const formData = new FormData();
+    formData.append('image', file);
+    return this.apiService
+      .postFormData<{
+        success: boolean;
+        data: { imageUrl: string };
+      }>('/messages/upload-image', formData)
+      .pipe(
+        map((res: { success: boolean; data: { imageUrl: string } }) => res.data?.imageUrl ?? ''),
+      );
   }
 
   handleKeydown(event: KeyboardEvent): void {
@@ -672,15 +1178,31 @@ export class ChatComponent implements OnInit, OnDestroy {
   }
 
   roomPreview(room: MessageRoomSummary): string {
-    const content = String(room.lastMessage?.content || '').trim();
-    if (!content) {
+    const msg = room.lastMessage;
+    if (!msg) {
       return room.roomType === 'department'
         ? 'Chưa có tin nhắn trong nhóm.'
         : 'Bắt đầu trò chuyện.';
     }
 
-    const sender = String(room.lastMessage?.senderName || '').trim();
-    return sender ? `${sender}: ${content}` : content;
+    const sender = String(msg.senderName || '').trim();
+    let preview = '';
+
+    if (msg.messageType === 'image') {
+      preview = '📷 Hình ảnh';
+    } else if (msg.messageType === 'form') {
+      preview = msg.formTitle ? `📋 ${msg.formTitle}` : '📋 Tin nhắn có tiêu đề';
+    } else {
+      preview = String(msg.content || '').trim();
+    }
+
+    if (!preview) {
+      return room.roomType === 'department'
+        ? 'Chưa có tin nhắn trong nhóm.'
+        : 'Bắt đầu trò chuyện.';
+    }
+
+    return sender ? `${sender}: ${preview}` : preview;
   }
 
   formatRoomTime(value: string | undefined): string {
@@ -732,12 +1254,21 @@ export class ChatComponent implements OnInit, OnDestroy {
 
   applyRoomFilter(): void {
     const keyword = this.searchText.trim().toLowerCase();
+
+    let base = [...this.rooms];
+
+    if (this.activeTab === 'unread') {
+      base = base.filter((room) => room.unreadCount > 0);
+    } else if (this.activeTab === 'group') {
+      base = base.filter((room) => room.roomType === 'department');
+    }
+
     if (!keyword) {
-      this.filteredRooms = [...this.rooms];
+      this.filteredRooms = base;
       return;
     }
 
-    this.filteredRooms = this.rooms.filter((room) => {
+    this.filteredRooms = base.filter((room) => {
       const label = this.roomLabel(room).toLowerCase();
       const preview = this.roomPreview(room).toLowerCase();
       const code = String(room.roomCode || '').toLowerCase();

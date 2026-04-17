@@ -1,5 +1,8 @@
 const express = require("express");
 const mongoose = require("mongoose");
+const path = require("path");
+const fs = require("fs");
+const multer = require("multer");
 const auth = require("../middleware/auth");
 const Message = require("../models/Message");
 const Department = require("../models/Department");
@@ -7,6 +10,46 @@ const Department = require("../models/Department");
 const router = express.Router();
 
 router.use(auth);
+
+// ── Upload ảnh cho tin nhắn ──────────────────────────────────────────────────
+const UPLOAD_DIR = path.join(__dirname, "..", "..", "uploads", "messages");
+if (!fs.existsSync(UPLOAD_DIR)) {
+  fs.mkdirSync(UPLOAD_DIR, { recursive: true });
+}
+
+const storage = multer.diskStorage({
+  destination: (_req, _file, cb) => cb(null, UPLOAD_DIR),
+  filename: (_req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    cb(
+      null,
+      `msg_${Date.now()}_${Math.random().toString(36).slice(2, 8)}${ext}`,
+    );
+  },
+});
+
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 }, // 5 MB
+  fileFilter: (_req, file, cb) => {
+    const allowed = /^image\/(jpeg|png|gif|webp)$/;
+    if (allowed.test(file.mimetype)) {
+      cb(null, true);
+    } else {
+      cb(new Error("Chỉ chấp nhận file ảnh (jpg, png, gif, webp)"));
+    }
+  },
+});
+
+router.post("/upload-image", upload.single("image"), (req, res) => {
+  if (!req.file) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Không có file ảnh" });
+  }
+  const imageUrl = `/uploads/messages/${req.file.filename}`;
+  return res.status(200).json({ success: true, data: { imageUrl } });
+});
 
 const getDepartmentIds = (user) =>
   (user.departmentIds || []).map((item) => String(item?._id || item));

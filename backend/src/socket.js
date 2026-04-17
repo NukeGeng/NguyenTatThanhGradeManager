@@ -128,11 +128,26 @@ module.exports = (httpServer) => {
         const roomId = String(payload.roomId || "").trim();
         const roomType =
           payload.roomType === "direct" ? "direct" : "department";
+        const messageType = ["text", "image", "form"].includes(
+          payload.messageType,
+        )
+          ? payload.messageType
+          : "text";
         const content = String(payload.content || "").trim();
+        const imageUrl = String(payload.imageUrl || "").trim();
+        const formTitle = String(payload.formTitle || "")
+          .trim()
+          .slice(0, 200);
 
-        if (!roomId || !content) {
+        if (!roomId) {
           return;
         }
+
+        // Validation per message type
+        if (messageType === "text" && !content) return;
+        if (messageType === "image" && !imageUrl) return;
+        if (messageType === "form" && !formTitle && !content && !imageUrl)
+          return;
 
         if (content.length > 2000) {
           return;
@@ -164,6 +179,9 @@ module.exports = (httpServer) => {
           senderId: user._id,
           senderName: user.name,
           content,
+          messageType,
+          imageUrl,
+          formTitle,
           isRead: false,
           readBy: [user._id],
         });

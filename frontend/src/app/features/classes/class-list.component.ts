@@ -182,7 +182,9 @@ interface ClassUpsertPayload {
 
               <ng-container matColumnDef="name">
                 <th mat-header-cell *matHeaderCellDef>Tên lớp</th>
-                <td mat-cell *matCellDef="let row">{{ row.name || row.code }}</td>
+                <td mat-cell *matCellDef="let row" class="cell-center">
+                  {{ row.name || row.code }}
+                </td>
               </ng-container>
 
               <ng-container matColumnDef="department">
@@ -229,7 +231,9 @@ interface ClassUpsertPayload {
 
               <ng-container matColumnDef="teacher">
                 <th mat-header-cell *matHeaderCellDef>Giáo viên</th>
-                <td mat-cell *matCellDef="let row">{{ getTeacherName(row.teacherId) }}</td>
+                <td mat-cell *matCellDef="let row" class="cell-center">
+                  {{ getTeacherName(row.teacherId) }}
+                </td>
               </ng-container>
 
               <ng-container matColumnDef="status">

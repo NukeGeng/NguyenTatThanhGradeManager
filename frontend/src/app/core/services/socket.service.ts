@@ -40,8 +40,20 @@ export class SocketService {
     this.socket?.emit('leave_room', { roomId });
   }
 
-  sendMessage(roomId: string, roomType: MessageRoomType, content: string): void {
-    this.socket?.emit('send_message', { roomId, roomType, content });
+  sendMessage(
+    roomId: string,
+    roomType: MessageRoomType,
+    content: string,
+    options?: { messageType?: 'text' | 'image' | 'form'; imageUrl?: string; formTitle?: string },
+  ): void {
+    this.socket?.emit('send_message', {
+      roomId,
+      roomType,
+      content,
+      messageType: options?.messageType ?? 'text',
+      imageUrl: options?.imageUrl ?? '',
+      formTitle: options?.formTitle ?? '',
+    });
   }
 
   markRead(roomId: string): void {

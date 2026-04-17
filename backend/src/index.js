@@ -17,6 +17,7 @@ const majorRoutes = require("./routes/majors");
 const curriculumRoutes = require("./routes/curricula");
 const studentCurriculumRoutes = require("./routes/studentCurricula");
 const messageRoutes = require("./routes/messages");
+const newsRoutes = require("./routes/news");
 const setupSocket = require("./socket");
 const errorHandler = require("./middleware/errorHandler");
 
@@ -30,6 +31,10 @@ setupSocket(httpServer);
 
 app.use(cors());
 app.use(express.json());
+app.use(
+  "/uploads",
+  express.static(require("path").join(__dirname, "..", "uploads")),
+);
 
 app.get("/api/health", (req, res) => {
   res.status(200).json({
@@ -51,6 +56,7 @@ app.use("/api/majors", majorRoutes);
 app.use("/api/curricula", curriculumRoutes);
 app.use("/api/student-curricula", studentCurriculumRoutes);
 app.use("/api/messages", messageRoutes);
+app.use("/api/news", newsRoutes);
 
 app.use((req, res) => {
   res.status(404).json({
