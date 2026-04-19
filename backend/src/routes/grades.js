@@ -587,6 +587,9 @@ router.get("/summary/dashboard", async (req, res, next) => {
     const normalizedSemester = normalizeFilterValue(req.query.semester);
     const normalizedClassId = normalizeFilterValue(req.query.classId);
     const normalizedStudentId = normalizeFilterValue(req.query.studentId);
+    const normalizedHomeClassCode = normalizeFilterValue(
+      req.query.homeClassCode,
+    );
 
     if (
       normalizedSemester !== null &&
@@ -623,18 +626,148 @@ router.get("/summary/dashboard", async (req, res, next) => {
       classScopeQuery.semester = Number(normalizedSemester);
     }
 
-    const [departmentDocs, classesInScope] = await Promise.all([
-      Department.find(
-        req.user.role === "admin" ? {} : { _id: { $in: allowedDepartmentIds } },
-      )
-        .select("_id code name")
-        .sort({ code: 1 })
-        .lean(),
-      Class.find(classScopeQuery)
-        .select("_id code name semester departmentId")
-        .sort({ semester: 1, code: 1, createdAt: -1 })
-        .lean(),
-    ]);
+    const [departmentDocs, classesInScope, allHomeClassCodes] =
+      await Promise.all([
+        Department.find(
+          req.user.role === "admin"
+            ? {}
+            : { _id: { $in: allowedDepartmentIds } },
+        )
+          .select("_id code name")
+          .sort({ code: 1 })
+          .lean(),
+        Class.find(classScopeQuery)
+          .select("_id code name semester departmentId")
+          .sort({ semester: 1, code: 1, createdAt: -1 })
+          .lean(),
+        // Lấy distinct homeClassCode của sinh viên trong scope khoa
+        Student.distinct("homeClassCode", {
+          homeClassCode: { $exists: true, $ne: "" },
+          ...(normalizedDepartmentId
+            ? {}
+            : req.user.role !== "admin"
+              ? {}
+              : {}),
+        }).then((codes) => codes.sort()),
+      ]);
+
+    // ── HOMEROOM (lớp sinh hoạt) mode ───────────────────────────────────────
+    // Khi homeClassCode được chỉ định: lấy tất cả điểm của SV thuộc lớp SH đó,
+    // không cần scope theo lớp học phần.
+    if (normalizedHomeClassCode) {
+      const homeroomStudentQuery = {
+        homeClassCode: normalizedHomeClassCode,
+        ...(activeOnly ? { status: "active" } : {}),
+      };
+      const homeroomStudents = await Student.find(homeroomStudentQuery)
+        .select("_id studentCode fullName classId")
+        .lean();
+
+      if (!homeroomStudents.length) {
+        return res.status(200).json({
+          success: true,
+          data: {
+            totalStudents: 0,
+            totalClasses: 0,
+            gradeCounts: { A: 0, B: 0, C: 0, F: 0 },
+            filterOptions: {
+              departments: departmentDocs.map((d) => ({
+                _id: String(d._id),
+                code: d.code,
+                name: d.name,
+              })),
+              semesters: DASHBOARD_SEMESTERS,
+              classes: [],
+              students: [],
+              homeClassCodes: allHomeClassCodes,
+            },
+            appliedFilters: {
+              departmentId: normalizedDepartmentId || "all",
+              semester: "all",
+              classId: "all",
+              homeClassCode: normalizedHomeClassCode,
+              studentId: normalizedStudentId || "all",
+              activeOnly,
+            },
+          },
+          message: "Get dashboard summary successfully",
+        });
+      }
+
+      const homeroomStudentIds = homeroomStudents.map((s) => s._id);
+      const homeroomStudentObjectIds = homeroomStudentIds
+        .map((id) =>
+          mongoose.Types.ObjectId.isValid(id)
+            ? new mongoose.Types.ObjectId(id)
+            : null,
+        )
+        .filter(Boolean);
+
+      const scopedObjectIds = normalizedStudentId
+        ? homeroomStudentObjectIds.filter(
+            (id) => String(id) === normalizedStudentId,
+          )
+        : homeroomStudentObjectIds;
+
+      const gradeMatchHR = {
+        studentId: { $in: scopedObjectIds },
+        letterGrade: { $in: DASHBOARD_GRADE_LETTERS },
+        ...(normalizedSemester ? { semester: Number(normalizedSemester) } : {}),
+      };
+
+      const gradeRowsHR = await Grade.aggregate([
+        { $match: gradeMatchHR },
+        { $group: { _id: "$letterGrade", count: { $sum: 1 } } },
+      ]);
+
+      const gradeCountsHR = { A: 0, B: 0, C: 0, F: 0 };
+      gradeRowsHR.forEach((row) => {
+        if (row._id && gradeCountsHR[row._id] !== undefined) {
+          gradeCountsHR[row._id] = Number(row.count || 0);
+        }
+      });
+
+      // Distinct subject classes for these students (filtered by semester)
+      const distinctClassIds = await Grade.distinct("classId", {
+        studentId: { $in: scopedObjectIds },
+        ...(normalizedSemester ? { semester: Number(normalizedSemester) } : {}),
+      });
+
+      const studentOptionRowsHR =
+        homeroomStudents.length <= 200
+          ? homeroomStudents.map(toDashboardStudentOption)
+          : [];
+
+      return res.status(200).json({
+        success: true,
+        data: {
+          totalStudents: scopedObjectIds.length,
+          totalClasses: distinctClassIds.length,
+          gradeCounts: gradeCountsHR,
+          filterOptions: {
+            departments: departmentDocs.map((d) => ({
+              _id: String(d._id),
+              code: d.code,
+              name: d.name,
+            })),
+            semesters: DASHBOARD_SEMESTERS,
+            classes: [],
+            students: studentOptionRowsHR,
+            homeClassCodes: allHomeClassCodes,
+          },
+          appliedFilters: {
+            departmentId: normalizedDepartmentId || "all",
+            semester: normalizedSemester ? String(normalizedSemester) : "all",
+            classId: "all",
+            homeClassCode: normalizedHomeClassCode,
+            studentId: normalizedStudentId || "all",
+            activeOnly,
+          },
+        },
+        message: "Get dashboard summary successfully",
+      });
+    }
+    // ── end HOMEROOM branch ──────────────────────────────────────────────────
 
     const classOptionRows = classesInScope.map(toDashboardClassOption);
     const classIdSetInScope = new Set(classOptionRows.map((item) => item._id));
@@ -744,6 +877,7 @@ router.get("/summary/dashboard", async (req, res, next) => {
           semesters: DASHBOARD_SEMESTERS,
           classes: classOptionRows,
           students: studentOptionRows.map(toDashboardStudentOption),
+          homeClassCodes: allHomeClassCodes,
         },
         appliedFilters: {
           departmentId: normalizedDepartmentId || "all",
@@ -848,6 +982,7 @@ router.get("/summary/dashboard", async (req, res, next) => {
           semesters: DASHBOARD_SEMESTERS,
           classes: classOptionRows,
           students: studentOptionRows.map(toDashboardStudentOption),
+          homeClassCodes: allHomeClassCodes,
         },
         appliedFilters: {
           departmentId: normalizedDepartmentId || "all",

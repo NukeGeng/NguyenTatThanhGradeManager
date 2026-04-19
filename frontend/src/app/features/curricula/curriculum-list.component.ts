@@ -198,7 +198,7 @@ export class CurriculumListComponent implements OnInit {
 
   resolveMajorCode(value: Curriculum['majorId']): string {
     if (typeof value !== 'string') {
-      return value.code;
+      return value?.code || value?._id || '';
     }
 
     return this.majors.find((item) => item._id === value)?.code || value;

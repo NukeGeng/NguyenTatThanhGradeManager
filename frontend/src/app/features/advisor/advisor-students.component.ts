@@ -6,6 +6,7 @@ import { Router } from '@angular/router';
 import { MatButtonModule } from '@angular/material/button';
 import { MatCardModule } from '@angular/material/card';
 import { MatFormFieldModule } from '@angular/material/form-field';
+import { MatPaginatorModule, PageEvent } from '@angular/material/paginator';
 import { MatProgressBarModule } from '@angular/material/progress-bar';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
 import { MatSelectModule } from '@angular/material/select';
@@ -46,6 +47,7 @@ interface AdvisorStudentsOverviewPayload {
     MatButtonModule,
     MatCardModule,
     MatFormFieldModule,
+    MatPaginatorModule,
     MatProgressBarModule,
     MatProgressSpinnerModule,
     MatSelectModule,
@@ -120,41 +122,15 @@ interface AdvisorStudentsOverviewPayload {
           }
         </div>
 
-        @if (totalPages > 1) {
-          <div class="pager">
-            <mat-form-field appearance="outline" class="pager-size">
-              <mat-label>Items per page</mat-label>
-              <mat-select
-                [value]="pageSize"
-                [disabled]="isLoading"
-                (selectionChange)="onPageSizeChange($event.value)"
-              >
-                @for (size of pageSizeOptions; track size) {
-                  <mat-option [value]="size">{{ size }}</mat-option>
-                }
-              </mat-select>
-            </mat-form-field>
-
-            <button
-              mat-stroked-button
-              type="button"
-              [disabled]="page <= 1 || isLoading"
-              (click)="prevPage()"
-            >
-              Trang trước
-            </button>
-
-            <p>Trang {{ page }}/{{ totalPages }} · Tổng {{ totalStudents }} sinh viên</p>
-
-            <button
-              mat-stroked-button
-              type="button"
-              [disabled]="page >= totalPages || isLoading"
-              (click)="nextPage()"
-            >
-              Trang sau
-            </button>
-          </div>
+        @if (totalStudents > pageSize) {
+          <mat-paginator
+            [length]="totalStudents"
+            [pageIndex]="page - 1"
+            [pageSize]="pageSize"
+            [pageSizeOptions]="pageSizeOptions"
+            (page)="onPageChange($event)"
+            showFirstLastButtons
+          ></mat-paginator>
         }
 
         @if (!students.length) {
@@ -263,27 +239,9 @@ interface AdvisorStudentsOverviewPayload {
         justify-content: center;
       }
 
-      .pager {
-        display: flex;
-        align-items: center;
-        justify-content: space-between;
-        gap: 0.75rem;
-        flex-wrap: wrap;
-      }
-
-      .pager-size {
-        width: 170px;
-      }
-
-      .pager-size .mat-mdc-form-field {
-        --mat-form-field-container-height: 44px;
-        --mat-form-field-container-vertical-padding: 10px;
-      }
-
-      .pager p {
-        margin: 0;
-        color: var(--text-sub);
-        font-size: 0.85rem;
+      mat-paginator {
+        background: #ffffff;
+        border-top: 1px solid #e4eaf0;
       }
 
       .state-card {
@@ -360,32 +318,9 @@ export class AdvisorStudentsComponent implements OnInit {
       });
   }
 
-  prevPage(): void {
-    if (this.page <= 1 || this.isLoading) {
-      return;
-    }
-
-    this.page -= 1;
-    this.loadData();
-  }
-
-  nextPage(): void {
-    if (this.page >= this.totalPages || this.isLoading) {
-      return;
-    }
-
-    this.page += 1;
-    this.loadData();
-  }
-
-  onPageSizeChange(value: number): void {
-    const nextSize = Number(value);
-    if (!Number.isFinite(nextSize) || nextSize <= 0 || nextSize === this.pageSize) {
-      return;
-    }
-
-    this.pageSize = Math.floor(nextSize);
-    this.page = 1;
+  onPageChange(event: PageEvent): void {
+    this.page = event.pageIndex + 1;
+    this.pageSize = event.pageSize;
     this.loadData();
   }
 

@@ -335,6 +335,15 @@
 - Fix: Đổi `@import './app/shared/styles/page'` → `@use './app/shared/styles/page'` và đặt lên trước `@import '@angular/material/...'` (vì `@use` phải đứng đầu file trước mọi CSS rule).
 - Trạng thái: ✅ Đã fix
 
+## [BUG-036] TS2339 + TS2393 khi thêm homeClassCode filter vào dashboard
+
+- Ngày: 18/04/2026
+- File/Vị trí: `frontend/src/app/features/dashboard/dashboard.component.ts`
+- Mô tả: Build lỗi `TS2339: Property 'homeClassCodes' does not exist on type` và `TS2393: Duplicate function implementation` cho `onClassTypeChange()` / `onHomeClassCodeChange()`.
+- Nguyên nhân: (1) `DashboardSummaryResponse.filterOptions` interface thiếu field `homeClassCodes: string[]`. (2) `multi_replace_string_in_file` thêm 2 method mới trước `onDepartmentChange()` nhưng cũng giữ nguyên 2 method cũ đã được thêm trước đó, dẫn đến khai báo trùng.
+- Fix: Thêm `homeClassCodes: string[]` vào interface. Xóa phần duplicate — giữ lại 1 cặp method duy nhất.
+- Trạng thái: ✅ Đã fix
+
 ---
 
 ## TEMPLATE THÊM BUG MỚI

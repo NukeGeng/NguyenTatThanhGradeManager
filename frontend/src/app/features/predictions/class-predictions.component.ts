@@ -93,12 +93,6 @@ interface PredictionSummary {
             class="full-field search-field"
             subscriptSizing="dynamic"
           >
-            <lucide-icon
-              matPrefix
-              name="search"
-              [size]="15"
-              style="margin-right:6px;color:var(--text-sub)"
-            ></lucide-icon>
             <input
               matInput
               type="text"
@@ -106,6 +100,15 @@ interface PredictionSummary {
               [(ngModel)]="searchKeyword"
               (ngModelChange)="onSearchChange($event)"
             />
+            <button
+              mat-icon-button
+              matSuffix
+              type="button"
+              tabindex="-1"
+              style="color:var(--text-sub)"
+            >
+              <lucide-icon name="search" [size]="15"></lucide-icon>
+            </button>
           </mat-form-field>
 
           @if (isLoadingStudents) {

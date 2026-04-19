@@ -196,7 +196,7 @@ const populatePredictionQuery = (query) =>
   query
     .populate({
       path: "studentId",
-      select: "studentCode fullName classId",
+      select: "studentCode fullName classId homeClassCode",
       populate: {
         path: "classId",
         select: "code name departmentId",
@@ -819,6 +819,43 @@ router.get("/alerts", async (req, res, next) => {
           String(item.studentId?.classId?.departmentId),
         );
       });
+    }
+
+    // Scope filter: classId > departmentId
+    const classIdFilter =
+      req.query.classId && req.query.classId !== "all"
+        ? String(req.query.classId)
+        : null;
+    const departmentIdFilter =
+      req.query.departmentId && req.query.departmentId !== "all"
+        ? String(req.query.departmentId)
+        : null;
+
+    if (classIdFilter) {
+      allPopulated = allPopulated.filter((item) => {
+        const cls = item.studentId?.classId;
+        const itemClassId =
+          typeof cls === "string" ? cls : String(cls?._id || "");
+        return itemClassId === classIdFilter;
+      });
+    } else if (departmentIdFilter) {
+      allPopulated = allPopulated.filter((item) => {
+        const dept = item.studentId?.classId?.departmentId;
+        const itemDeptId =
+          typeof dept === "string" ? dept : String(dept?._id || "");
+        return itemDeptId === departmentIdFilter;
+      });
+    }
+
+    const homeClassCodeFilter =
+      req.query.homeClassCode && req.query.homeClassCode !== "all"
+        ? String(req.query.homeClassCode)
+        : null;
+    if (homeClassCodeFilter) {
+      allPopulated = allPopulated.filter(
+        (item) =>
+          String(item.studentId?.homeClassCode || "") === homeClassCodeFilter,
+      );
     }
 
     const total = allPopulated.length;

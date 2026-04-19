@@ -81,11 +81,6 @@ interface DepartmentFilterOption {
   label: string;
 }
 
-interface PredictClassSummary {
-  processed: number;
-  failed: number;
-}
-
 @Component({
   selector: 'app-grade-entry',
   standalone: true,
@@ -198,16 +193,6 @@ interface PredictClassSummary {
               <button mat-stroked-button type="button" (click)="openBulkImportForSelectedClass()">
                 <lucide-icon name="arrow-right" [size]="16"></lucide-icon>
                 Nhập điểm hàng loạt lớp này
-              </button>
-
-              <button
-                mat-stroked-button
-                type="button"
-                [disabled]="isPredictingClass"
-                (click)="predictSelectedClass()"
-              >
-                <lucide-icon name="chart-column-increasing" [size]="16"></lucide-icon>
-                {{ isPredictingClass ? 'Đang chạy AI...' : 'Chạy AI dự đoán cả lớp' }}
               </button>
 
               <button mat-stroked-button type="button" (click)="openWeightDialog()">
@@ -885,7 +870,6 @@ export class GradeEntryComponent implements OnInit {
 
   isLoadingStudents = false;
   isSaving = false;
-  isPredictingClass = false;
   loadErrorMessage = '';
 
   ngOnInit(): void {
@@ -1167,40 +1151,6 @@ export class GradeEntryComponent implements OnInit {
         autoPredict: 'true',
       },
     });
-  }
-
-  predictSelectedClass(): void {
-    if (!this.selectedClass || this.isPredictingClass) {
-      return;
-    }
-
-    this.isPredictingClass = true;
-
-    this.apiService
-      .post<ApiResponse<PredictClassSummary>, { classId: string }>('/predictions/predict-class', {
-        classId: this.selectedClass._id,
-      })
-      .pipe(
-        finalize(() => {
-          this.isPredictingClass = false;
-        }),
-        takeUntilDestroyed(this.destroyRef),
-      )
-      .subscribe({
-        next: (response) => {
-          const processed = Number(response.data?.processed || 0);
-          const failed = Number(response.data?.failed || 0);
-
-          this.snackBar.open(`AI đã xử lý ${processed} bảng điểm, lỗi ${failed}.`, 'Đóng', {
-            duration: 3200,
-          });
-        },
-        error: (error: unknown) => {
-          this.snackBar.open(this.resolveError(error), 'Đóng', {
-            duration: 3200,
-          });
-        },
-      });
   }
 
   selectStudent(student: Student): void {

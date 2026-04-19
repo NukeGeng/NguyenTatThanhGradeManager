@@ -250,6 +250,32 @@ interface ClassUpsertPayload {
                 <td mat-cell *matCellDef="let row" class="actions-cell cell-center">
                   <div class="actions-wrap">
                     <button
+                      *ngIf="isHomeroomClass(row)"
+                      type="button"
+                      class="action-btn action-btn--predict"
+                      [attr.aria-label]="
+                        isPredictingClassId === row._id
+                          ? 'Đang dự đoán...'
+                          : 'Chạy AI dự đoán cả lớp'
+                      "
+                      [title]="
+                        isPredictingClassId === row._id
+                          ? 'Đang dự đoán...'
+                          : 'Chạy AI dự đoán cả lớp'
+                      "
+                      [disabled]="isPredictingClassId === row._id"
+                      (click)="predictHomeroom(row)"
+                    >
+                      <lucide-icon
+                        [name]="
+                          isPredictingClassId === row._id ? 'loader-2' : 'chart-column-increasing'
+                        "
+                        [size]="15"
+                        [class.spin]="isPredictingClassId === row._id"
+                      ></lucide-icon>
+                    </button>
+
+                    <button
                       type="button"
                       class="action-btn"
                       aria-label="Chi tiết lớp"
@@ -534,6 +560,8 @@ export class ClassListComponent implements OnInit {
   selectedClassType: 'all' | 'subject' | 'homeroom' = 'subject';
   searchKeyword = '';
 
+  isPredictingClassId: string | null = null;
+
   isLoading = true;
   errorMessage = '';
 
@@ -717,6 +745,34 @@ export class ClassListComponent implements OnInit {
         },
         error: (error: unknown) => {
           this.snackBar.open(this.resolveErrorMessage(error), 'Đóng', { duration: 2800 });
+        },
+      });
+  }
+
+  predictHomeroom(row: Class): void {
+    if (this.isPredictingClassId) return;
+    this.isPredictingClassId = row._id;
+    this.apiService
+      .post<ApiResponse<{ processed: number; failed: number }>, { homeClassCode: string }>(
+        '/predictions/predict-class',
+        { homeClassCode: row.code },
+      )
+      .pipe(
+        finalize(() => {
+          this.isPredictingClassId = null;
+        }),
+        takeUntilDestroyed(this.destroyRef),
+      )
+      .subscribe({
+        next: (response) => {
+          const processed = Number(response.data?.processed || 0);
+          const failed = Number(response.data?.failed || 0);
+          this.snackBar.open(`AI đã xử lý ${processed} sinh viên, lỗi ${failed}.`, 'Đóng', {
+            duration: 3200,
+          });
+        },
+        error: (error: unknown) => {
+          this.snackBar.open(this.resolveErrorMessage(error), 'Đóng', { duration: 3200 });
         },
       });
   }

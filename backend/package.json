@@ -12,7 +12,15 @@
     "grades:prefill-all": "node src/scripts/prefillAllClassGrades.js",
     "predict:batch-all": "node src/scripts/batchPredictAll.js",
     "predict:batch-dry": "node src/scripts/batchPredictAll.js --dry-run",
-    "predict:batch-overall": "node src/scripts/batchPredictAll.js --overall-only"
+    "predict:batch-overall": "node src/scripts/batchPredictAll.js --overall-only",
+    "students:reset": "node src/scripts/resetStudentData.js",
+    "predict:all": "node src/scripts/runAllPredictions.js",
+    "reseed": "node src/scripts/resetStudentData.js && node src/scripts/seedLargeScaleData.js",
+    "reseed:cntt": "node src/scripts/resetAndSeedCNTTOnly.js",
+    "reseed:ktpm": "node src/scripts/resetAndSeedKTPM.js",
+    "fix:ktpm": "node src/scripts/fixClassNamesAndPredict.js",
+    "fix:grades": "node src/scripts/rebalanceGrades.js",
+    "fix:predict": "node src/scripts/repredictKTPM.js"
   },
   "keywords": [
     "express",

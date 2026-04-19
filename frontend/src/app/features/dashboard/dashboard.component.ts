@@ -67,6 +67,7 @@ interface DashboardSummaryResponse {
       fullName: string;
       classId: string;
     }>;
+    homeClassCodes: string[];
   };
   appliedFilters: {
     departmentId: string;
@@ -175,10 +176,14 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   selectedSemester: 'all' | '1' | '2' | '3' = 'all';
   selectedClassId = 'all';
   selectedStudentId = 'all';
+  classType: 'subject' | 'homeroom' = 'subject';
+  selectedHomeClassCode = 'all';
+  selectedHomeroomSemester: 'all' | '1' | '2' | '3' = 'all';
 
   departmentOptions: DashboardDepartmentOption[] = [];
   classOptions: DashboardClassOption[] = [];
   studentOptions: DashboardStudentOption[] = [];
+  homeClassCodeOptions: string[] = [];
 
   private gradeChart?: Chart<'bar', number[], string>;
   ngOnInit(): void {
@@ -223,9 +228,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       .get<ApiResponse<DashboardSummaryResponse>>('/grades/summary/dashboard', {
         activeOnly: true,
         departmentId: this.selectedDepartmentId,
-        semester: this.selectedSemester,
-        classId: this.selectedClassId,
+        semester:
+          this.classType === 'homeroom' ? this.selectedHomeroomSemester : this.selectedSemester,
+        classId: this.classType === 'homeroom' ? 'all' : this.selectedClassId,
         studentId: this.selectedStudentId,
+        homeClassCode: this.classType === 'homeroom' ? this.selectedHomeClassCode : 'all',
       })
       .pipe(
         timeout(this.requestTimeoutMs),
@@ -240,6 +247,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
                 semesters: [1, 2, 3],
                 classes: [],
                 students: [],
+                homeClassCodes: [],
               },
               appliedFilters: {
                 departmentId: 'all',
@@ -260,6 +268,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
               semesters: [1, 2, 3],
               classes: [],
               students: [],
+              homeClassCodes: [],
             },
             appliedFilters: {
               departmentId: 'all',
@@ -276,6 +285,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       .get<ApiResponse<AlertsPagePayload>>('/predictions/alerts', {
         page: this.alertPage,
         limit: this.alertPageSize,
+        classId: this.classType === 'homeroom' ? 'all' : this.selectedClassId,
+        departmentId: this.selectedDepartmentId,
+        semester:
+          this.classType === 'homeroom' ? this.selectedHomeroomSemester : this.selectedSemester,
+        homeClassCode: this.classType === 'homeroom' ? this.selectedHomeClassCode : 'all',
       })
       .pipe(
         timeout(this.requestTimeoutMs),
@@ -306,8 +320,8 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       .subscribe({
         next: ({ summary, alerts }) => {
           try {
-            this.applyDashboardData(summary, alerts.items ?? []);
             this.alertTotal = Number(alerts.total || 0);
+            this.applyDashboardData(summary, alerts.items ?? [], this.alertTotal);
             this.syncView();
           } catch (error: unknown) {
             this.errorMessage = this.resolveErrorMessage(error);
@@ -323,18 +337,26 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       });
   }
 
-  private applyDashboardData(summary: DashboardSummaryResponse, alerts: Prediction[]): void {
+  private applyDashboardData(
+    summary: DashboardSummaryResponse,
+    alerts: Prediction[],
+    alertTotal?: number,
+  ): void {
+    this.homeClassCodeOptions = summary.filterOptions?.homeClassCodes ?? [];
+
     this.departmentOptions = (summary.filterOptions?.departments ?? []).map((item) => ({
       id: item._id,
       label: `${item.code} - ${item.name}`,
     }));
 
-    this.classOptions = (summary.filterOptions?.classes ?? []).map((item) => ({
-      id: item._id,
-      label: `${item.code} - ${item.name}`,
-      semester: Number(item.semester || 1),
-      departmentId: item.departmentId,
-    }));
+    this.classOptions = (summary.filterOptions?.classes ?? [])
+      .filter((item) => item.code.includes('-'))
+      .map((item) => ({
+        id: item._id,
+        label: `${item.code} - ${item.name}`,
+        semester: Number(item.semester || 1),
+        departmentId: item.departmentId,
+      }));
 
     this.studentOptions = (summary.filterOptions?.students ?? []).map((item) => ({
       id: item._id,
@@ -356,7 +378,7 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.stats = {
       totalStudents: Number(summary.totalStudents || 0),
       totalClasses: Number(summary.totalClasses || 0),
-      totalAlerts: this.alertTotal,
+      totalAlerts: alertTotal ?? this.alertTotal,
       excellentRate:
         totalGraded > 0 ? Number(((this.gradeCounts.A / totalGraded) * 100).toFixed(1)) : 0,
     };
@@ -376,6 +398,27 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         riskLevel: alert.riskLevel ?? 'high',
       };
     });
+  }
+
+  onClassTypeChange(): void {
+    this.selectedClassId = 'all';
+    this.selectedHomeClassCode = 'all';
+    this.selectedHomeroomSemester = 'all';
+    this.selectedStudentId = 'all';
+    this.alertPage = 1;
+    this.loadDashboardData();
+  }
+
+  onHomeroomSemesterChange(): void {
+    this.selectedStudentId = 'all';
+    this.alertPage = 1;
+    this.loadDashboardData();
+  }
+
+  onHomeClassCodeChange(): void {
+    this.selectedStudentId = 'all';
+    this.alertPage = 1;
+    this.loadDashboardData();
   }
 
   onDepartmentChange(): void {
@@ -419,6 +462,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   }
 
   private filterAlertsByScope(alerts: Prediction[]): Prediction[] {
+    // In homeroom mode the backend already filters by homeClassCode
+    if (this.classType === 'homeroom') {
+      return alerts;
+    }
+
     const availableClassIds = new Set(this.classOptions.map((item) => item.id));
 
     return alerts.filter((alert) => {
