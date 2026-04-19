@@ -49,56 +49,52 @@
       </mat-form-field>
 
       <!-- Subject-class mode: Học kỳ + Lớp học phần -->
-      <ng-container *ngIf="classType === 'subject'">
-        <mat-form-field appearance="outline">
-          <mat-label>Học kỳ</mat-label>
-          <mat-select [(ngModel)]="selectedSemester" (selectionChange)="onSemesterChange()">
-            <mat-option value="all">Tất cả học kỳ</mat-option>
-            <mat-option value="1">HK 1</mat-option>
-            <mat-option value="2">HK 2</mat-option>
-            <mat-option value="3">HK 3</mat-option>
-          </mat-select>
-        </mat-form-field>
+      <mat-form-field appearance="outline" [hidden]="classType !== 'subject'">
+        <mat-label>Học kỳ</mat-label>
+        <mat-select [(ngModel)]="selectedSemester" (selectionChange)="onSemesterChange()">
+          <mat-option value="all">Tất cả học kỳ</mat-option>
+          <mat-option value="1">HK 1</mat-option>
+          <mat-option value="2">HK 2</mat-option>
+          <mat-option value="3">HK 3</mat-option>
+        </mat-select>
+      </mat-form-field>
 
-        <mat-form-field appearance="outline">
-          <mat-label>Học phần</mat-label>
-          <mat-select [(ngModel)]="selectedClassId" (selectionChange)="onClassChange()">
-            <mat-option value="all">Tất cả học phần</mat-option>
-            <mat-option *ngFor="let classItem of classOptions" [value]="classItem.id">
-              {{ classItem.label }}
-            </mat-option>
-          </mat-select>
-        </mat-form-field>
-      </ng-container>
+      <mat-form-field appearance="outline" [hidden]="classType !== 'subject'">
+        <mat-label>Học phần</mat-label>
+        <mat-select [(ngModel)]="selectedClassId" (selectionChange)="onClassChange()">
+          <mat-option value="all">Tất cả học phần</mat-option>
+          <mat-option *ngFor="let classItem of classOptions" [value]="classItem.id">
+            {{ classItem.label }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
 
       <!-- Homeroom mode: Học kỳ + Lớp sinh hoạt -->
-      <ng-container *ngIf="classType === 'homeroom'">
-        <mat-form-field appearance="outline">
-          <mat-label>Học kỳ</mat-label>
-          <mat-select
-            [(ngModel)]="selectedHomeroomSemester"
-            (selectionChange)="onHomeroomSemesterChange()"
-          >
-            <mat-option value="all">Tất cả học kỳ</mat-option>
-            <mat-option value="1">HK 1</mat-option>
-            <mat-option value="2">HK 2</mat-option>
-            <mat-option value="3">HK 3</mat-option>
-          </mat-select>
-        </mat-form-field>
+      <mat-form-field appearance="outline" [hidden]="classType !== 'homeroom'">
+        <mat-label>Học kỳ</mat-label>
+        <mat-select
+          [(ngModel)]="selectedHomeroomSemester"
+          (selectionChange)="onHomeroomSemesterChange()"
+        >
+          <mat-option value="all">Tất cả học kỳ</mat-option>
+          <mat-option value="1">HK 1</mat-option>
+          <mat-option value="2">HK 2</mat-option>
+          <mat-option value="3">HK 3</mat-option>
+        </mat-select>
+      </mat-form-field>
 
-        <mat-form-field appearance="outline">
-          <mat-label>Lớp sinh hoạt</mat-label>
-          <mat-select
-            [(ngModel)]="selectedHomeClassCode"
-            (selectionChange)="onHomeClassCodeChange()"
-          >
-            <mat-option value="all">Tất cả lớp sinh hoạt</mat-option>
-            <mat-option *ngFor="let code of homeClassCodeOptions" [value]="code">
-              {{ code }}
-            </mat-option>
-          </mat-select>
-        </mat-form-field>
-      </ng-container>
+      <mat-form-field appearance="outline" [hidden]="classType !== 'homeroom'">
+        <mat-label>Lớp sinh hoạt</mat-label>
+        <mat-select
+          [(ngModel)]="selectedHomeClassCode"
+          (selectionChange)="onHomeClassCodeChange()"
+        >
+          <mat-option value="all">Tất cả lớp sinh hoạt</mat-option>
+          <mat-option *ngFor="let code of homeClassCodeOptions" [value]="code">
+            {{ code }}
+          </mat-option>
+        </mat-select>
+      </mat-form-field>
 
       <mat-form-field appearance="outline">
         <mat-label>Sinh viên</mat-label>

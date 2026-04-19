@@ -1,6 +1,8 @@
+const dotenv = require("dotenv");
+dotenv.config();
+
 const express = require("express");
 const cors = require("cors");
-const dotenv = require("dotenv");
 const http = require("http");
 
 const connectDatabase = require("./config/database");
@@ -20,8 +22,6 @@ const messageRoutes = require("./routes/messages");
 const newsRoutes = require("./routes/news");
 const setupSocket = require("./socket");
 const errorHandler = require("./middleware/errorHandler");
-
-dotenv.config();
 
 const app = express();
 const httpServer = http.createServer(app);

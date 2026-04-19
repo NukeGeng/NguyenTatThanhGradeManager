@@ -1,12 +1,24 @@
 // ── Entrance animations ──────────────────────────────────────
 @keyframes fadeInLeft {
-  from { opacity: 0; transform: translateX(-32px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(-32px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 @keyframes slideInRight {
-  from { opacity: 0; transform: translateX(48px); }
-  to   { opacity: 1; transform: translateX(0); }
+  from {
+    opacity: 0;
+    transform: translateX(48px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
 }
 
 // ── Page shell ───────────────────────────────────────────────
@@ -75,7 +87,7 @@
   font-weight: 600;
   color: #bfdbfe;
   padding-top: 0.25rem;
-  border-top: 1px solid rgba(255,255,255,0.12);
+  border-top: 1px solid rgba(255, 255, 255, 0.12);
 }
 
 .feature-list {
@@ -107,9 +119,9 @@
 
 .brand-footer {
   font-size: 0.75rem;
-  color: rgba(255,255,255,0.35);
+  color: rgba(255, 255, 255, 0.35);
   padding-top: 0.5rem;
-  border-top: 1px solid rgba(255,255,255,0.08);
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
 
 // ── Right form panel ─────────────────────────────────────────
@@ -127,7 +139,9 @@
   border-radius: 16px !important;
   background: #ffffff !important;
   border: 1px solid #dde6f0 !important;
-  box-shadow: 0 4px 24px rgba(10, 30, 70, 0.08), 0 1px 4px rgba(10, 30, 70, 0.05) !important;
+  box-shadow:
+    0 4px 24px rgba(10, 30, 70, 0.08),
+    0 1px 4px rgba(10, 30, 70, 0.05) !important;
   animation: slideInRight 0.65s cubic-bezier(0.22, 1, 0.36, 1) both 0.1s;
 }
 
@@ -227,7 +241,9 @@ form {
   font-weight: 700;
   letter-spacing: 0.01em;
   margin-top: 4px;
-  transition: background 0.2s, box-shadow 0.2s;
+  transition:
+    background 0.2s,
+    box-shadow 0.2s;
 
   &:hover:not([disabled]) {
     background: #14336a !important;
@@ -257,6 +273,145 @@ form {
     &:hover {
       text-decoration: underline;
     }
+  }
+}
+
+// ── OTP ───────────────────────────────────────────────────────
+.btn-send-otp {
+  width: 100%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 0.65rem 1.5rem;
+  margin-top: 0.25rem;
+  border: 1.5px solid #2563eb;
+  border-radius: 8px;
+  background: transparent;
+  color: #2563eb;
+  font-size: 0.875rem;
+  font-weight: 600;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  cursor: pointer;
+  transition: all 0.15s;
+
+  &:hover:not(:disabled) {
+    background: #eff6ff;
+  }
+
+  &:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+}
+
+.otp-section {
+  margin-top: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+
+.otp-notice {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: #475569;
+  background: #eff6ff;
+  border-radius: 8px;
+  padding: 0.5rem 0.75rem;
+
+  lucide-icon {
+    color: #2563eb;
+    flex-shrink: 0;
+  }
+}
+
+.otp-countdown {
+  margin-left: auto;
+  font-weight: 700;
+  font-family: monospace;
+  color: #2563eb;
+  font-size: 0.85rem;
+
+  &.urgent {
+    color: #dc2626;
+  }
+}
+
+.otp-grid {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+}
+
+.otp-input {
+  width: 46px;
+  height: 54px;
+  border: 1.5px solid #cbd5e1;
+  border-radius: 8px;
+  text-align: center;
+  font-size: 1.4rem;
+  font-weight: 700;
+  font-family: monospace;
+  color: #0c1e3f;
+  outline: none;
+  transition: all 0.15s;
+
+  &:focus {
+    border-color: #2563eb;
+    box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.1);
+  }
+
+  &.filled {
+    border-color: #0c1e3f;
+    background: #eff6ff;
+  }
+
+  &.error {
+    border-color: #dc2626;
+    background: #fef2f2;
+  }
+}
+
+.otp-error {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.8rem;
+  color: #dc2626;
+
+  lucide-icon {
+    flex-shrink: 0;
+  }
+}
+
+.otp-resend {
+  text-align: center;
+  font-size: 0.8rem;
+}
+
+.resend-disabled {
+  color: #94a3b8;
+}
+
+.resend-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  background: none;
+  border: none;
+  color: #2563eb;
+  font-size: 0.8rem;
+  font-weight: 600;
+  font-family: 'Be Vietnam Pro', sans-serif;
+  cursor: pointer;
+  text-decoration: underline;
+  padding: 0;
+
+  &:hover {
+    color: #0c1e3f;
   }
 }
 

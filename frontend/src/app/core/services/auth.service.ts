@@ -23,6 +23,28 @@ export class AuthService {
       .pipe(tap((response) => this.storeToken(response.data.token, rememberMe)));
   }
 
+  sendOtp(email: string): Observable<{ success: boolean; maskedEmail: string }> {
+    return this.apiService.post<{ success: boolean; maskedEmail: string }, { email: string }>(
+      '/auth/send-otp',
+      { email },
+    );
+  }
+
+  verifyOtp(email: string, otp: string, rememberMe = true): Observable<ApiResponse<AuthPayload>> {
+    return this.apiService
+      .post<ApiResponse<AuthPayload>, { email: string; otp: string }>('/auth/verify-otp', {
+        email,
+        otp,
+      })
+      .pipe(
+        tap((response) => {
+          // verify-otp returns token at top-level; wrap if needed
+          const token = (response as any).token ?? response?.data?.token;
+          if (token) this.storeToken(token, rememberMe);
+        }),
+      );
+  }
+
   register(payload: RegisterRequest): Observable<ApiResponse<AuthPayload>> {
     return this.apiService
       .post<ApiResponse<AuthPayload>, RegisterRequest>('/auth/register', payload)

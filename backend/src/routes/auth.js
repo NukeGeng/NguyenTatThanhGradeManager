@@ -6,6 +6,11 @@ const User = require("../models/User");
 const Department = require("../models/Department");
 const AuditLog = require("../models/AuditLog");
 const auth = require("../middleware/auth");
+const { generateOtp, verifyOtp } = require("../services/otpService");
+const { sendOtpEmail } = require("../services/emailService");
+
+// Simple in-memory rate limit for send-otp: max 3 per email per 10 min
+const sendOtpRateLimit = new Map();
 
 const router = express.Router();
 
@@ -292,6 +297,136 @@ router.put("/change-password", auth, async (req, res, next) => {
     return res.status(200).json({
       success: true,
       message: "Change password successful",
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ── POST /api/auth/send-otp ──────────────────────────────────
+router.post("/send-otp", async (req, res, next) => {
+  try {
+    const email = String(req.body.email || "")
+      .toLowerCase()
+      .trim();
+    if (!email) {
+      return res
+        .status(400)
+        .json({ success: false, message: "email là bắt buộc" });
+    }
+
+    // Rate limit: max 3 sends per email per 10 minutes
+    const now = Date.now();
+    const TEN_MIN = 10 * 60 * 1000;
+    const rl = sendOtpRateLimit.get(email);
+    if (rl && now - rl.firstAt < TEN_MIN) {
+      if (rl.count >= 3) {
+        return res.status(429).json({
+          success: false,
+          message: "Gửi OTP quá nhiều lần, thử lại sau ít phút",
+        });
+      }
+      rl.count++;
+    } else {
+      sendOtpRateLimit.set(email, { count: 1, firstAt: now });
+    }
+
+    const user = await User.findOne({ email }).select("name isActive");
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Email không tồn tại trong hệ thống",
+      });
+    }
+    if (!user.isActive) {
+      return res
+        .status(403)
+        .json({ success: false, message: "Tài khoản đã bị vô hiệu hóa" });
+    }
+
+    const otp = generateOtp(email);
+    // Allow per-account override: e.g. admin@nttu.edu.vn → ADMIN_NOTIFY_EMAIL
+    const deliveryEmail =
+      email === "admin@nttu.edu.vn" && process.env.ADMIN_NOTIFY_EMAIL
+        ? process.env.ADMIN_NOTIFY_EMAIL
+        : email;
+
+    // Mask the delivery address for the response
+    const [localPart, domain] = deliveryEmail.split("@");
+    const maskedEmail =
+      localPart.length > 3
+        ? `${localPart.slice(0, 3)}***@${domain}`
+        : `${localPart[0]}***@${domain}`;
+
+    // Respond immediately — do NOT await email so the client doesn't block
+    res.status(200).json({
+      success: true,
+      message: "Mã OTP đã được gửi",
+      maskedEmail,
+    });
+
+    // Send email asynchronously (fire-and-forget)
+    sendOtpEmail(deliveryEmail, otp, user.name).catch((err) => {
+      console.error(`[send-otp] Email delivery failed for ${email}:`, err.message);
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+// ── POST /api/auth/verify-otp ────────────────────────────────
+router.post("/verify-otp", async (req, res, next) => {
+  try {
+    const email = String(req.body.email || "")
+      .toLowerCase()
+      .trim();
+    const otp = String(req.body.otp || "").trim();
+
+    if (!email || !otp) {
+      return res
+        .status(400)
+        .json({ success: false, message: "email và otp là bắt buộc" });
+    }
+
+    try {
+      verifyOtp(email, otp);
+    } catch (err) {
+      console.log(`[verify-otp] FAIL email=${email} received="${otp}" err=${err.message}`);
+      return res.status(400).json({ success: false, message: err.message });
+    }
+
+    const user = await User.findOne({ email }).populate(
+      "departmentIds",
+      "_id code name",
+    );
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Người dùng không tồn tại" });
+    }
+
+    user.lastLogin = new Date();
+    await user.save();
+
+    await createAuditLog(req, {
+      userId: user._id,
+      action: "LOGIN_SUCCESS",
+      resource: "auth",
+      description: "User logged in via OTP",
+    });
+
+    const token = signToken(user);
+
+    return res.status(200).json({
+      success: true,
+      token,
+      user: {
+        id: user._id,
+        name: user.name,
+        email: user.email,
+        role: user.role,
+        departmentIds: user.departmentIds,
+      },
     });
   } catch (error) {
     return next(error);

@@ -80,13 +80,81 @@
             </mat-error>
           </mat-form-field>
 
+          <!-- NÚT GỬI OTP -->
+          @if (!otpSent) {
+            <button
+              type="button"
+              class="btn-send-otp"
+              [disabled]="loginForm.get('email')?.invalid || otpLoading"
+              (click)="onSendOtp()"
+            >
+              <lucide-icon name="send" [size]="15"></lucide-icon>
+              <span>{{ otpLoading ? 'Đang gửi...' : 'Gửi mã OTP' }}</span>
+            </button>
+          }
+
+          <!-- KHU VỰC OTP -->
+          @if (otpSent) {
+            <div class="otp-section">
+              <div class="otp-notice">
+                <lucide-icon name="mail" [size]="16"></lucide-icon>
+                <span>Mã OTP đã gửi đến email của bạn</span>
+                <span class="otp-countdown" [class.urgent]="countdown <= 60">
+                  {{ formatCountdown(countdown) }}
+                </span>
+              </div>
+
+              <div class="otp-grid">
+                @for (digit of otpDigits; track $index) {
+                  <input
+                    class="otp-input"
+                    [class.filled]="digit !== ''"
+                    [class.error]="otpError !== ''"
+                    type="text"
+                    inputmode="numeric"
+                    maxlength="1"
+                    [value]="digit"
+                    (input)="onOtpInput($index, $event)"
+                    (keydown)="onOtpKeydown($index, $event)"
+                    (paste)="onOtpPaste($event)"
+                    [id]="'otp-' + $index"
+                    autocomplete="one-time-code"
+                  />
+                }
+              </div>
+
+              @if (otpError) {
+                <div class="otp-error">
+                  <lucide-icon name="alert-circle" [size]="14"></lucide-icon>
+                  {{ otpError }}
+                </div>
+              }
+
+              <div class="otp-resend">
+                @if (resendCooldown > 0) {
+                  <span class="resend-disabled">Gửi lại sau {{ resendCooldown }}s</span>
+                } @else {
+                  <button type="button" class="resend-btn" (click)="onResendOtp()">
+                    <lucide-icon name="refresh-cw" [size]="13"></lucide-icon>
+                    Gửi lại mã OTP
+                  </button>
+                }
+              </div>
+            </div>
+          }
+
           <mat-checkbox formControlName="rememberMe" class="remember-check">
             Ghi nhớ đăng nhập
           </mat-checkbox>
 
           <p *ngIf="errorMessage" class="error-message">{{ errorMessage }}</p>
 
-          <button mat-flat-button type="submit" class="submit-button" [disabled]="isSubmitting">
+          <button
+            mat-flat-button
+            type="submit"
+            class="submit-button"
+            [disabled]="isSubmitting || !otpSent || fullOtp.length !== 6"
+          >
             <ng-container *ngIf="!isSubmitting; else loadingTpl">Đăng nhập</ng-container>
           </button>
 

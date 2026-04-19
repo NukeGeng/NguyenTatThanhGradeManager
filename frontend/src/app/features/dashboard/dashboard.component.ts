@@ -145,7 +145,9 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       return;
     }
 
-    this.renderOrUpdateGradeChart();
+    // Defer to next tick to avoid triggering CD during ngAfterContentChecked
+    // which causes mat-form-field control-not-found errors.
+    setTimeout(() => this.renderOrUpdateGradeChart(), 0);
   }
 
   private gradeChartCanvas?: ElementRef<HTMLCanvasElement>;
@@ -172,13 +174,19 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
   alertPageSize = 20;
   alertTotal = 0;
 
-  selectedDepartmentId = 'all';
-  selectedSemester: 'all' | '1' | '2' | '3' = 'all';
-  selectedClassId = 'all';
-  selectedStudentId = 'all';
+  // Initialized to null (not 'all') to prevent MatSelect._keyManager crash:
+  // NgModel.ngOnInit fires writeValue(value) BEFORE MatSelect.ngAfterContentInit
+  // sets up _keyManager. With 'all', _selectValue finds the static mat-option and
+  // calls _keyManager.updateActiveItem which is still null → TypeError crash.
+  // With null, _selectValue finds no match → no crash. Actual 'all' is set
+  // in ngAfterViewInit after all ngAfterContentInit hooks have run.
+  selectedDepartmentId: string | null = null;
+  selectedSemester: string | null = null;
+  selectedClassId: string | null = null;
+  selectedStudentId: string | null = null;
   classType: 'subject' | 'homeroom' = 'subject';
-  selectedHomeClassCode = 'all';
-  selectedHomeroomSemester: 'all' | '1' | '2' | '3' = 'all';
+  selectedHomeClassCode: string | null = null;
+  selectedHomeroomSemester: string | null = null;
 
   departmentOptions: DashboardDepartmentOption[] = [];
   classOptions: DashboardClassOption[] = [];
@@ -194,6 +202,19 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     this.ngZone.runOutsideAngular(() => {
       this.initPlexus();
       this.initSmokeTrail();
+    });
+
+    // By this point all MatSelect.ngAfterContentInit hooks have run and _keyManager
+    // is initialized. Use a microtask to set defaults AFTER the current CD pass
+    // completes, avoiding ExpressionChangedAfterItHasBeenChecked errors.
+    Promise.resolve().then(() => {
+      this.selectedDepartmentId ??= 'all';
+      this.selectedSemester ??= 'all';
+      this.selectedClassId ??= 'all';
+      this.selectedStudentId ??= 'all';
+      this.selectedHomeClassCode ??= 'all';
+      this.selectedHomeroomSemester ??= 'all';
+      this.cdr.markForCheck();
     });
   }
 
@@ -227,12 +248,12 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     const summaryRequest = this.apiService
       .get<ApiResponse<DashboardSummaryResponse>>('/grades/summary/dashboard', {
         activeOnly: true,
-        departmentId: this.selectedDepartmentId,
+        departmentId: this.selectedDepartmentId ?? 'all',
         semester:
-          this.classType === 'homeroom' ? this.selectedHomeroomSemester : this.selectedSemester,
-        classId: this.classType === 'homeroom' ? 'all' : this.selectedClassId,
-        studentId: this.selectedStudentId,
-        homeClassCode: this.classType === 'homeroom' ? this.selectedHomeClassCode : 'all',
+          (this.classType === 'homeroom' ? this.selectedHomeroomSemester : this.selectedSemester) ?? 'all',
+        classId: this.classType === 'homeroom' ? 'all' : (this.selectedClassId ?? 'all'),
+        studentId: this.selectedStudentId ?? 'all',
+        homeClassCode: this.classType === 'homeroom' ? (this.selectedHomeClassCode ?? 'all') : 'all',
       })
       .pipe(
         timeout(this.requestTimeoutMs),
@@ -285,11 +306,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
       .get<ApiResponse<AlertsPagePayload>>('/predictions/alerts', {
         page: this.alertPage,
         limit: this.alertPageSize,
-        classId: this.classType === 'homeroom' ? 'all' : this.selectedClassId,
-        departmentId: this.selectedDepartmentId,
+        classId: this.classType === 'homeroom' ? 'all' : (this.selectedClassId ?? 'all'),
+        departmentId: this.selectedDepartmentId ?? 'all',
         semester:
-          this.classType === 'homeroom' ? this.selectedHomeroomSemester : this.selectedSemester,
-        homeClassCode: this.classType === 'homeroom' ? this.selectedHomeClassCode : 'all',
+          (this.classType === 'homeroom' ? this.selectedHomeroomSemester : this.selectedSemester) ?? 'all',
+        homeClassCode: this.classType === 'homeroom' ? (this.selectedHomeClassCode ?? 'all') : 'all',
       })
       .pipe(
         timeout(this.requestTimeoutMs),
@@ -488,21 +509,21 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
             : String(classValue.departmentId._id)
           : null;
 
-      if (this.selectedStudentId !== 'all' && studentId !== this.selectedStudentId) {
+      if ((this.selectedStudentId ?? 'all') !== 'all' && studentId !== this.selectedStudentId) {
         return false;
       }
 
-      if (this.selectedClassId !== 'all' && classId !== this.selectedClassId) {
+      if ((this.selectedClassId ?? 'all') !== 'all' && classId !== this.selectedClassId) {
         return false;
       }
 
-      if (this.selectedClassId === 'all' && this.selectedDepartmentId !== 'all') {
+      if ((this.selectedClassId ?? 'all') === 'all' && (this.selectedDepartmentId ?? 'all') !== 'all') {
         if (departmentId !== this.selectedDepartmentId) {
           return false;
         }
       }
 
-      if (this.selectedSemester !== 'all' && this.selectedClassId === 'all') {
+      if ((this.selectedSemester ?? 'all') !== 'all' && (this.selectedClassId ?? 'all') === 'all') {
         if (!classId || !availableClassIds.has(classId)) {
           return false;
         }
@@ -632,9 +653,11 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
     }
   }
 
-  // Dam bao UI cap nhat ngay ca khi callback async chay ngoai vung change detection.
+  // Angular zone (HttpClient) tu dong schedule CD sau moi callback async.
+  // detectChanges() dong bo gay loi mat-form-field/keyManager chua init.
+  // markForCheck() an toan: chi danh dau dirty, khong force CD ngay lap tuc.
   private syncView(): void {
-    this.cdr.detectChanges();
+    this.cdr.markForCheck();
   }
 
   private initPlexus(): void {

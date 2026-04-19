@@ -102,6 +102,16 @@
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 0.75rem;
+
+  // Hidden fields stay in DOM (avoids MatSelect keyManager init race) but are invisible.
+  mat-form-field[hidden] {
+    display: none !important;
+  }
+
+  // Hidden fields stay in DOM (avoids MatSelect keyManager init race) but are invisible.
+  mat-form-field[hidden] {
+    display: none !important;
+  }
 }
 
 .state-card.error {

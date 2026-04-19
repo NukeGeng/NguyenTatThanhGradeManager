@@ -8,7 +8,6 @@ import {
 import { provideHttpClient, withInterceptors } from '@angular/common/http';
 import { provideRouter } from '@angular/router';
 import { provideAnimationsAsync } from '@angular/platform-browser/animations/async';
-import { MatSnackBarModule } from '@angular/material/snack-bar';
 import {
   AlertCircle,
   AlertTriangle,
@@ -104,7 +103,6 @@ export const appConfig: ApplicationConfig = {
     provideRouter(routes),
     provideAnimationsAsync(),
     importProvidersFrom(
-      MatSnackBarModule,
       LucideAngularModule.pick({
         AlertCircle,
         AlertTriangle,
