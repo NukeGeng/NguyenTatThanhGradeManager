@@ -250,10 +250,12 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         activeOnly: true,
         departmentId: this.selectedDepartmentId ?? 'all',
         semester:
-          (this.classType === 'homeroom' ? this.selectedHomeroomSemester : this.selectedSemester) ?? 'all',
+          (this.classType === 'homeroom' ? this.selectedHomeroomSemester : this.selectedSemester) ??
+          'all',
         classId: this.classType === 'homeroom' ? 'all' : (this.selectedClassId ?? 'all'),
         studentId: this.selectedStudentId ?? 'all',
-        homeClassCode: this.classType === 'homeroom' ? (this.selectedHomeClassCode ?? 'all') : 'all',
+        homeClassCode:
+          this.classType === 'homeroom' ? (this.selectedHomeClassCode ?? 'all') : 'all',
       })
       .pipe(
         timeout(this.requestTimeoutMs),
@@ -309,8 +311,10 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         classId: this.classType === 'homeroom' ? 'all' : (this.selectedClassId ?? 'all'),
         departmentId: this.selectedDepartmentId ?? 'all',
         semester:
-          (this.classType === 'homeroom' ? this.selectedHomeroomSemester : this.selectedSemester) ?? 'all',
-        homeClassCode: this.classType === 'homeroom' ? (this.selectedHomeClassCode ?? 'all') : 'all',
+          (this.classType === 'homeroom' ? this.selectedHomeroomSemester : this.selectedSemester) ??
+          'all',
+        homeClassCode:
+          this.classType === 'homeroom' ? (this.selectedHomeClassCode ?? 'all') : 'all',
       })
       .pipe(
         timeout(this.requestTimeoutMs),
@@ -517,7 +521,10 @@ export class DashboardComponent implements OnInit, AfterViewInit, OnDestroy {
         return false;
       }
 
-      if ((this.selectedClassId ?? 'all') === 'all' && (this.selectedDepartmentId ?? 'all') !== 'all') {
+      if (
+        (this.selectedClassId ?? 'all') === 'all' &&
+        (this.selectedDepartmentId ?? 'all') !== 'all'
+      ) {
         if (departmentId !== this.selectedDepartmentId) {
           return false;
         }

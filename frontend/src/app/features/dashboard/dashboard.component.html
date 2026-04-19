@@ -85,10 +85,7 @@
 
       <mat-form-field appearance="outline" [hidden]="classType !== 'homeroom'">
         <mat-label>Lớp sinh hoạt</mat-label>
-        <mat-select
-          [(ngModel)]="selectedHomeClassCode"
-          (selectionChange)="onHomeClassCodeChange()"
-        >
+        <mat-select [(ngModel)]="selectedHomeClassCode" (selectionChange)="onHomeClassCodeChange()">
           <mat-option value="all">Tất cả lớp sinh hoạt</mat-option>
           <mat-option *ngFor="let code of homeClassCodeOptions" [value]="code">
             {{ code }}

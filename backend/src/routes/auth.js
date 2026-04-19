@@ -367,7 +367,10 @@ router.post("/send-otp", async (req, res, next) => {
 
     // Send email asynchronously (fire-and-forget)
     sendOtpEmail(deliveryEmail, otp, user.name).catch((err) => {
-      console.error(`[send-otp] Email delivery failed for ${email}:`, err.message);
+      console.error(
+        `[send-otp] Email delivery failed for ${email}:`,
+        err.message,
+      );
     });
   } catch (error) {
     return next(error);
@@ -391,7 +394,9 @@ router.post("/verify-otp", async (req, res, next) => {
     try {
       verifyOtp(email, otp);
     } catch (err) {
-      console.log(`[verify-otp] FAIL email=${email} received="${otp}" err=${err.message}`);
+      console.log(
+        `[verify-otp] FAIL email=${email} received="${otp}" err=${err.message}`,
+      );
       return res.status(400).json({ success: false, message: err.message });
     }
 
