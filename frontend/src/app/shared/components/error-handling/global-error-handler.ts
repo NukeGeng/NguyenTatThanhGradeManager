@@ -23,16 +23,4 @@ export class GlobalErrorHandler implements ErrorHandler {
       this.isShowingError = false;
     });
   }
-
-    // Deduplicate: show at most one error snackbar at a time to prevent cascade.
-    if (this.isShowingError) return;
-    this.isShowingError = true;
-
-    const ref = this.snackBar.open('Đã xảy ra lỗi không mong muốn. Vui lòng thử lại.', 'Đóng', {
-      duration: 4000,
-    });
-    ref.afterDismissed().subscribe(() => {
-      this.isShowingError = false;
-    });
-  }
 }

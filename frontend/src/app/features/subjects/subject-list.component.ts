@@ -646,8 +646,9 @@ export class SubjectListComponent implements OnInit {
   }
 
   getDepartmentCode(value: Subject['departmentId']): string {
+    if (!value) return '—';
     if (typeof value !== 'string') {
-      return value.code;
+      return value.code ?? '—';
     }
 
     const found = this.departments.find((department) => department._id === value);
