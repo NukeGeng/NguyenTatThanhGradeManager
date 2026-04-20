@@ -20,6 +20,7 @@ const curriculumRoutes = require("./routes/curricula");
 const studentCurriculumRoutes = require("./routes/studentCurricula");
 const messageRoutes = require("./routes/messages");
 const newsRoutes = require("./routes/news");
+const chatbotRoutes = require("./routes/chatbot");
 const setupSocket = require("./socket");
 const errorHandler = require("./middleware/errorHandler");
 
@@ -57,6 +58,7 @@ app.use("/api/curricula", curriculumRoutes);
 app.use("/api/student-curricula", studentCurriculumRoutes);
 app.use("/api/messages", messageRoutes);
 app.use("/api/news", newsRoutes);
+app.use("/api/chatbot", chatbotRoutes);
 
 app.use((req, res) => {
   res.status(404).json({

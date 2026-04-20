@@ -85,6 +85,8 @@ import {
   Send,
   ImagePlus,
   FileText,
+  Bot,
+  LoaderCircle,
 } from 'lucide-angular';
 
 import { routes } from './app.routes';
@@ -179,6 +181,8 @@ export const appConfig: ApplicationConfig = {
         Zap,
         ImagePlus,
         FileText,
+        Bot,
+        LoaderCircle,
       }),
     ),
     // Cau hinh HttpClient toan cuc va tu dong gan JWT cho moi request.

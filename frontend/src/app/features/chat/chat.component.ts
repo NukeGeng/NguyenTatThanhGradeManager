@@ -1,14 +1,16 @@
-import { CommonModule } from '@angular/common';
+import { CommonModule, DatePipe } from '@angular/common';
 import { Component, DestroyRef, OnDestroy, OnInit, inject } from '@angular/core';
 import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
 import { MatButtonModule } from '@angular/material/button';
 import { MatProgressSpinnerModule } from '@angular/material/progress-spinner';
+import { MatTooltipModule } from '@angular/material/tooltip';
 import { LucideAngularModule } from 'lucide-angular';
 import { debounceTime, finalize, map, Observable, Subject } from 'rxjs';
 
 import { ApiService } from '../../core/services/api.service';
 import { AuthService } from '../../core/services/auth.service';
+import { ChatbotService, ChatMessage } from '../../core/services/chatbot.service';
 import { SocketService } from '../../core/services/socket.service';
 import {
   ApiResponse,
@@ -22,9 +24,11 @@ import {
   standalone: true,
   imports: [
     CommonModule,
+    DatePipe,
     FormsModule,
     MatButtonModule,
     MatProgressSpinnerModule,
+    MatTooltipModule,
     LucideAngularModule,
   ],
   template: `
@@ -83,6 +87,31 @@ import {
           </div>
         } @else {
           <div class="room-list">
+            <!-- ── Trợ lý AI (room đặc biệt, luôn đầu danh sách) ── -->
+            <button
+              type="button"
+              class="room-item room-item--ai"
+              [class.active]="isAiRoom"
+              (click)="selectAiRoom()"
+            >
+              <span class="room-avatar room-avatar--ai">
+                <lucide-icon name="bot" [size]="16"></lucide-icon>
+              </span>
+              <div class="room-main">
+                <p class="room-name">Trợ lý AI</p>
+                <p class="preview">
+                  @if (aiOnline) {
+                    <span class="ai-status ai-status--online">● Đang hoạt động</span>
+                  } @else {
+                    <span class="ai-status ai-status--offline">● Ngoại tuyến</span>
+                  }
+                </p>
+              </div>
+              <div class="room-right"></div>
+            </button>
+
+            <hr class="room-divider" />
+
             @for (room of filteredRooms; track room.roomId) {
               <button
                 type="button"
@@ -110,7 +139,197 @@ import {
       </aside>
 
       <section class="chat-panel">
-        @if (!selectedRoomId) {
+        @if (isAiRoom) {
+          <!-- ══════════════════════════════════════════
+               AI CHATBOT WINDOW
+          ══════════════════════════════════════════ -->
+          <header class="chat-head">
+            <div class="chat-head-left">
+              <span class="room-avatar room-avatar--head room-avatar--ai">
+                <lucide-icon name="bot" [size]="18"></lucide-icon>
+              </span>
+              <div>
+                <h2>Trợ lý NTTU</h2>
+                <p>
+                  @if (aiOnline) {
+                    <span class="status-dot status-dot--online"></span>
+                    Llama AI · Đang hoạt động
+                  } @else {
+                    <span class="status-dot status-dot--offline"></span>
+                    Ngoại tuyến
+                  }
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              class="btn-icon btn-query-db"
+              matTooltip="Tra cứu dữ liệu"
+              [class.btn-query-db--active]="showAiQuery"
+              (click)="showAiQuery = !showAiQuery"
+            >
+              <lucide-icon name="database" [size]="15"></lucide-icon>
+            </button>
+            <button
+              type="button"
+              class="btn-icon btn-clear-chat"
+              matTooltip="Xóa lịch sử chat"
+              (click)="clearAiHistory()"
+            >
+              <lucide-icon name="trash-2" [size]="15"></lucide-icon>
+            </button>
+          </header>
+
+          <div class="messages ai-messages" #aiScrollAnchor>
+            @for (msg of aiMessages; track $index) {
+              <div class="message-row" [class.message-row--mine]="msg.role === 'user'">
+                @if (msg.role === 'assistant') {
+                  <span class="msg-avatar msg-avatar--ai">
+                    <lucide-icon name="bot" [size]="13"></lucide-icon>
+                  </span>
+                }
+                <article
+                  class="bubble"
+                  [class.mine]="msg.role === 'user'"
+                  [class.bubble--ai]="msg.role === 'assistant'"
+                >
+                  <p class="content" [innerHTML]="formatAiMessage(msg.content)"></p>
+                  @if (msg.isStreaming) {
+                    <span class="typing-cursor">▋</span>
+                  }
+                  <p class="time">{{ msg.timestamp | date: 'HH:mm' }}</p>
+                </article>
+              </div>
+            }
+
+            @if (
+              aiIsTyping &&
+              aiMessages.length > 0 &&
+              aiMessages[aiMessages.length - 1].content === ''
+            ) {
+              <div class="message-row">
+                <span class="msg-avatar msg-avatar--ai">
+                  <lucide-icon name="bot" [size]="13"></lucide-icon>
+                </span>
+                <div class="bubble bubble--ai typing-indicator">
+                  <span></span><span></span><span></span>
+                </div>
+              </div>
+            }
+          </div>
+
+          <footer class="composer">
+            @if (showAiQuery) {
+              <!-- ── Tra cứu DB form ── -->
+              <div class="ai-query-panel">
+                <div class="ai-query-head">
+                  <span>
+                    <lucide-icon
+                      name="database"
+                      [size]="13"
+                      style="vertical-align:-2px;margin-right:4px"
+                    ></lucide-icon>
+                    Tra cứu dữ liệu
+                  </span>
+                  <button type="button" class="btn-icon" (click)="showAiQuery = false">
+                    <lucide-icon name="x" [size]="14"></lucide-icon>
+                  </button>
+                </div>
+                <div class="query-type-chips">
+                  @for (t of queryTypes; track t.value) {
+                    <button
+                      type="button"
+                      class="query-type-chip"
+                      [class.active]="aiQueryType === t.value"
+                      (click)="aiQueryType = t.value"
+                    >
+                      {{ t.label }}
+                    </button>
+                  }
+                </div>
+                <div class="query-inputs-row">
+                  <input
+                    [(ngModel)]="aiQueryStudentCode"
+                    placeholder="Mã SV (tuỳ chọn)"
+                    class="form-input query-input-sm"
+                    maxlength="20"
+                  />
+                  <input
+                    [(ngModel)]="aiQueryClassName"
+                    placeholder="Lớp (tuỳ chọn)"
+                    class="form-input query-input-sm"
+                    maxlength="40"
+                  />
+                </div>
+                <textarea
+                  [(ngModel)]="aiQueryQuestion"
+                  placeholder="Câu hỏi cho AI (bắt buộc)..."
+                  rows="2"
+                  class="form-textarea"
+                  (keydown.enter)="$event.preventDefault(); sendAiQuery()"
+                ></textarea>
+                <div style="display:flex;justify-content:flex-end">
+                  <button
+                    mat-flat-button
+                    class="btn-send"
+                    type="button"
+                    [disabled]="!aiQueryType || !aiQueryQuestion.trim() || aiIsTyping"
+                    (click)="sendAiQuery()"
+                  >
+                    <lucide-icon name="search" [size]="14"></lucide-icon>
+                    Tra cứu + Hỏi AI
+                  </button>
+                </div>
+              </div>
+            }
+            <div class="quick-prompts">
+              <button
+                type="button"
+                class="quick-btn"
+                (click)="setQuickPrompt('Lộ trình cải thiện GPA lên 3.2')"
+              >
+                Lộ trình GPA 3.2
+              </button>
+              <button
+                type="button"
+                class="quick-btn"
+                (click)="setQuickPrompt('Môn nào nên học lại trước?')"
+              >
+                Môn nên học lại
+              </button>
+              <button
+                type="button"
+                class="quick-btn"
+                (click)="setQuickPrompt('Gợi ý tài liệu học lập trình')"
+              >
+                Tài liệu học tập
+              </button>
+            </div>
+            <div class="composer-row">
+              <textarea
+                [(ngModel)]="aiInputText"
+                (keydown)="onAiKeydown($event)"
+                placeholder="Hỏi Trợ lý AI... (Enter gửi, Shift+Enter xuống dòng)"
+                [disabled]="aiIsTyping"
+                rows="1"
+              ></textarea>
+              <button
+                mat-flat-button
+                class="btn-send"
+                type="button"
+                [disabled]="!aiInputText.trim() || aiIsTyping"
+                (click)="sendAiMessage()"
+              >
+                @if (aiIsTyping) {
+                  <lucide-icon name="loader-circle" [size]="14" class="spin"></lucide-icon>
+                } @else {
+                  <lucide-icon name="send" [size]="14"></lucide-icon>
+                }
+              </button>
+            </div>
+            <p class="input-hint">Powered by Llama · Chạy local trên VPS NTTU</p>
+          </footer>
+        } @else if (!selectedRoomId) {
           <div class="empty-chat">
             <lucide-icon name="message-circle" [size]="20"></lucide-icon>
             <p>Chọn một room để bắt đầu trò chuyện.</p>
@@ -284,6 +503,7 @@ import {
                     placeholder="Nhập tin nhắn..."
                     maxlength="2000"
                     rows="1"
+                    class="chat-textarea"
                   ></textarea>
                 }
 
@@ -544,14 +764,16 @@ import {
       .messages {
         overflow: auto;
         min-height: 0;
-        padding: 0.8rem 0.9rem;
-        display: grid;
-        gap: 0.6rem;
-        align-content: start;
+        padding: 1rem 1rem;
+        display: flex;
+        flex-direction: column;
+        gap: 0.75rem;
       }
 
       .message-row {
         display: flex;
+        align-items: flex-end;
+        gap: 0.5rem;
         justify-content: flex-start;
       }
 
@@ -560,16 +782,22 @@ import {
       }
 
       .bubble {
-        max-width: min(75%, 560px);
+        max-width: min(72%, 540px);
         background: #f1f5f9;
-        border-radius: 12px 12px 12px 3px;
-        padding: 0.45rem 0.65rem;
+        border-radius: 16px 16px 16px 4px;
+        padding: 0.55rem 0.8rem;
         font-size: 0.875rem;
+        box-shadow: 0 1px 2px rgba(0, 0, 0, 0.06);
       }
 
       .bubble.mine {
-        background: var(--blue-pale, #dbeafe);
-        border-radius: 12px 12px 3px 12px;
+        background: var(--navy, #1e3a5f);
+        color: #fff;
+        border-radius: 16px 16px 4px 16px;
+      }
+
+      .bubble.mine .time {
+        color: rgba(255, 255, 255, 0.6);
       }
 
       .sender {
@@ -625,14 +853,45 @@ import {
 
       .composer {
         border-top: 1px solid var(--gray-200);
-        padding: 0.5rem 0.75rem;
+        padding: 0.6rem 0.85rem 0.5rem;
         background: #fff;
+        display: flex;
+        flex-direction: column;
+        gap: 0;
       }
 
       .composer-row {
         display: flex;
         align-items: flex-end;
-        gap: 0.35rem;
+        gap: 0.4rem;
+      }
+
+      .composer-row textarea {
+        flex: 1;
+        min-width: 0;
+        min-height: 38px;
+        max-height: 140px;
+        resize: none;
+        overflow-y: auto;
+        border: 1px solid var(--gray-200);
+        border-radius: 20px;
+        padding: 0.5rem 0.85rem;
+        font: inherit;
+        font-size: 0.875rem;
+        line-height: 1.45;
+        outline: none;
+        transition: border-color 0.15s;
+        background: #f8fafc;
+      }
+
+      .composer-row textarea:focus {
+        border-color: var(--blue, #3b82f6);
+        background: #fff;
+      }
+
+      .composer-row textarea:disabled {
+        opacity: 0.6;
+        cursor: not-allowed;
       }
 
       .composer-tools {
@@ -777,24 +1036,33 @@ import {
       }
 
       textarea {
-        flex: 1;
-        min-width: 0;
-        min-height: 36px;
-        max-height: 140px;
-        resize: none;
-        overflow-y: auto;
-        border: 1px solid var(--gray-200);
-        border-radius: 18px;
-        padding: 0.45rem 0.75rem;
         font: inherit;
-        font-size: 0.875rem;
-        line-height: 1.45;
         outline: none;
-        transition: border-color 0.15s;
+        resize: none;
       }
 
       textarea:focus {
         border-color: var(--blue, #3b82f6);
+      }
+
+      .chat-textarea {
+        flex: 1;
+        min-width: 0;
+        min-height: 38px;
+        max-height: 140px;
+        overflow-y: auto;
+        border: 1px solid var(--gray-200);
+        border-radius: 20px;
+        padding: 0.5rem 0.85rem;
+        font-size: 0.875rem;
+        line-height: 1.45;
+        transition: border-color 0.15s;
+        background: #f8fafc;
+      }
+
+      .chat-textarea:focus {
+        border-color: var(--blue, #3b82f6);
+        background: #fff;
       }
 
       .pending-image-row {
@@ -817,11 +1085,25 @@ import {
       .btn-send {
         background: var(--navy) !important;
         color: #fff !important;
-        padding: 0.35rem 0.6rem !important;
+        padding: 0.42rem 0.75rem !important;
         min-width: 0 !important;
-        border-radius: 8px !important;
+        border-radius: 20px !important;
         flex-shrink: 0;
         align-self: flex-end;
+        display: inline-flex;
+        align-items: center;
+        gap: 0.3rem;
+        font-size: 0.83rem !important;
+        font-weight: 600 !important;
+        transition: opacity 0.15s !important;
+      }
+
+      .btn-send:disabled {
+        opacity: 0.45 !important;
+      }
+
+      .btn-send:not(:disabled):hover {
+        opacity: 0.88 !important;
       }
 
       .empty-chat,
@@ -859,6 +1141,274 @@ import {
           max-height: 320px;
         }
       }
+
+      /* ── AI Room item ── */
+      .room-item--ai {
+        border: 1px solid rgba(37, 99, 235, 0.18);
+        background: var(--blue-pale, #eff6ff);
+      }
+
+      .room-item--ai:hover {
+        border-color: var(--blue, #3b82f6);
+      }
+
+      .room-item--ai.active {
+        border-color: var(--blue, #3b82f6);
+        background: #dbeafe;
+      }
+
+      .room-avatar--ai {
+        background: linear-gradient(135deg, var(--navy, #1e3a5f), var(--blue, #3b82f6));
+        color: #fff;
+      }
+
+      .ai-status {
+        font-size: 0.72rem;
+        font-weight: 600;
+      }
+      .ai-status--online {
+        color: #16a34a;
+      }
+      .ai-status--offline {
+        color: #94a3b8;
+      }
+
+      .room-divider {
+        border: none;
+        border-top: 1px solid var(--gray-200, #e5e7eb);
+        margin: 4px 0;
+      }
+
+      /* ── AI Chat window ── */
+      .chat-head {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        padding: 0.75rem 0.9rem;
+        border-bottom: 1px solid var(--gray-200, #e5e7eb);
+      }
+
+      .btn-clear-chat {
+        margin-left: auto;
+        color: var(--text-sub);
+      }
+
+      .btn-clear-chat:hover {
+        color: #dc2626;
+        background: #fee2e2;
+      }
+
+      .status-dot {
+        display: inline-block;
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        margin-right: 3px;
+        vertical-align: middle;
+      }
+
+      .status-dot--online {
+        background: #16a34a;
+      }
+      .status-dot--offline {
+        background: #94a3b8;
+      }
+
+      /* AI message bubble */
+      .msg-avatar--ai {
+        width: 28px;
+        height: 28px;
+        min-width: 28px;
+        border-radius: 50%;
+        flex-shrink: 0;
+        background: linear-gradient(135deg, var(--navy, #1e3a5f), var(--blue, #3b82f6));
+        color: #fff;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+      }
+
+      .bubble--ai {
+        background: #fff;
+        border: 1px solid var(--gray-200, #e5e7eb);
+        border-radius: 4px 16px 16px 16px;
+        box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+        max-width: min(80%, 600px);
+      }
+
+      .bubble--ai .content {
+        color: var(--text, #1e293b);
+        line-height: 1.6;
+      }
+
+      .typing-cursor {
+        display: inline-block;
+        animation: blink 0.7s step-end infinite;
+        color: var(--blue, #3b82f6);
+        font-size: 0.9rem;
+        margin-left: 2px;
+      }
+
+      @keyframes blink {
+        0%,
+        100% {
+          opacity: 1;
+        }
+        50% {
+          opacity: 0;
+        }
+      }
+
+      .typing-indicator {
+        display: inline-flex;
+        gap: 4px;
+        padding: 0.6rem 0.75rem;
+        align-items: center;
+      }
+
+      .typing-indicator span {
+        width: 6px;
+        height: 6px;
+        border-radius: 50%;
+        background: var(--gray-400, #94a3b8);
+        animation: bounce 1.2s ease-in-out infinite;
+      }
+
+      .typing-indicator span:nth-child(2) {
+        animation-delay: 0.2s;
+      }
+      .typing-indicator span:nth-child(3) {
+        animation-delay: 0.4s;
+      }
+
+      @keyframes bounce {
+        0%,
+        60%,
+        100% {
+          transform: translateY(0);
+        }
+        30% {
+          transform: translateY(-5px);
+        }
+      }
+
+      .quick-prompts {
+        display: flex;
+        gap: 6px;
+        flex-wrap: wrap;
+        padding: 4px 0 6px;
+        border-bottom: 1px solid var(--gray-100, #f1f5f9);
+        margin-bottom: 6px;
+      }
+
+      .quick-btn {
+        font-size: 0.72rem;
+        font-weight: 500;
+        padding: 0.22rem 0.6rem;
+        border-radius: 999px;
+        border: 1px solid var(--gray-200, #e5e7eb);
+        background: #fff;
+        color: var(--text-sub);
+        cursor: pointer;
+        transition: all 0.15s;
+        font-family: inherit;
+        white-space: nowrap;
+      }
+
+      .quick-btn:hover {
+        border-color: var(--blue, #3b82f6);
+        color: var(--blue, #3b82f6);
+        background: var(--blue-pale, #eff6ff);
+      }
+
+      .input-hint {
+        font-size: 0.67rem;
+        color: var(--text-muted, #94a3b8);
+        text-align: center;
+        margin: 4px 0 0;
+      }
+
+      .spin {
+        animation: spin 1s linear infinite;
+      }
+      @keyframes spin {
+        to {
+          transform: rotate(360deg);
+        }
+      }
+
+      /* ── AI Query panel ── */
+      .ai-query-panel {
+        border: 1px solid #bfdbfe;
+        border-radius: 10px;
+        padding: 0.65rem 0.75rem;
+        background: #f0f7ff;
+        display: flex;
+        flex-direction: column;
+        gap: 0.45rem;
+        margin-bottom: 0.5rem;
+      }
+
+      .ai-query-head {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        font-size: 0.78rem;
+        font-weight: 700;
+        color: var(--navy);
+      }
+
+      .query-type-chips {
+        display: flex;
+        gap: 5px;
+        flex-wrap: wrap;
+      }
+
+      .query-type-chip {
+        font-size: 0.72rem;
+        font-weight: 600;
+        padding: 0.22rem 0.6rem;
+        border-radius: 999px;
+        border: 1px solid #bfdbfe;
+        background: #fff;
+        color: #3b82f6;
+        cursor: pointer;
+        font-family: inherit;
+        transition: all 0.15s;
+      }
+
+      .query-type-chip:hover,
+      .query-type-chip.active {
+        background: var(--navy, #1e3a5f);
+        border-color: var(--navy, #1e3a5f);
+        color: #fff;
+      }
+
+      .query-inputs-row {
+        display: flex;
+        gap: 0.4rem;
+      }
+
+      .query-input-sm {
+        flex: 1;
+        min-width: 0;
+        font-size: 0.82rem !important;
+      }
+
+      .btn-query-db {
+        color: var(--text-sub);
+      }
+
+      .btn-query-db:hover,
+      .btn-query-db--active {
+        background: var(--blue-pale, #eff6ff) !important;
+        color: var(--blue, #3b82f6) !important;
+      }
+
+      .ai-messages {
+        scroll-behavior: smooth;
+        background: #fafbfd;
+      }
     `,
   ],
 })
@@ -866,6 +1416,7 @@ export class ChatComponent implements OnInit, OnDestroy {
   private readonly apiService = inject(ApiService);
   private readonly socketService = inject(SocketService);
   private readonly authService = inject(AuthService);
+  private readonly chatbotService = inject(ChatbotService);
   private readonly destroyRef = inject(DestroyRef);
 
   rooms: MessageRoomSummary[] = [];
@@ -899,9 +1450,36 @@ export class ChatComponent implements OnInit, OnDestroy {
   private readonly typingTrigger$ = new Subject<void>();
   private typingTimeoutRef: ReturnType<typeof setTimeout> | null = null;
 
+  // ── AI Chatbot state ──
+  isAiRoom = false;
+  aiMessages: ChatMessage[] = [];
+  aiInputText = '';
+  aiIsTyping = false;
+  aiOnline = false;
+
+  // ── AI Query form state ──
+  showAiQuery = false;
+  aiQueryType = '';
+  aiQueryStudentCode = '';
+  aiQueryClassName = '';
+  aiQueryQuestion = '';
+
+  readonly queryTypes = [
+    { value: 'student_info', label: 'Thông tin SV' },
+    { value: 'grade_query', label: 'Điểm học tập' },
+    { value: 'risk_alert', label: 'Cảnh báo rủi ro' },
+    { value: 'roadmap', label: 'Lộ trình học' },
+  ];
+
   ngOnInit(): void {
     this.currentUserId = this.authService.getCurrentUserId() || '';
     this.loadRooms();
+
+    // Kiểm tra Ollama health và theo dõi trạng thái online
+    this.chatbotService.checkHealth();
+    this.chatbotService.isOnline$
+      .pipe(takeUntilDestroyed(this.destroyRef))
+      .subscribe((online) => (this.aiOnline = online));
 
     this.socketService.connect();
 
@@ -945,6 +1523,183 @@ export class ChatComponent implements OnInit, OnDestroy {
     this.socketService.disconnect();
   }
 
+  // ════════════════════════════════════════════
+  // AI Chatbot methods
+  // ════════════════════════════════════════════
+
+  selectAiRoom(): void {
+    // Rời room chat thường nếu đang ở đó
+    if (this.selectedRoomId) {
+      this.socketService.leaveRoom(this.selectedRoomId);
+      this.selectedRoomId = '';
+    }
+    this.isAiRoom = true;
+
+    // Tải lịch sử từ localStorage
+    if (this.aiMessages.length === 0) {
+      const saved = this.chatbotService.loadHistory();
+      if (saved.length > 0) {
+        this.aiMessages = saved;
+      } else {
+        this.aiMessages = [
+          {
+            role: 'assistant',
+            content:
+              'Xin chào! Tôi là Trợ lý NTTU. Tôi có thể giúp bạn về lộ trình học tập, phân tích điểm số và tư vấn học vụ. Bạn cần hỗ trợ gì?',
+            timestamp: new Date(),
+          },
+        ];
+      }
+    }
+
+    setTimeout(() => this.scrollAiToBottom(), 80);
+  }
+
+  sendAiMessage(): void {
+    const content = this.aiInputText.trim();
+    if (!content || this.aiIsTyping) return;
+
+    this.aiMessages.push({ role: 'user', content, timestamp: new Date() });
+    this.aiInputText = '';
+    this.aiIsTyping = true;
+    setTimeout(() => this.scrollAiToBottom(), 50);
+
+    // Placeholder cho phản hồi của AI (streaming vào đây)
+    const aiMsg: ChatMessage = {
+      role: 'assistant',
+      content: '',
+      timestamp: new Date(),
+      isStreaming: true,
+    };
+    this.aiMessages.push(aiMsg);
+
+    // Chỉ gửi 10 tin nhắn gần nhất, bỏ placeholder cuối (isStreaming)
+    const history = this.aiMessages.filter((m) => !m.isStreaming).slice(-10);
+
+    this.chatbotService.sendMessage(history).subscribe({
+      next: (chunk) => {
+        aiMsg.content += chunk;
+        this.scrollAiToBottom();
+      },
+      error: (err: Error) => {
+        console.error('[AI] sendMessage error:', err);
+        aiMsg.content = `⚠️ Không thể kết nối AI. ${err?.message ? `(${err.message})` : 'Vui lòng thử lại sau.'}`;
+        aiMsg.isStreaming = false;
+        this.aiIsTyping = false;
+        // Lưu lại lịch sử dù lỗi
+        this.chatbotService.saveHistory(this.aiMessages);
+      },
+      complete: () => {
+        aiMsg.isStreaming = false;
+        this.aiIsTyping = false;
+        this.scrollAiToBottom();
+        // Lưu lịch sử sau mỗi lượt trả lời xong
+        this.chatbotService.saveHistory(this.aiMessages);
+      },
+    });
+  }
+
+  onAiKeydown(event: KeyboardEvent): void {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      this.sendAiMessage();
+    }
+  }
+
+  clearAiHistory(): void {
+    this.aiMessages = [];
+    this.chatbotService.clearHistory();
+    this.selectAiRoom(); // Reset + hiển thị lời chào lại
+  }
+
+  setQuickPrompt(text: string): void {
+    this.aiInputText = text;
+    const el = document.querySelector<HTMLTextAreaElement>('.ai-messages ~ footer textarea');
+    el?.focus();
+  }
+
+  sendAiQuery(): void {
+    if (!this.aiQueryType || !this.aiQueryQuestion.trim() || this.aiIsTyping) return;
+
+    const typeLabels: Record<string, string> = {
+      student_info: 'Tra cứu thông tin sinh viên',
+      grade_query: 'Xem điểm học tập',
+      risk_alert: 'Cảnh báo rủi ro',
+      roadmap: 'Lộ trình học tập',
+    };
+    const label = typeLabels[this.aiQueryType] ?? this.aiQueryType;
+    const identifier = this.aiQueryStudentCode.trim() || this.aiQueryClassName.trim();
+    const displayContent = identifier
+      ? `[${label}] ${identifier}: ${this.aiQueryQuestion.trim()}`
+      : `[${label}] ${this.aiQueryQuestion.trim()}`;
+
+    this.aiMessages.push({ role: 'user', content: displayContent, timestamp: new Date() });
+    this.showAiQuery = false;
+    this.aiIsTyping = true;
+    setTimeout(() => this.scrollAiToBottom(), 50);
+
+    const aiMsg: ChatMessage = {
+      role: 'assistant',
+      content: '',
+      timestamp: new Date(),
+      isStreaming: true,
+    };
+    this.aiMessages.push(aiMsg);
+
+    const history = this.aiMessages.filter((m) => !m.isStreaming).slice(-6);
+
+    this.chatbotService
+      .sendQuery({
+        queryType: this.aiQueryType,
+        studentCode: this.aiQueryStudentCode.trim(),
+        className: this.aiQueryClassName.trim(),
+        question: this.aiQueryQuestion.trim(),
+        history,
+      })
+      .subscribe({
+        next: (chunk) => {
+          aiMsg.content += chunk;
+          this.scrollAiToBottom();
+        },
+        error: (err: Error) => {
+          console.error('[AI query] error:', err);
+          aiMsg.content = `⚠️ Không thể kết nối AI. ${err?.message ? `(${err.message})` : 'Vui lòng thử lại sau.'}`;
+          aiMsg.isStreaming = false;
+          this.aiIsTyping = false;
+          this.chatbotService.saveHistory(this.aiMessages);
+        },
+        complete: () => {
+          aiMsg.isStreaming = false;
+          this.aiIsTyping = false;
+          this.scrollAiToBottom();
+          this.chatbotService.saveHistory(this.aiMessages);
+          this.aiQueryQuestion = '';
+        },
+      });
+  }
+
+  formatAiMessage(content: string): string {
+    if (!content) return '';
+    return (
+      content
+        // **bold**
+        .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
+        // ## Tiêu đề
+        .replace(/^##\s+(.+)$/gm, '<strong>$1</strong>')
+        // - bullet → li (bọc thô)
+        .replace(/^[-*]\s+(.+)$/gm, '• $1')
+        // Xuống dòng
+        .replace(/\n/g, '<br>')
+    );
+  }
+
+  private scrollAiToBottom(): void {
+    setTimeout(() => {
+      const el = document.querySelector<HTMLElement>('.ai-messages');
+      if (el) el.scrollTop = el.scrollHeight;
+    }, 30);
+  }
+
   loadRooms(): void {
     this.loadingRooms = true;
 
@@ -980,6 +1735,7 @@ export class ChatComponent implements OnInit, OnDestroy {
       this.socketService.leaveRoom(this.selectedRoomId);
     }
 
+    this.isAiRoom = false;
     this.selectedRoomId = room.roomId;
     this.selectedRoomType = room.roomType;
     this.selectedRoomLabel = this.roomLabel(room);
