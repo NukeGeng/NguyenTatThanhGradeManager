@@ -44,14 +44,60 @@ router.get("/", async (req, res, next) => {
 
     const query = {};
 
-    if (req.user.role !== "admin") {
+    if (req.user.role === "advisor") {
+      // Advisor sees only classes where their advisees are enrolled
+      const advisingStudentIds = (req.user.advisingStudentIds || []).map(
+        (item) => (item?._id ? String(item._id) : String(item)),
+      );
+
+      if (!advisingStudentIds.length) {
+        const payload = {
+          success: true,
+          data: [],
+          message: "Get classes successfully",
+        };
+        setRouteCacheEntry(cacheKey, payload, CLASS_LIST_CACHE_TTL_MS);
+        return res.status(200).json(payload);
+      }
+
+      const [directClassIds, curriculumClassIds] = await Promise.all([
+        Student.distinct("classId", {
+          _id: { $in: advisingStudentIds },
+          classId: { $exists: true, $ne: null },
+        }),
+        StudentCurriculum.distinct("registrations.classId", {
+          studentId: { $in: advisingStudentIds },
+          "registrations.classId": { $exists: true, $ne: null },
+        }),
+      ]);
+
+      const advisorClassIds = Array.from(
+        new Set(
+          [...directClassIds, ...curriculumClassIds]
+            .filter(Boolean)
+            .map((item) => String(item)),
+        ),
+      );
+
+      if (!advisorClassIds.length) {
+        const payload = {
+          success: true,
+          data: [],
+          message: "Get classes successfully",
+        };
+        setRouteCacheEntry(cacheKey, payload, CLASS_LIST_CACHE_TTL_MS);
+        return res.status(200).json(payload);
+      }
+
+      query._id = { $in: advisorClassIds };
+
+      if (departmentId) {
+        query.departmentId = departmentId;
+      }
+    } else if (req.user.role !== "admin") {
       const allowedDepartmentIds = (req.user.departmentIds || []).map((item) =>
         item?._id ? String(item._id) : String(item),
       );
-
-      query.departmentId = {
-        $in: allowedDepartmentIds,
-      };
 
       if (
         departmentId &&
@@ -62,6 +108,12 @@ router.get("/", async (req, res, next) => {
           message: "Bạn không có quyền xem khoa này",
         });
       }
+
+      // Teacher sees classes in their departments OR classes where they're the assigned teacher
+      query.$or = [
+        { departmentId: { $in: allowedDepartmentIds } },
+        { teacherId: req.user._id },
+      ];
     }
 
     if (departmentId) {
@@ -92,7 +144,14 @@ router.get("/", async (req, res, next) => {
         });
       }
 
-      query._id = { $in: classIds };
+      if (query._id) {
+        // Intersect with existing scope (e.g. advisor-scoped class IDs)
+        const existingIds = new Set((query._id.$in || []).map(String));
+        const intersected = classIds.filter((id) => existingIds.has(id));
+        query._id = { $in: intersected };
+      } else {
+        query._id = { $in: classIds };
+      }
     }
 
     const classes = await Class.find(query)

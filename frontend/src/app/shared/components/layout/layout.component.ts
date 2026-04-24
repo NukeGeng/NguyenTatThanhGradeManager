@@ -618,13 +618,23 @@ export class LayoutComponent implements OnInit {
       allowedRoles: ['admin', 'teacher', 'advisor'],
       showMessageBadge: true,
     },
-    { label: 'Lớp học', path: '/classes', icon: 'school', allowedRoles: ['admin', 'teacher'] },
-    { label: 'Học sinh', path: '/students', icon: 'users', allowedRoles: ['admin', 'teacher'] },
+    {
+      label: 'Lớp học',
+      path: '/classes',
+      icon: 'school',
+      allowedRoles: ['admin', 'teacher', 'advisor'],
+    },
+    {
+      label: 'Học sinh',
+      path: '/students',
+      icon: 'users',
+      allowedRoles: ['admin', 'teacher', 'advisor'],
+    },
     {
       label: 'Nhập điểm',
       path: '/grades',
       icon: 'book-open-check',
-      allowedRoles: ['admin', 'teacher'],
+      allowedRoles: ['admin', 'teacher', 'advisor'],
     },
     {
       label: 'Sinh viên của tôi',

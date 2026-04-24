@@ -144,6 +144,7 @@ router.get("/", async (req, res, next) => {
       if (
         normalizedDepartmentId &&
         req.user.role !== "admin" &&
+        req.user.role !== "advisor" &&
         !allowedDepartmentIds.includes(normalizedDepartmentId)
       ) {
         return res.status(403).json({
@@ -154,12 +155,18 @@ router.get("/", async (req, res, next) => {
 
       if (classId) {
         const classAccessQuery = { _id: classId };
-        if (req.user.role !== "admin") {
-          classAccessQuery.departmentId = { $in: allowedDepartmentIds };
+        if (req.user.role === "advisor") {
+          // Advisor can access any class their advisees are in — verified below via studentId filter
+        } else if (req.user.role !== "admin") {
+          classAccessQuery.$or = [
+            { departmentId: { $in: allowedDepartmentIds } },
+            { teacherId: req.user._id },
+          ];
         }
 
         if (normalizedDepartmentId) {
           classAccessQuery.departmentId = normalizedDepartmentId;
+          delete classAccessQuery.$or;
         }
 
         const classData = await Class.findOne(classAccessQuery).select("_id");
@@ -191,17 +198,42 @@ router.get("/", async (req, res, next) => {
           _id: { $in: Array.from(usedClassIds) },
         };
 
-        if (req.user.role !== "admin") {
-          classAccessQuery.departmentId = { $in: allowedDepartmentIds };
+        if (req.user.role === "advisor") {
+          // Advisor scope: only classes where their advisees are directly enrolled or registered
+          const advisingStudentIds = getAdvisingStudentIds(req.user);
+          const [advDirectIds, advCurriculumIds] = await Promise.all([
+            Student.distinct("classId", {
+              _id: { $in: advisingStudentIds },
+              classId: { $exists: true, $ne: null },
+            }),
+            StudentCurriculum.distinct("registrations.classId", {
+              studentId: { $in: advisingStudentIds },
+              "registrations.classId": { $exists: true, $ne: null },
+            }),
+          ]);
+          const advisorClassIdSet = new Set(
+            [...advDirectIds, ...advCurriculumIds].filter(Boolean).map(String),
+          );
+          candidateClassIds = Array.from(advisorClassIdSet).filter((id) =>
+            usedClassIds.has(id),
+          );
+        } else {
+          if (req.user.role !== "admin") {
+            classAccessQuery.$or = [
+              { departmentId: { $in: allowedDepartmentIds } },
+              { teacherId: req.user._id },
+            ];
+          }
+
+          if (normalizedDepartmentId) {
+            classAccessQuery.departmentId = normalizedDepartmentId;
+            delete classAccessQuery.$or;
+          }
+
+          const allowedClasses =
+            await Class.find(classAccessQuery).select("_id");
+          candidateClassIds = allowedClasses.map((item) => String(item._id));
         }
-
-        if (normalizedDepartmentId) {
-          classAccessQuery.departmentId = normalizedDepartmentId;
-        }
-
-        const allowedClasses = await Class.find(classAccessQuery).select("_id");
-
-        candidateClassIds = allowedClasses.map((item) => String(item._id));
       }
 
       if (candidateClassIds.length === 0) {
@@ -266,9 +298,10 @@ router.get("/", async (req, res, next) => {
       query._id = { $in: getAdvisingStudentIds(req.user) };
     } else if (!fromClasses && req.user.role !== "admin") {
       const classQuery = {
-        departmentId: {
-          $in: allowedDepartmentIds,
-        },
+        $or: [
+          { departmentId: { $in: allowedDepartmentIds } },
+          { teacherId: req.user._id },
+        ],
       };
 
       if (normalizedDepartmentId) {
@@ -301,11 +334,15 @@ router.get("/", async (req, res, next) => {
       if (req.user.role !== "admin") {
         const classAccessQuery = {
           _id: classId,
-          departmentId: { $in: allowedDepartmentIds },
+          $or: [
+            { departmentId: { $in: allowedDepartmentIds } },
+            { teacherId: req.user._id },
+          ],
         };
 
         if (normalizedDepartmentId) {
           classAccessQuery.departmentId = normalizedDepartmentId;
+          delete classAccessQuery.$or;
         }
 
         const classData = await Class.findOne(classAccessQuery).select("_id");

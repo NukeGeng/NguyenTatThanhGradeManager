@@ -20,10 +20,20 @@ import { finalize, forkJoin, map } from 'rxjs';
 import { ApiService } from '../../../core/services/api.service';
 import { ApiResponse, Class, SchoolYear } from '../../../shared/models/interfaces';
 
+interface GradePayloadPreview {
+  txScores: (number | null)[];
+  gkScore: number | null;
+  thScores: (number | null)[];
+  tktScore: number | null;
+  isDuThi: boolean;
+  isVangThi: boolean;
+}
+
 interface ImportPreviewValidRow {
   row: number;
   studentCode: string;
   studentName: string;
+  gradePayload: GradePayloadPreview;
 }
 
 interface ImportPreviewErrorRow {
@@ -229,6 +239,27 @@ interface ImportPresetParams {
                       <ng-container matColumnDef="studentName">
                         <th mat-header-cell *matHeaderCellDef>Họ tên</th>
                         <td mat-cell *matCellDef="let row">{{ row.studentName }}</td>
+                      </ng-container>
+
+                      <ng-container matColumnDef="txScores">
+                        <th mat-header-cell *matHeaderCellDef>Điểm TX</th>
+                        <td mat-cell *matCellDef="let row">
+                          {{ formatTxScores(row.gradePayload?.txScores) }}
+                        </td>
+                      </ng-container>
+
+                      <ng-container matColumnDef="gkScore">
+                        <th mat-header-cell *matHeaderCellDef>GK</th>
+                        <td mat-cell *matCellDef="let row">
+                          {{ row.gradePayload?.gkScore ?? '-' }}
+                        </td>
+                      </ng-container>
+
+                      <ng-container matColumnDef="tktScore">
+                        <th mat-header-cell *matHeaderCellDef>TKT</th>
+                        <td mat-cell *matCellDef="let row">
+                          {{ row.gradePayload?.tktScore ?? '-' }}
+                        </td>
                       </ng-container>
 
                       <tr mat-header-row *matHeaderRowDef="validColumns"></tr>
@@ -510,8 +541,21 @@ export class GradeImportComponent implements OnInit {
 
   @ViewChild('stepper') private stepper?: MatStepper;
 
-  readonly validColumns: string[] = ['row', 'studentCode', 'studentName'];
+  readonly validColumns: string[] = [
+    'row',
+    'studentCode',
+    'studentName',
+    'txScores',
+    'gkScore',
+    'tktScore',
+  ];
   readonly errorColumns: string[] = ['row', 'studentCode', 'error'];
+
+  formatTxScores(scores: (number | null)[] | undefined): string {
+    if (!scores?.length) return '-';
+    const nonNull = scores.filter((s) => s !== null);
+    return nonNull.length ? nonNull.join(' / ') : '-';
+  }
 
   readonly setupForm = this.fb.group({
     schoolYearId: this.fb.control<string>('', {

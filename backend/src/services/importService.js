@@ -30,7 +30,8 @@ const resolveRefId = (value) => {
     return String(value._id);
   }
 
-  return null;
+  // Handles Mongoose ObjectId instances (e.g. from .lean() results)
+  return String(value);
 };
 
 const getHeaderKey = (rawHeader) => {
@@ -141,6 +142,101 @@ const normalizeClassConfig = (classData) => {
   };
 };
 
+// Replicates Grade's pre('save') logic so insertMany (which skips hooks)
+// still persists correct computed fields: txAvg, thAvg, finalScore, gpa4, letterGrade
+const computeGradeFields = (doc) => {
+  const calcMean = (arr) => {
+    const valid = (arr || []).filter(
+      (v) => v !== null && v !== undefined && !Number.isNaN(Number(v)),
+    );
+    if (!valid.length) return 0;
+    return Number(
+      (valid.reduce((sum, v) => sum + Number(v), 0) / valid.length).toFixed(2),
+    );
+  };
+
+  const txAvg = calcMean(doc.txScores);
+  const thAvg = calcMean(doc.thScores);
+
+  if (
+    doc.tktScore === null ||
+    doc.tktScore === undefined ||
+    doc.tktScore === ""
+  ) {
+    return {
+      ...doc,
+      txAvg,
+      thAvg,
+      finalScore: null,
+      gpa4: null,
+      letterGrade: null,
+    };
+  }
+
+  const weights = doc.weights || {};
+  const gkScore = Number(doc.gkScore ?? 0);
+  const tktScore = Number(doc.tktScore ?? 0);
+  const finalScore =
+    txAvg * (Number(weights.tx || 0) / 100) +
+    gkScore * (Number(weights.gk || 0) / 100) +
+    thAvg * (Number(weights.th || 0) / 100) +
+    tktScore * (Number(weights.tkt || 0) / 100);
+
+  const roundedFinal = Number(finalScore.toFixed(2));
+
+  if (doc.isVangThi) {
+    return {
+      ...doc,
+      txAvg,
+      thAvg,
+      finalScore: roundedFinal,
+      letterGrade: "F",
+      gpa4: 0,
+    };
+  }
+
+  if (tktScore < 4) {
+    return {
+      ...doc,
+      txAvg,
+      thAvg,
+      finalScore: roundedFinal,
+      letterGrade: "F",
+      gpa4: 0,
+    };
+  }
+
+  if (tktScore === 4) {
+    return {
+      ...doc,
+      txAvg,
+      thAvg,
+      finalScore: roundedFinal,
+      letterGrade: "C",
+      gpa4: 2,
+    };
+  }
+
+  let letterGrade;
+  let gpa4;
+
+  if (roundedFinal >= 8.5) {
+    letterGrade = "A";
+    gpa4 = 4;
+  } else if (roundedFinal >= 7.0) {
+    letterGrade = "B";
+    gpa4 = 3;
+  } else if (roundedFinal >= 5.0) {
+    letterGrade = "C";
+    gpa4 = 2;
+  } else {
+    letterGrade = "F";
+    gpa4 = 0;
+  }
+
+  return { ...doc, txAvg, thAvg, finalScore: roundedFinal, letterGrade, gpa4 };
+};
+
 const getEnrolledStudentsByClassId = async (classId, studentCodes = []) => {
   const [directStudentIds, registeredStudentIds] = await Promise.all([
     Student.distinct("_id", { classId }),
@@ -178,12 +274,18 @@ const getEnrolledStudentsByClassId = async (classId, studentCodes = []) => {
 const parseExcelFile = (buffer) => {
   const workbook = XLSX.read(buffer, { type: "buffer" });
   const firstSheetName = workbook.SheetNames[0];
+  console.log(
+    `[Import] Sheet names: [${workbook.SheetNames.join(", ")}] | Using: ${firstSheetName}`,
+  );
   const sheet = workbook.Sheets[firstSheetName];
 
   const rows = XLSX.utils.sheet_to_json(sheet, {
     defval: null,
     raw: false,
   });
+  console.log(
+    `[Import] sheet_to_json: ${rows.length} rows | headers: ${rows[0] ? Object.keys(rows[0]).join(", ") : "none"}`,
+  );
 
   return rows.map((row, index) => {
     const mappedRow = {
@@ -255,6 +357,13 @@ const validateRows = async (rows, classData, semester, schoolYearId) => {
 
   const normalizedSemester = Number(semester);
   const classId = resolveRefId(classData?._id);
+
+  console.log(
+    `[Import] validateRows: rows=${rows.length}, semester=${semester}, schoolYearId=${schoolYearId}`,
+  );
+  console.log(
+    `[Import] classData._id=${classData?._id}, semester=${classData?.semester}, schoolYearId=${classData?.schoolYearId}`,
+  );
 
   if (!classId || !normalizedSemester || !schoolYearId) {
     return {
@@ -437,32 +546,69 @@ const validateRows = async (rows, classData, semester, schoolYearId) => {
 };
 
 const importValidRows = async (validRows, enteredBy) => {
-  const docs = validRows.map((item) => ({
-    ...item.gradePayload,
-    enteredBy,
-  }));
+  // Compute grade fields (txAvg, finalScore, gpa4, letterGrade) before insertMany
+  // because insertMany bypasses pre('save') hooks that normally compute them.
+  const docs = validRows.map((item) =>
+    computeGradeFields({ ...item.gradePayload, enteredBy }),
+  );
 
   if (docs.length === 0) {
     return { importedCount: 0, duplicateErrors: [] };
   }
 
+  console.log(
+    `[Import] Inserting ${docs.length} grade documents via bulkWrite upsert`,
+  );
+
   try {
-    const inserted = await Grade.insertMany(docs, { ordered: false });
-    return { importedCount: inserted.length, duplicateErrors: [] };
+    // Use updateOne with upsert instead of insertMany so that:
+    // 1. Existing grade records get their scores updated (re-import scenario)
+    // 2. New records are created if none exist
+    // This bypasses the pre('save') hook limitation of insertMany while allowing idempotent imports.
+    const bulkOps = docs.map((doc) => ({
+      updateOne: {
+        filter: { studentId: doc.studentId, classId: doc.classId },
+        update: { $set: doc },
+        upsert: true,
+      },
+    }));
+
+    const result = await Grade.bulkWrite(bulkOps, { ordered: false });
+    const importedCount = result.upsertedCount + result.modifiedCount;
+    console.log(
+      `[Import] bulkWrite success: ${result.upsertedCount} inserted, ${result.modifiedCount} updated`,
+    );
+    return { importedCount, duplicateErrors: [] };
   } catch (error) {
     if (!error?.writeErrors) {
+      console.error(
+        "[Import] Non-BulkWrite error during bulkWrite:",
+        error.message,
+        error.stack,
+      );
       throw error;
     }
 
-    const duplicateErrors = error.writeErrors
-      .filter((writeError) => writeError.code === 11000)
-      .map((writeError) => ({
+    const allWriteErrors = error.writeErrors.map((writeError) => {
+      const code = writeError.err?.code ?? writeError.code;
+      const errmsg = writeError.err?.errmsg ?? writeError.errmsg ?? "";
+      console.error(
+        `[Import] writeError[${writeError.index}]:`,
+        JSON.stringify({ code, errmsg }),
+      );
+      return {
         index: writeError.index,
-        message: "Đã tồn tại bảng điểm của sinh viên trong lớp học phần này",
-      }));
+        code,
+        message:
+          code === 11000
+            ? "Đã tồn tại bảng điểm của sinh viên trong lớp học phần này"
+            : `Lỗi lưu bản ghi: ${errmsg || `mã lỗi ${code}`}`,
+      };
+    });
 
     const importedCount = docs.length - error.writeErrors.length;
-    return { importedCount, duplicateErrors };
+    console.log(`[Import] importedCount after errors: ${importedCount}`);
+    return { importedCount, duplicateErrors: allWriteErrors };
   }
 };
 
@@ -550,7 +696,7 @@ const getTemplateOptionsByClassId = async (classId) => {
   }
 
   const classData = await Class.findById(classId)
-    .select("_id code name txCount weights departmentId")
+    .select("_id code name txCount weights departmentId teacherId")
     .lean();
 
   if (!classData) {
@@ -564,6 +710,7 @@ const getTemplateOptionsByClassId = async (classId) => {
     classCode: classData.code,
     className: classData.name || classData.code,
     departmentId: resolveRefId(classData.departmentId),
+    teacherId: resolveRefId(classData.teacherId),
     txCount: classConfig.txCount,
     thCount: classConfig.thCount,
     hasTh: classConfig.hasTh,

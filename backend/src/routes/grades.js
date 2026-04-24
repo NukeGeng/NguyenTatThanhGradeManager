@@ -56,6 +56,18 @@ const getAdvisingStudentIds = (user) =>
     item?._id ? String(item._id) : String(item),
   );
 
+// Returns true if the non-admin user can access this class:
+// either via their department assignment OR as the assigned teacher.
+const canAccessClass = (user, classDoc) => {
+  if (!classDoc) return false;
+  const allowedDepartmentIds = getAllowedDepartmentIds(user);
+  if (allowedDepartmentIds.includes(String(classDoc.departmentId))) return true;
+  const teacherId = classDoc.teacherId?._id
+    ? String(classDoc.teacherId._id)
+    : String(classDoc.teacherId || "");
+  return teacherId && teacherId === String(user._id);
+};
+
 const DASHBOARD_GRADE_LETTERS = ["A", "B", "C", "F"];
 const DASHBOARD_SEMESTERS = [1, 2, 3];
 
@@ -132,7 +144,7 @@ const populateGradeQuery = (query) =>
     .populate("studentId", "studentCode fullName classId")
     .populate(
       "classId",
-      "code name subjectId semester departmentId schoolYearId weights txCount",
+      "code name subjectId semester departmentId teacherId schoolYearId weights txCount",
     )
     .populate("subjectId", "_id code name credits coefficient")
     .populate("schoolYearId", "_id name isCurrent");
@@ -152,10 +164,7 @@ router.get("/import/template", async (req, res, next) => {
     }
 
     if (classId && req.user.role !== "admin") {
-      const allowedDepartmentIds = getAllowedDepartmentIds(req.user);
-      if (
-        !allowedDepartmentIds.includes(String(templateOptions.departmentId))
-      ) {
+      if (!canAccessClass(req.user, templateOptions)) {
         return res.status(403).json({
           success: false,
           message: "Bạn không có quyền tải mẫu import của lớp này",
@@ -205,7 +214,7 @@ router.post("/import/preview", async (req, res, next) => {
 
     const classData = await Class.findById(classId)
       .select(
-        "_id subjectId departmentId schoolYearId semester weights txCount",
+        "_id subjectId departmentId teacherId schoolYearId semester weights txCount",
       )
       .lean();
 
@@ -217,8 +226,7 @@ router.post("/import/preview", async (req, res, next) => {
     }
 
     if (req.user.role !== "admin") {
-      const allowedDepartmentIds = getAllowedDepartmentIds(req.user);
-      if (!allowedDepartmentIds.includes(String(classData.departmentId))) {
+      if (!canAccessClass(req.user, classData)) {
         return res.status(403).json({
           success: false,
           message: "Bạn không có quyền import điểm cho lớp này",
@@ -281,7 +289,7 @@ router.post("/import/excel", async (req, res, next) => {
 
     const classData = await Class.findById(classId)
       .select(
-        "_id subjectId departmentId schoolYearId semester weights txCount",
+        "_id subjectId departmentId teacherId schoolYearId semester weights txCount",
       )
       .lean();
 
@@ -293,8 +301,7 @@ router.post("/import/excel", async (req, res, next) => {
     }
 
     if (req.user.role !== "admin") {
-      const allowedDepartmentIds = getAllowedDepartmentIds(req.user);
-      if (!allowedDepartmentIds.includes(String(classData.departmentId))) {
+      if (!canAccessClass(req.user, classData)) {
         return res.status(403).json({
           success: false,
           message: "Bạn không có quyền import điểm cho lớp này",
@@ -428,9 +435,7 @@ router.post("/", async (req, res, next) => {
     }
 
     if (req.user.role !== "admin") {
-      const allowedDepartmentIds = getAllowedDepartmentIds(req.user);
-
-      if (!allowedDepartmentIds.includes(String(classData.departmentId))) {
+      if (!canAccessClass(req.user, classData)) {
         return res.status(403).json({
           success: false,
           message: "Bạn không có quyền nhập điểm cho lớp này",
@@ -523,12 +528,11 @@ router.put("/:id", async (req, res, next) => {
     }
 
     const classData = await Class.findById(grade.classId).select(
-      "departmentId",
+      "departmentId teacherId",
     );
 
     if (req.user.role !== "admin") {
-      const allowedDepartmentIds = getAllowedDepartmentIds(req.user);
-      if (!allowedDepartmentIds.includes(String(classData?.departmentId))) {
+      if (!canAccessClass(req.user, classData)) {
         return res.status(403).json({
           success: false,
           message: "Bạn không có quyền cập nhật điểm cho lớp này",
@@ -604,13 +608,50 @@ router.get("/summary/dashboard", async (req, res, next) => {
     const allowedDepartmentIds =
       req.user.role === "admin" ? [] : getAllowedDepartmentIds(req.user);
 
-    if (req.user.role !== "admin") {
-      classScopeQuery.departmentId = { $in: allowedDepartmentIds };
+    // Advisor: scope classes to those where their advisees are enrolled
+    const isAdvisor = req.user.role === "advisor";
+    let advisorClassIdSet = null;
+
+    if (isAdvisor) {
+      const advisingStudentIds = getAdvisingStudentIds(req.user);
+      if (advisingStudentIds.length) {
+        const [directClassIds, curriculumClassIds] = await Promise.all([
+          Student.distinct("classId", {
+            _id: { $in: advisingStudentIds },
+            classId: { $exists: true, $ne: null },
+          }),
+          StudentCurriculum.distinct("registrations.classId", {
+            studentId: { $in: advisingStudentIds },
+            "registrations.classId": { $exists: true, $ne: null },
+          }),
+        ]);
+        advisorClassIdSet = new Set(
+          [...directClassIds, ...curriculumClassIds]
+            .filter(Boolean)
+            .map(String),
+        );
+      } else {
+        advisorClassIdSet = new Set();
+      }
+
+      if (advisorClassIdSet.size) {
+        classScopeQuery._id = { $in: Array.from(advisorClassIdSet) };
+      } else {
+        classScopeQuery._id = { $in: [] };
+      }
+    } else if (req.user.role !== "admin") {
+      // Teacher: see classes in their departments OR classes where they're the assigned teacher
+      classScopeQuery.$or = [
+        { departmentId: { $in: allowedDepartmentIds } },
+        { teacherId: req.user._id },
+      ];
     }
 
     if (normalizedDepartmentId) {
       if (
         req.user.role !== "admin" &&
+        !isAdvisor &&
+        allowedDepartmentIds.length > 0 &&
         !allowedDepartmentIds.includes(normalizedDepartmentId)
       ) {
         return res.status(403).json({
@@ -619,7 +660,17 @@ router.get("/summary/dashboard", async (req, res, next) => {
         });
       }
 
-      classScopeQuery.departmentId = normalizedDepartmentId;
+      if (!isAdvisor) {
+        // Narrow teacher scope to this specific department (intersect with teacherId scope)
+        classScopeQuery.$or = [
+          { departmentId: normalizedDepartmentId },
+          { teacherId: req.user._id, departmentId: normalizedDepartmentId },
+        ];
+        if (req.user.role === "admin") {
+          delete classScopeQuery.$or;
+          classScopeQuery.departmentId = normalizedDepartmentId;
+        }
+      }
     }
 
     if (normalizedSemester) {
@@ -629,9 +680,11 @@ router.get("/summary/dashboard", async (req, res, next) => {
     const [departmentDocs, classesInScope, allHomeClassCodes] =
       await Promise.all([
         Department.find(
-          req.user.role === "admin"
+          req.user.role === "admin" || isAdvisor
             ? {}
-            : { _id: { $in: allowedDepartmentIds } },
+            : allowedDepartmentIds.length
+              ? { _id: { $in: allowedDepartmentIds } }
+              : {}, // teacher with no depts: show all for display
         )
           .select("_id code name")
           .sort({ code: 1 })
@@ -1072,13 +1125,6 @@ router.get("/student/:studentId", async (req, res, next) => {
 
 router.get("/class/:classId", async (req, res, next) => {
   try {
-    if (req.user.role === "advisor") {
-      return res.status(403).json({
-        success: false,
-        message: "Advisor không có quyền xem bảng điểm toàn lớp",
-      });
-    }
-
     const { semester, schoolYearId } = req.query;
     const query = {
       classId: req.params.classId,
@@ -1107,10 +1153,12 @@ router.get("/class/:classId", async (req, res, next) => {
       });
     }
 
-    if (req.user.role !== "admin") {
-      const allowedDepartmentIds = getAllowedDepartmentIds(req.user);
-
-      if (!allowedDepartmentIds.includes(String(classData.departmentId))) {
+    if (req.user.role === "advisor") {
+      // Advisor can view grades only for their advisees in this class
+      const advisingStudentIds = getAdvisingStudentIds(req.user);
+      query.studentId = { $in: advisingStudentIds };
+    } else if (req.user.role !== "admin") {
+      if (!canAccessClass(req.user, classData)) {
         return res.status(403).json({
           success: false,
           message: "Bạn không có quyền xem điểm của lớp này",
@@ -1144,8 +1192,7 @@ router.get("/:id", async (req, res, next) => {
     }
 
     if (req.user.role !== "admin") {
-      const allowedDepartmentIds = getAllowedDepartmentIds(req.user);
-      if (!allowedDepartmentIds.includes(String(grade.classId?.departmentId))) {
+      if (!canAccessClass(req.user, grade.classId)) {
         return res.status(403).json({
           success: false,
           message: "Bạn không có quyền xem bảng điểm này",

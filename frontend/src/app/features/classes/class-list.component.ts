@@ -19,9 +19,10 @@ import { MatSelectModule } from '@angular/material/select';
 import { MatSnackBar, MatSnackBarModule } from '@angular/material/snack-bar';
 import { MatTableModule } from '@angular/material/table';
 import { LucideAngularModule } from 'lucide-angular';
-import { finalize, forkJoin, map } from 'rxjs';
+import { catchError, finalize, forkJoin, map, of } from 'rxjs';
 
 import { ApiService } from '../../core/services/api.service';
+import { AuthService } from '../../core/services/auth.service';
 import {
   ApiResponse,
   Class,
@@ -82,7 +83,13 @@ interface ClassUpsertPayload {
           <p class="subtitle">Theo dõi theo năm học, học kỳ, khoa và trạng thái mở lớp.</p>
         </div>
 
-        <button mat-flat-button type="button" class="btn-primary" (click)="openCreateDialog()">
+        <button
+          *ngIf="isAdmin"
+          mat-flat-button
+          type="button"
+          class="btn-primary"
+          (click)="openCreateDialog()"
+        >
           <lucide-icon name="plus" [size]="16"></lucide-icon>
           Thêm lớp
         </button>
@@ -512,14 +519,19 @@ interface ClassUpsertPayload {
 })
 export class ClassListComponent implements OnInit {
   private readonly apiService = inject(ApiService);
+  private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
   private readonly dialog = inject(MatDialog);
   private readonly snackBar = inject(MatSnackBar);
   private readonly destroyRef = inject(DestroyRef);
 
+  get isAdmin(): boolean {
+    return this.authService.getCurrentRole() === 'admin';
+  }
+
   get displayedColumns(): string[] {
     if (this.selectedClassType === 'homeroom') {
-      return [
+      const cols = [
         'index',
         'code',
         'name',
@@ -528,10 +540,11 @@ export class ClassListComponent implements OnInit {
         'semester',
         'studentCount',
         'status',
-        'actions',
       ];
+      if (this.isAdmin) cols.push('actions');
+      return cols;
     }
-    return [
+    const cols = [
       'index',
       'code',
       'name',
@@ -543,8 +556,9 @@ export class ClassListComponent implements OnInit {
       'weights',
       'teacher',
       'status',
-      'actions',
     ];
+    if (this.isAdmin) cols.push('actions');
+    return cols;
   }
 
   classes: Class[] = [];
@@ -574,21 +588,30 @@ export class ClassListComponent implements OnInit {
     this.errorMessage = '';
 
     forkJoin({
-      classes: this.apiService
-        .get<ApiResponse<Class[]>>('/classes')
-        .pipe(map((response) => response.data ?? [])),
-      departments: this.apiService
-        .get<ApiResponse<Department[]>>('/departments')
-        .pipe(map((response) => response.data ?? [])),
-      schoolYears: this.apiService
-        .get<ApiResponse<SchoolYear[]>>('/school-years')
-        .pipe(map((response) => response.data ?? [])),
-      subjects: this.apiService
-        .get<ApiResponse<Subject[]>>('/subjects', { isActive: false })
-        .pipe(map((response) => response.data ?? [])),
-      users: this.apiService
-        .get<ApiResponse<User[]>>('/users')
-        .pipe(map((response) => response.data ?? [])),
+      classes: this.apiService.get<ApiResponse<Class[]>>('/classes').pipe(
+        map((response) => response.data ?? []),
+        catchError(() => of([])),
+      ),
+      departments: this.apiService.get<ApiResponse<Department[]>>('/departments').pipe(
+        map((response) => response.data ?? []),
+        catchError(() => of([])),
+      ),
+      schoolYears: this.apiService.get<ApiResponse<SchoolYear[]>>('/school-years').pipe(
+        map((response) => response.data ?? []),
+        catchError(() => of([])),
+      ),
+      subjects: this.isAdmin
+        ? this.apiService.get<ApiResponse<Subject[]>>('/subjects', { isActive: false }).pipe(
+            map((response) => response.data ?? []),
+            catchError(() => of([])),
+          )
+        : of([] as Subject[]),
+      users: this.isAdmin
+        ? this.apiService.get<ApiResponse<User[]>>('/users').pipe(
+            map((response) => response.data ?? []),
+            catchError(() => of([])),
+          )
+        : of([] as User[]),
     })
       .pipe(
         finalize(() => {
